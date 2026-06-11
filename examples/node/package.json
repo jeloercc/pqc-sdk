@@ -1,0 +1,12 @@
+{
+  "name": "@pqc-sdk/example-node",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@pqc-sdk/core": "workspace:*"
+  }
+}

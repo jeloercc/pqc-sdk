@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "start": "deno run --allow-read main.ts"
+  },
+  "imports": {
+    "@pqc-sdk/core": "../../packages/core/dist/index.js",
+    "@noble/ciphers/aes.js": "npm:@noble/ciphers@^2.2.0/aes.js",
+    "@noble/post-quantum/ml-kem.js": "npm:@noble/post-quantum@^0.6.1/ml-kem.js",
+    "@noble/post-quantum/ml-dsa.js": "npm:@noble/post-quantum@^0.6.1/ml-dsa.js",
+    "@noble/post-quantum/utils.js": "npm:@noble/post-quantum@^0.6.1/utils.js"
+  }
+}

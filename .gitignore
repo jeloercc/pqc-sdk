@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+.vitepress/cache/
+.vitepress/dist/
+apps/docs/api/
+apps/docs/compatibility.md
+.wrangler/
+*.log
+*.tsbuildinfo
+.env
+.env.*
+.DS_Store
+.claude/settings.local.json

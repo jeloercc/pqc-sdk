@@ -1,0 +1,24 @@
+{
+  "name": "@pqc-sdk/docs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/sync.mjs && typedoc",
+    "dev": "vitepress dev",
+    "build": "node scripts/sync.mjs && typedoc && vitepress build",
+    "preview": "vitepress preview"
+  },
+  "dependencies": {
+    "@pqc-sdk/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@shikijs/vitepress-twoslash": "^3.0.0",
+    "@types/node": "^22.15.29",
+    "typedoc": "^0.28.0",
+    "typedoc-plugin-markdown": "^4.6.0",
+    "typedoc-vitepress-theme": "^1.1.0",
+    "typescript": "^5.8.3",
+    "vitepress": "^1.6.3"
+  }
+}
