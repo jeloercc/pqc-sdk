@@ -29,7 +29,7 @@
     "vitest": "^3.2.6"
   },
   "license": "MIT",
-  "homepage": "https://github.com/jeloercc/pqc-sdk#readme",
+  "homepage": "https://jeloercc.github.io/pqc-sdk/",
   "bugs": "https://github.com/jeloercc/pqc-sdk/issues",
   "publishConfig": {
     "access": "public"

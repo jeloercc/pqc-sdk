@@ -56,9 +56,12 @@ Node 24, x86_64 (mensajes de 1 KB):
 
 ## Documentación
 
-- [Quickstart de 5 minutos](https://github.com/jeloercc/pqc-sdk/tree/main/apps/docs/guide/quickstart.md)
-- [Cifrado híbrido KEM+AES, explicado](https://github.com/jeloercc/pqc-sdk/tree/main/apps/docs/guide/hybrid-encryption.md)
-- [Compatibilidad detallada](https://github.com/jeloercc/pqc-sdk/tree/main/docs/compatibility.md)
+Documentación completa en **[jeloercc.github.io/pqc-sdk](https://jeloercc.github.io/pqc-sdk/)**.
+
+- [Quickstart de 5 minutos](https://jeloercc.github.io/pqc-sdk/guide/quickstart)
+- [Cifrado híbrido KEM+AES, explicado](https://jeloercc.github.io/pqc-sdk/guide/hybrid-encryption)
+- [Compatibilidad detallada](https://jeloercc.github.io/pqc-sdk/compatibility)
+- [Referencia de API](https://jeloercc.github.io/pqc-sdk/api/)
 
 ## Seguridad
 
