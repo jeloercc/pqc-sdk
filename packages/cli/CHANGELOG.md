@@ -1,5 +1,18 @@
 # @pqc-sdk/cli
 
+## 0.1.2
+
+### Patch Changes
+
+- 82bbac3: Translate all user-facing text to English: CLI command and flag descriptions,
+  CLI output (success messages, warnings, audit report, errors), files generated
+  by `pqc init`, every typed error message in core, the full public API JSDoc
+  (including examples, which feed the generated API reference), package
+  descriptions, and both READMEs. Error `code` values are unchanged, so programs
+  handling `PqcError` by code are unaffected.
+- Updated dependencies [82bbac3]
+  - @pqc-sdk/core@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
