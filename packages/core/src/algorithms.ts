@@ -54,7 +54,7 @@ export const ALGORITHMS: Record<Algorithm, KemSpec | SignerSpec> = {
 export function getAlgorithm(algorithm: string): KemSpec | SignerSpec {
   const spec = (ALGORITHMS as Record<string, KemSpec | SignerSpec>)[algorithm];
   if (!spec) {
-    throw new PqcError('UNSUPPORTED_ALGORITHM', `Algoritmo no soportado: ${algorithm}`);
+    throw new PqcError('UNSUPPORTED_ALGORITHM', `Unsupported algorithm: ${algorithm}`);
   }
   return spec;
 }
@@ -63,7 +63,7 @@ export function keyLengthFor(spec: KemSpec | SignerSpec, use: KeyUse): number {
   return use === 'public' ? spec.publicKeyLength : spec.secretKeyLength;
 }
 
-/** Valida algoritmo, uso y longitud de una key antes de operar con ella. */
+/** Validates a key's algorithm, use and length before operating with it. */
 export function requireKey<K extends 'kem' | 'signer'>(
   key: PqcKey,
   kind: K,
@@ -74,16 +74,16 @@ export function requireKey<K extends 'kem' | 'signer'>(
   if (spec.kind !== kind) {
     throw new PqcError(
       'WRONG_ALGORITHM',
-      `${operation} requiere una key ${kind === 'kem' ? 'ML-KEM' : 'ML-DSA'}, recibió ${key.algorithm}`,
+      `${operation} requires an ${kind === 'kem' ? 'ML-KEM' : 'ML-DSA'} key, got ${key.algorithm}`,
     );
   }
   if (key.use !== use) {
-    throw new PqcError('WRONG_KEY_USE', `${operation} requiere la key ${use}, recibió ${key.use}`);
+    throw new PqcError('WRONG_KEY_USE', `${operation} requires the ${use} key, got ${key.use}`);
   }
   if (key.bytes.length !== keyLengthFor(spec, use)) {
     throw new PqcError(
       'INVALID_KEY',
-      `Key ${key.algorithm} ${use} con longitud inválida: ${key.bytes.length}`,
+      `${key.algorithm} ${use} key has invalid length: ${key.bytes.length}`,
     );
   }
   return spec as K extends 'kem' ? KemSpec : SignerSpec;

@@ -4,7 +4,7 @@ import { PqcError } from './errors.js';
 import { pqc } from './index.js';
 
 describe('pqc.keys.generate', () => {
-  it('genera un par ML-KEM-768 por defecto', async () => {
+  it('generates an ML-KEM-768 pair by default', async () => {
     const pair = await pqc.keys.generate();
 
     expect(pair.algorithm).toBe('ml-kem-768');
@@ -15,7 +15,7 @@ describe('pqc.keys.generate', () => {
     expect(pair.secretKey.bytes).toHaveLength(2400);
   });
 
-  it('genera un par ML-DSA-65 cuando se pide', async () => {
+  it('generates an ML-DSA-65 pair when requested', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
 
     expect(pair.algorithm).toBe('ml-dsa-65');
@@ -23,30 +23,30 @@ describe('pqc.keys.generate', () => {
     expect(pair.secretKey.bytes).toHaveLength(4032);
   });
 
-  it('genera pares distintos en cada llamada', async () => {
+  it('generates a different pair on every call', async () => {
     const a = await pqc.keys.generate();
     const b = await pqc.keys.generate();
 
     expect(Buffer.from(a.publicKey.bytes).equals(Buffer.from(b.publicKey.bytes))).toBe(false);
   });
 
-  it('rechaza algoritmos desconocidos', async () => {
+  it('rejects unknown algorithms', async () => {
     await expect(
-      // @ts-expect-error algoritmo inválido a propósito
+      // @ts-expect-error invalid algorithm on purpose
       pqc.keys.generate({ algorithm: 'rsa-2048' }),
     ).rejects.toThrow(PqcError);
   });
 });
 
-describe('pqc.keys serialización', () => {
-  it('serializa a base64url con metadata de algoritmo y uso', async () => {
+describe('pqc.keys serialization', () => {
+  it('serializes to base64url with algorithm and use metadata', async () => {
     const pair = await pqc.keys.generate();
     const serialized = pqc.keys.serialize(pair.publicKey);
 
     expect(serialized).toMatch(/^pqcv1\.ml-kem-768\.public\.[A-Za-z0-9_-]+$/);
   });
 
-  it('roundtrip serialize → deserialize conserva la key', async () => {
+  it('serialize → deserialize roundtrip preserves the key', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
 
     for (const key of [pair.publicKey, pair.secretKey]) {
@@ -57,9 +57,9 @@ describe('pqc.keys serialización', () => {
     }
   });
 
-  it('rechaza strings con formato inválido', () => {
+  it('rejects strings with an invalid format', () => {
     for (const bad of [
-      'no-es-una-key',
+      'not-a-key',
       'pqcv9.ml-kem-768.public.AAAA',
       'pqcv1.rsa-2048.public.AAAA',
       'pqcv1.ml-kem-768.banana.AAAA',
@@ -69,7 +69,7 @@ describe('pqc.keys serialización', () => {
     }
   });
 
-  it('rechaza keys con longitud incorrecta para el algoritmo', () => {
+  it('rejects keys with the wrong length for the algorithm', () => {
     expect(() => pqc.keys.deserialize('pqcv1.ml-kem-768.public.AAAA')).toThrow(PqcError);
   });
 });

@@ -5,9 +5,10 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/%40pqc-sdk%2Fcore)](https://bundlephobia.com/package/@pqc-sdk/core)
 [![license](https://img.shields.io/npm/l/%40pqc-sdk%2Fcore)](./LICENSE)
 
-Criptografía post-cuántica para JS/TS con defaults seguros y cero configuración.
-**ML-KEM-768** (FIPS 203) + AES-256-GCM para cifrado híbrido, **ML-DSA-65**
-(FIPS 204) para firmas. Validado contra los test vectors oficiales NIST ACVP.
+Post-quantum cryptography for JS/TS with safe defaults and zero configuration.
+**ML-KEM-768** (FIPS 203) + AES-256-GCM for hybrid encryption, **ML-DSA-65**
+(FIPS 204) for signatures. Validated against the official NIST ACVP test
+vectors.
 
 ```bash
 npm install @pqc-sdk/core
@@ -17,60 +18,61 @@ npm install @pqc-sdk/core
 import { pqc } from '@pqc-sdk/core';
 
 const pair = await pqc.keys.generate();
-const ciphertext = await pqc.encrypt('secreto', pair.publicKey);
+const ciphertext = await pqc.encrypt('secret', pair.publicKey);
 const plaintext = await pqc.decrypt(ciphertext, pair.secretKey);
 
 const signer = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
-const signature = await pqc.sign('documento', signer.secretKey);
-const valid = await pqc.verify('documento', signature, signer.publicKey);
+const signature = await pqc.sign('document', signer.secretKey);
+const valid = await pqc.verify('document', signature, signer.publicKey);
 
-console.log(new TextDecoder().decode(plaintext), valid); // "secreto" true
+console.log(new TextDecoder().decode(plaintext), valid); // "secret" true
 ```
 
-## Compatibilidad
+## Compatibility
 
-| Runtime            | Soporte | Notas                                         |
-| ------------------ | ------- | --------------------------------------------- |
-| Node 20+           | ✅      | ESM y CJS                                     |
-| Cloudflare Workers | ✅      | Sin `nodejs_compat`; ~20 KB gzip en el bundle |
-| Deno 2+            | ✅      | `npm:@pqc-sdk/core`                           |
-| Bun                | ✅      |                                               |
-| React Native       | ✅      | Requiere `react-native-get-random-values`     |
-| Navegadores        | ✅      | Cualquier target ES2022 con WebCrypto         |
+| Runtime            | Support | Notes                                     |
+| ------------------ | ------- | ----------------------------------------- |
+| Node 20+           | ✅      | ESM and CJS                               |
+| Cloudflare Workers | ✅      | No `nodejs_compat`; ~20 KB gzip in bundle |
+| Deno 2+            | ✅      | `npm:@pqc-sdk/core`                       |
+| Bun                | ✅      |                                           |
+| React Native       | ✅      | Requires `react-native-get-random-values` |
+| Browsers           | ✅      | Any ES2022 target with WebCrypto          |
 
-Sin WASM ni addons nativos: TypeScript puro sobre
+No WASM or native addons: pure TypeScript on top of
 [@noble/post-quantum](https://github.com/paulmillr/noble-post-quantum).
 
 ## Benchmarks
 
-Node 24, x86_64 (mensajes de 1 KB):
+Node 24, x86_64 (1 KB messages):
 
-| Operación         | Tiempo     | Throughput |
+| Operation         | Time       | Throughput |
 | ----------------- | ---------- | ---------- |
-| keygen ML-KEM-768 | 1,3 ms/op  | 768 ops/s  |
-| encrypt           | 1,7 ms/op  | 585 ops/s  |
-| decrypt           | 2,3 ms/op  | 440 ops/s  |
-| keygen ML-DSA-65  | 4,8 ms/op  | 210 ops/s  |
-| sign              | 20,2 ms/op | 50 ops/s   |
-| verify            | 5,1 ms/op  | 195 ops/s  |
+| keygen ML-KEM-768 | 1.3 ms/op  | 768 ops/s  |
+| encrypt           | 1.7 ms/op  | 585 ops/s  |
+| decrypt           | 2.3 ms/op  | 440 ops/s  |
+| keygen ML-DSA-65  | 4.8 ms/op  | 210 ops/s  |
+| sign              | 20.2 ms/op | 50 ops/s   |
+| verify            | 5.1 ms/op  | 195 ops/s  |
 
-## Documentación
+## Documentation
 
-Documentación completa en **[jeloercc.github.io/pqc-sdk](https://jeloercc.github.io/pqc-sdk/)**.
+Full documentation at **[jeloercc.github.io/pqc-sdk](https://jeloercc.github.io/pqc-sdk/)**.
 
-- [Quickstart de 5 minutos](https://jeloercc.github.io/pqc-sdk/guide/quickstart)
-- [Cifrado híbrido KEM+AES, explicado](https://jeloercc.github.io/pqc-sdk/guide/hybrid-encryption)
-- [Compatibilidad detallada](https://jeloercc.github.io/pqc-sdk/compatibility)
-- [Referencia de API](https://jeloercc.github.io/pqc-sdk/api/)
+- [5-minute quickstart](https://jeloercc.github.io/pqc-sdk/guide/quickstart)
+- [Hybrid KEM+AES encryption, explained](https://jeloercc.github.io/pqc-sdk/guide/hybrid-encryption)
+- [Detailed compatibility](https://jeloercc.github.io/pqc-sdk/compatibility)
+- [API reference](https://jeloercc.github.io/pqc-sdk/api/)
 
-## Seguridad
+## Security
 
-- Nunca implementamos primitivas: ML-KEM/ML-DSA vienen de `@noble/post-quantum`
-  y AES-GCM de `@noble/ciphers`.
-- `@noble/post-quantum` no tiene aún auditoría independiente (self-audit
-  04/2026). Como todo JS, sin garantías constant-time estrictas.
-- Reportes de seguridad: abrí un issue privado o escribí al maintainer.
+- We never implement primitives: ML-KEM/ML-DSA come from
+  `@noble/post-quantum` and AES-GCM from `@noble/ciphers`.
+- `@noble/post-quantum` has no independent audit yet (self-audit 04/2026).
+  As with all JS, there are no strict constant-time guarantees.
+- Security reports: see [SECURITY.md](https://github.com/jeloercc/pqc-sdk/blob/main/SECURITY.md) —
+  please do not open public issues.
 
-## Licencia
+## License
 
 [MIT](./LICENSE)
