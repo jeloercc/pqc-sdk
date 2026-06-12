@@ -1,0 +1,19 @@
+{
+  "name": "@pqc-sdk/example-hermes-standalone",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild index.js --bundle --format=iife --target=es2020 --outfile=dist/bundle.es2020.js && babel dist/bundle.es2020.js --plugins @babel/plugin-transform-classes --compact false -o dist/bundle.js",
+    "start": "pnpm run build && ${HERMES_BIN:-hermes} dist/bundle.js"
+  },
+  "dependencies": {
+    "@pqc-sdk/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.29.7",
+    "@babel/core": "^7.29.7",
+    "@babel/plugin-transform-classes": "^7.29.7",
+    "esbuild": "^0.25.5"
+  }
+}
