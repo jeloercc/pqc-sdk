@@ -1,10 +1,15 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { SUPPORTED_ALGORITHMS, pqc, version } from './index.js';
 
 describe('@pqc-sdk/core', () => {
-  it('expone la versión del SDK', () => {
-    expect(version).toBe('0.0.1');
+  it('expone la versión del package.json', () => {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      version: string;
+    };
+    expect(version).toBe(pkg.version);
   });
 
   it('lista los algoritmos implementados', () => {
