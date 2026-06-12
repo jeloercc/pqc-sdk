@@ -4,9 +4,9 @@ import { PqcError } from './errors.js';
 import { pqc } from './index.js';
 
 describe('pqc.encrypt / pqc.decrypt', () => {
-  it('roundtrip con Uint8Array', async () => {
+  it('roundtrips a Uint8Array', async () => {
     const pair = await pqc.keys.generate();
-    const data = new TextEncoder().encode('mensaje secreto');
+    const data = new TextEncoder().encode('secret message');
 
     const ciphertext = await pqc.encrypt(data, pair.publicKey);
     const plaintext = await pqc.decrypt(ciphertext, pair.secretKey);
@@ -14,25 +14,25 @@ describe('pqc.encrypt / pqc.decrypt', () => {
     expect(Buffer.from(plaintext).equals(Buffer.from(data))).toBe(true);
   });
 
-  it('acepta strings y los cifra como UTF-8', async () => {
+  it('accepts strings and encrypts them as UTF-8', async () => {
     const pair = await pqc.keys.generate();
 
-    const ciphertext = await pqc.encrypt('hola PQC ✓', pair.publicKey);
+    const ciphertext = await pqc.encrypt('hello PQC ✓', pair.publicKey);
     const plaintext = await pqc.decrypt(ciphertext, pair.secretKey);
 
-    expect(new TextDecoder().decode(plaintext)).toBe('hola PQC ✓');
+    expect(new TextDecoder().decode(plaintext)).toBe('hello PQC ✓');
   });
 
-  it('produce ciphertexts distintos para el mismo mensaje', async () => {
+  it('produces different ciphertexts for the same message', async () => {
     const pair = await pqc.keys.generate();
 
-    const a = await pqc.encrypt('mismo mensaje', pair.publicKey);
-    const b = await pqc.encrypt('mismo mensaje', pair.publicKey);
+    const a = await pqc.encrypt('same message', pair.publicKey);
+    const b = await pqc.encrypt('same message', pair.publicKey);
 
     expect(Buffer.from(a).equals(Buffer.from(b))).toBe(false);
   });
 
-  it('cifra mensajes vacíos y binarios grandes', async () => {
+  it('encrypts empty messages and large binaries', async () => {
     const pair = await pqc.keys.generate();
     const big = new Uint8Array(100_000).map((_, i) => i % 251);
 
@@ -42,25 +42,25 @@ describe('pqc.encrypt / pqc.decrypt', () => {
     }
   });
 
-  it('rechaza encrypt con una key que no es ML-KEM', async () => {
+  it('rejects encrypt with a non-ML-KEM key', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
 
-    // @ts-expect-error key de firma usada para cifrar a propósito
+    // @ts-expect-error signing key used for encryption on purpose
     await expect(pqc.encrypt('x', pair.publicKey)).rejects.toMatchObject({
       code: 'WRONG_ALGORITHM',
     });
   });
 
-  it('rechaza encrypt con la secret key', async () => {
+  it('rejects encrypt with the secret key', async () => {
     const pair = await pqc.keys.generate();
 
-    // @ts-expect-error secret key donde va public key a propósito
+    // @ts-expect-error secret key where the public key belongs, on purpose
     await expect(pqc.encrypt('x', pair.secretKey)).rejects.toThrow(PqcError);
   });
 
-  it('falla con DECRYPTION_FAILED si el ciphertext fue manipulado', async () => {
+  it('fails with DECRYPTION_FAILED if the ciphertext was tampered with', async () => {
     const pair = await pqc.keys.generate();
-    const ciphertext = await pqc.encrypt('dato íntegro', pair.publicKey);
+    const ciphertext = await pqc.encrypt('intact data', pair.publicKey);
 
     const tampered = new Uint8Array(ciphertext);
     const lastByte = tampered.length - 1;
@@ -71,17 +71,17 @@ describe('pqc.encrypt / pqc.decrypt', () => {
     });
   });
 
-  it('falla con DECRYPTION_FAILED si se usa otra secret key', async () => {
+  it('fails with DECRYPTION_FAILED when using another secret key', async () => {
     const alice = await pqc.keys.generate();
     const eve = await pqc.keys.generate();
-    const ciphertext = await pqc.encrypt('solo para alice', alice.publicKey);
+    const ciphertext = await pqc.encrypt('for alice only', alice.publicKey);
 
     await expect(pqc.decrypt(ciphertext, eve.secretKey)).rejects.toMatchObject({
       code: 'DECRYPTION_FAILED',
     });
   });
 
-  it('rechaza ciphertexts truncados o con header desconocido', async () => {
+  it('rejects truncated ciphertexts or unknown headers', async () => {
     const pair = await pqc.keys.generate();
 
     await expect(pqc.decrypt(new Uint8Array([1, 1, 2, 3]), pair.secretKey)).rejects.toMatchObject({
