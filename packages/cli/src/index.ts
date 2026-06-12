@@ -4,14 +4,14 @@ import { audit } from './commands/audit.js';
 import { init } from './commands/init.js';
 import { keygen } from './commands/keygen.js';
 
-// Inyectada por tsup (`define` en tsup.config.ts) desde el package.json en build time.
+// Injected by tsup (`define` in tsup.config.ts) from package.json at build time.
 declare const __PQC_CLI_VERSION__: string;
 
 const main = defineCommand({
   meta: {
     name: 'pqc',
     version: __PQC_CLI_VERSION__,
-    description: 'CLI del SDK de criptografía post-cuántica (@pqc-sdk/core)',
+    description: 'CLI for the post-quantum cryptography SDK (@pqc-sdk/core)',
   },
   subCommands: {
     init,

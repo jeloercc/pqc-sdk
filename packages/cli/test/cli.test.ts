@@ -18,7 +18,7 @@ interface CliResult {
 }
 
 async function runCli(args: string[], cwd: string): Promise<CliResult> {
-  // Entorno sin TTY ni señales de CI: picocolors debe desactivar los colores.
+  // Environment without TTY or CI signals: picocolors must disable colors.
   const env = { ...process.env };
   delete env.CI;
   delete env.FORCE_COLOR;
@@ -34,13 +34,13 @@ async function runCli(args: string[], cwd: string): Promise<CliResult> {
 
 const freshDir = () => mkdtemp(join(tmpdir(), 'pqc-cli-'));
 
-describe('binario pqc', () => {
-  it('tiene shebang para ejecutarse vía npx', async () => {
+describe('pqc binary', () => {
+  it('has a shebang so it runs via npx', async () => {
     const dist = await readFile(CLI, 'utf8');
     expect(dist.startsWith('#!/usr/bin/env node')).toBe(true);
   });
 
-  it('--version refleja la versión del package.json', async () => {
+  it('--version reflects the package.json version', async () => {
     const pkg = JSON.parse(
       await readFile(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
     ) as { version: string };
@@ -51,7 +51,7 @@ describe('binario pqc', () => {
     expect(result.stdout.trim()).toBe(pkg.version);
   });
 
-  it('--help lista los comandos y sale con 0', async () => {
+  it('--help lists the commands and exits with 0', async () => {
     const result = await runCli(['--help'], await freshDir());
 
     expect(result.code).toBe(0);
@@ -61,7 +61,7 @@ describe('binario pqc', () => {
     expect(output).toContain('audit');
   });
 
-  it('no emite códigos ANSI sin TTY (apto para CI)', async () => {
+  it('emits no ANSI codes without a TTY (CI-friendly)', async () => {
     const dir = await freshDir();
     const result = await runCli(['init'], dir);
 
@@ -71,7 +71,7 @@ describe('binario pqc', () => {
 });
 
 describe('pqc init', () => {
-  it('crea config, keys de desarrollo y example.ts', async () => {
+  it('creates config, development keys and example.ts', async () => {
     const dir = await freshDir();
     const result = await runCli(['init'], dir);
 
@@ -98,7 +98,7 @@ describe('pqc init', () => {
     expect(example).toContain('pqc.decrypt');
   });
 
-  it('las keys de desarrollo funcionan para un roundtrip real', async () => {
+  it('development keys work for a real roundtrip', async () => {
     const dir = await freshDir();
     await runCli(['init'], dir);
 
@@ -114,24 +114,24 @@ describe('pqc init', () => {
     expect(new TextDecoder().decode(plaintext)).toBe('init e2e');
   });
 
-  it('advierte que las keys NO son para producción', async () => {
+  it('warns that the keys are NOT for production', async () => {
     const result = await runCli(['init'], await freshDir());
 
-    expect(result.stdout + result.stderr).toMatch(/no.{0,30}producción/i);
+    expect(result.stdout + result.stderr).toMatch(/NOT.{0,30}production/i);
   });
 
-  it('se niega a reinicializar un proyecto existente', async () => {
+  it('refuses to reinitialize an existing project', async () => {
     const dir = await freshDir();
     await runCli(['init'], dir);
     const second = await runCli(['init'], dir);
 
     expect(second.code).not.toBe(0);
-    expect(second.stdout + second.stderr).toMatch(/ya (existe|está inicializado)/i);
+    expect(second.stdout + second.stderr).toMatch(/already (exists|initialized)/i);
   });
 });
 
 describe('pqc keygen', () => {
-  it('genera ML-KEM-768 en ./keys por defecto', async () => {
+  it('generates ML-KEM-768 in ./keys by default', async () => {
     const dir = await freshDir();
     const result = await runCli(['keygen'], dir);
 
@@ -143,26 +143,26 @@ describe('pqc keygen', () => {
     await readFile(join(dir, 'keys/ml-kem-768.secret.pqc'), 'utf8');
   });
 
-  it('respeta --algorithm y --out', async () => {
+  it('honors --algorithm and --out', async () => {
     const dir = await freshDir();
-    const result = await runCli(['keygen', '--algorithm', 'ml-dsa-65', '--out', 'firma/'], dir);
+    const result = await runCli(['keygen', '--algorithm', 'ml-dsa-65', '--out', 'signing/'], dir);
 
     expect(result.code).toBe(0);
     const key = pqc.keys.deserialize(
-      (await readFile(join(dir, 'firma/ml-dsa-65.secret.pqc'), 'utf8')).trim(),
+      (await readFile(join(dir, 'signing/ml-dsa-65.secret.pqc'), 'utf8')).trim(),
     );
     expect(key.algorithm).toBe('ml-dsa-65');
     expect(key.use).toBe('secret');
   });
 
-  it('rechaza algoritmos desconocidos', async () => {
+  it('rejects unknown algorithms', async () => {
     const result = await runCli(['keygen', '--algorithm', 'rsa-2048'], await freshDir());
 
     expect(result.code).not.toBe(0);
-    expect(result.stdout + result.stderr).toMatch(/no soportado|UNSUPPORTED/i);
+    expect(result.stdout + result.stderr).toMatch(/unsupported/i);
   });
 
-  it('no pisa keys existentes sin --force', async () => {
+  it('does not overwrite existing keys without --force', async () => {
     const dir = await freshDir();
     await runCli(['keygen'], dir);
     const original = await readFile(join(dir, 'keys/ml-kem-768.public.pqc'), 'utf8');
@@ -178,18 +178,18 @@ describe('pqc keygen', () => {
 });
 
 describe('pqc audit', () => {
-  it('proyecto limpio: exit 0 y mensaje claro', async () => {
+  it('clean project: exit 0 and a clear message', async () => {
     const dir = await freshDir();
-    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'limpio' }));
-    await writeFile(join(dir, 'index.js'), 'console.log("sin crypto");\n');
+    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'clean' }));
+    await writeFile(join(dir, 'index.js'), 'console.log("no crypto");\n');
 
     const result = await runCli(['audit'], dir);
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toMatch(/sin (uso de )?crypto pre-cuántic/i);
+    expect(result.stdout).toMatch(/no pre-quantum crypto/i);
   });
 
-  it('detecta dependencias y código pre-cuántico con su equivalente PQC', async () => {
+  it('detects pre-quantum dependencies and code with their PQC equivalent', async () => {
     const dir = await freshDir();
     await writeFile(
       join(dir, 'package.json'),
@@ -216,9 +216,9 @@ describe('pqc audit', () => {
     expect(result.stdout).toContain('ML-KEM-768');
   });
 
-  it('ignora node_modules y dist', async () => {
+  it('ignores node_modules and dist', async () => {
     const dir = await freshDir();
-    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'limpio' }));
+    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'clean' }));
     await mkdir(join(dir, 'node_modules/lib'), { recursive: true });
     await writeFile(join(dir, 'node_modules/lib/index.js'), "createSign('RSA-SHA256');");
 

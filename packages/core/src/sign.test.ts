@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { pqc } from './index.js';
 
 describe('pqc.sign / pqc.verify', () => {
-  it('roundtrip firma y verificación', async () => {
+  it('roundtrips signing and verification', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
-    const data = new TextEncoder().encode('documento importante');
+    const data = new TextEncoder().encode('important document');
 
     const signature = await pqc.sign(data, pair.secretKey);
 
@@ -13,23 +13,23 @@ describe('pqc.sign / pqc.verify', () => {
     await expect(pqc.verify(data, signature, pair.publicKey)).resolves.toBe(true);
   });
 
-  it('acepta strings como datos', async () => {
+  it('accepts strings as data', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
 
-    const signature = await pqc.sign('hola', pair.secretKey);
+    const signature = await pqc.sign('hello', pair.secretKey);
 
-    await expect(pqc.verify('hola', signature, pair.publicKey)).resolves.toBe(true);
-    await expect(pqc.verify('hole', signature, pair.publicKey)).resolves.toBe(false);
+    await expect(pqc.verify('hello', signature, pair.publicKey)).resolves.toBe(true);
+    await expect(pqc.verify('hallo', signature, pair.publicKey)).resolves.toBe(false);
   });
 
-  it('devuelve false si el mensaje cambió', async () => {
+  it('returns false if the message changed', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
     const signature = await pqc.sign('original', pair.secretKey);
 
-    await expect(pqc.verify('alterado', signature, pair.publicKey)).resolves.toBe(false);
+    await expect(pqc.verify('altered', signature, pair.publicKey)).resolves.toBe(false);
   });
 
-  it('devuelve false si la firma fue manipulada o es basura', async () => {
+  it('returns false if the signature was tampered with or is garbage', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
     const signature = await pqc.sign('msg', pair.secretKey);
 
@@ -40,7 +40,7 @@ describe('pqc.sign / pqc.verify', () => {
     await expect(pqc.verify('msg', new Uint8Array(10), pair.publicKey)).resolves.toBe(false);
   });
 
-  it('devuelve false con la public key de otro par', async () => {
+  it('returns false with the public key of another pair', async () => {
     const a = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
     const b = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
     const signature = await pqc.sign('msg', a.secretKey);
@@ -48,7 +48,7 @@ describe('pqc.sign / pqc.verify', () => {
     await expect(pqc.verify('msg', signature, b.publicKey)).resolves.toBe(false);
   });
 
-  it('soporta context strings de FIPS 204 (default vacío)', async () => {
+  it('supports FIPS 204 context strings (empty by default)', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
     const context = new TextEncoder().encode('app-v1');
 
@@ -58,21 +58,21 @@ describe('pqc.sign / pqc.verify', () => {
     await expect(pqc.verify('msg', signature, pair.publicKey)).resolves.toBe(false);
   });
 
-  it('rechaza sign con una key que no es ML-DSA', async () => {
+  it('rejects sign with a non-ML-DSA key', async () => {
     const pair = await pqc.keys.generate();
 
-    // @ts-expect-error key KEM usada para firmar a propósito
+    // @ts-expect-error KEM key used for signing on purpose
     await expect(pqc.sign('x', pair.secretKey)).rejects.toMatchObject({
       code: 'WRONG_ALGORITHM',
     });
   });
 
-  it('rechaza verify con una public key que no es ML-DSA', async () => {
+  it('rejects verify with a non-ML-DSA public key', async () => {
     const dsa = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
     const kem = await pqc.keys.generate();
     const signature = await pqc.sign('x', dsa.secretKey);
 
-    // @ts-expect-error key KEM usada para verificar a propósito
+    // @ts-expect-error KEM key used for verification on purpose
     await expect(pqc.verify('x', signature, kem.publicKey)).rejects.toMatchObject({
       code: 'WRONG_ALGORITHM',
     });

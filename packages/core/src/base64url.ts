@@ -2,7 +2,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
 
 const CHAR_TO_VALUE = new Map<string, number>([...ALPHABET].map((c, i) => [c, i]));
 
-/** Codifica bytes a base64url sin padding. Implementación pura, sin Buffer/btoa. */
+/** Encodes bytes to unpadded base64url. Pure implementation, no Buffer/btoa. */
 export function toBase64Url(bytes: Uint8Array): string {
   let out = '';
   for (let i = 0; i < bytes.length; i += 3) {
@@ -17,10 +17,10 @@ export function toBase64Url(bytes: Uint8Array): string {
   return out;
 }
 
-/** Decodifica base64url sin padding. Lanza TypeError ante caracteres inválidos. */
+/** Decodes unpadded base64url. Throws TypeError on invalid characters. */
 export function fromBase64Url(encoded: string): Uint8Array {
   if (encoded.length % 4 === 1) {
-    throw new TypeError('base64url inválido: longitud imposible');
+    throw new TypeError('Invalid base64url: impossible length');
   }
   const out = new Uint8Array(Math.floor((encoded.length * 3) / 4));
   let outIndex = 0;
@@ -29,7 +29,7 @@ export function fromBase64Url(encoded: string): Uint8Array {
   for (const char of encoded) {
     const value = CHAR_TO_VALUE.get(char);
     if (value === undefined) {
-      throw new TypeError(`base64url inválido: carácter ${JSON.stringify(char)}`);
+      throw new TypeError(`Invalid base64url: character ${JSON.stringify(char)}`);
     }
     buffer = (buffer << 6) | value;
     bits += 6;
