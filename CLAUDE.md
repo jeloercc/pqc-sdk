@@ -18,3 +18,6 @@ Objetivo: que un developer agregue cifrado PQC a su app en 30 minutos.
 - API zero-config: defaults seguros siempre
 - Cada función pública debe tener JSDoc con ejemplo de uso
 - Conventional commits
+- All user-facing text MUST be in English: CLI output, error messages, JSDoc,
+  READMEs, docs, changesets, code comments, and commit messages. English is
+  the project's only public language.
