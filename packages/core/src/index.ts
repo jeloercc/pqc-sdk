@@ -17,6 +17,9 @@ export type {
 } from './types.js';
 export { encrypt, decrypt, sign, verify, generate, serialize, deserialize };
 
+// Inyectada en build time desde el package.json (`define` en tsup.config.ts y vitest.config.ts).
+declare const __PQC_CORE_VERSION__: string;
+
 /**
  * Versión del SDK.
  *
@@ -24,10 +27,10 @@ export { encrypt, decrypt, sign, verify, generate, serialize, deserialize };
  * ```ts
  * import { version } from '@pqc-sdk/core';
  *
- * console.log(version); // "0.0.1"
+ * console.log(version); // p. ej. "0.1.0"
  * ```
  */
-export const version = '0.0.1';
+export const version = __PQC_CORE_VERSION__;
 
 /**
  * Algoritmos PQC implementados (FIPS 203 y FIPS 204).
