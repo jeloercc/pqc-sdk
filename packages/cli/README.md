@@ -3,23 +3,23 @@
 [![CI](https://github.com/jeloercc/pqc-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/jeloercc/pqc-sdk/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/%40pqc-sdk%2Fcli)](https://www.npmjs.com/package/@pqc-sdk/cli)
 
-CLI de [@pqc-sdk/core](https://www.npmjs.com/package/@pqc-sdk/core): proyectos
-post-cuánticos en un comando.
+CLI for [@pqc-sdk/core](https://www.npmjs.com/package/@pqc-sdk/core):
+post-quantum projects in one command.
 
 ```bash
-# Inicializar proyecto: config + keys de desarrollo + ejemplo funcional
+# Initialize a project: config + development keys + working example
 npx @pqc-sdk/cli init
 
-# Generar keys serializadas en base64url
+# Generate keys serialized as base64url
 npx @pqc-sdk/cli keygen --algorithm ml-dsa-65 --out keys/
 
-# Detectar crypto pre-cuántico (RSA/ECDSA/ECDH) y qué migrar a PQC
+# Detect pre-quantum crypto (RSA/ECDSA/ECDH) and what to migrate to PQC
 npx @pqc-sdk/cli audit
 ```
 
-`audit` sale con código 1 si encuentra crypto a migrar — usable como gate de CI.
-El output usa colores solo cuando hay TTY: legible en logs y pipes.
+`audit` exits with code 1 when it finds crypto to migrate — usable as a CI
+gate. Output uses colors only when there is a TTY: readable in logs and pipes.
 
-## Licencia
+## License
 
 [MIT](./LICENSE)

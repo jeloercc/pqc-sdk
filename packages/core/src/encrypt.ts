@@ -16,16 +16,16 @@ function toBytes(data: Uint8Array | string): Uint8Array {
 }
 
 /**
- * Cifrado híbrido: encapsula un secreto con ML-KEM-768 (FIPS 203) y cifra los
- * datos con AES-256-GCM usando ese secreto. El resultado es un único
- * `Uint8Array` autocontenido que solo {@link decrypt} puede abrir.
+ * Hybrid encryption: encapsulates a secret with ML-KEM-768 (FIPS 203) and
+ * encrypts the data with AES-256-GCM using that secret. The result is a
+ * single self-contained `Uint8Array` that only {@link decrypt} can open.
  *
  * @example
  * ```ts
  * import { pqc } from '@pqc-sdk/core';
  *
  * const pair = await pqc.keys.generate();
- * const ciphertext = await pqc.encrypt('dato sensible', pair.publicKey);
+ * const ciphertext = await pqc.encrypt('sensitive data', pair.publicKey);
  * ```
  */
 export async function encrypt(
@@ -49,9 +49,9 @@ export async function encrypt(
 }
 
 /**
- * Descifra un ciphertext producido por {@link encrypt}. Si el ciphertext fue
- * manipulado o la key no corresponde, lanza {@link PqcError} con código
- * `DECRYPTION_FAILED` — nunca devuelve datos corruptos.
+ * Decrypts a ciphertext produced by {@link encrypt}. If the ciphertext was
+ * tampered with or the key does not match, it throws {@link PqcError} with
+ * code `DECRYPTION_FAILED` — it never returns corrupted data.
  *
  * @example
  * ```ts
@@ -69,12 +69,15 @@ export async function decrypt(
 
   const minLength = 2 + spec.ciphertextLength + NONCE_LENGTH + GCM_TAG_LENGTH;
   if (ciphertext.length < minLength) {
-    throw new PqcError('INVALID_CIPHERTEXT', 'Ciphertext truncado o no producido por pqc.encrypt');
+    throw new PqcError(
+      'INVALID_CIPHERTEXT',
+      'Ciphertext is truncated or was not produced by pqc.encrypt',
+    );
   }
   if (ciphertext[0] !== FORMAT_VERSION || ciphertext[1] !== spec.headerId) {
     throw new PqcError(
       'INVALID_CIPHERTEXT',
-      'Header desconocido: el ciphertext no corresponde a esta versión o algoritmo',
+      'Unknown header: the ciphertext does not match this version or algorithm',
     );
   }
 
@@ -91,10 +94,10 @@ export async function decrypt(
   } catch {
     throw new PqcError(
       'DECRYPTION_FAILED',
-      'No se pudo descifrar: ciphertext manipulado o secret key incorrecta',
+      'Decryption failed: tampered ciphertext or wrong secret key',
     );
   }
 }
 
-/** Algoritmos KEM disponibles, exportado para introspección. */
+/** Available KEM algorithms, exported for introspection. */
 export const KEM_NAMES = Object.keys(KEM_ALGORITHMS);

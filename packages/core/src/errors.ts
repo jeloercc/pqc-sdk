@@ -1,4 +1,4 @@
-/** Códigos de error que puede emitir el SDK. */
+/** Error codes the SDK can emit. */
 export type PqcErrorCode =
   | 'UNSUPPORTED_ALGORITHM'
   | 'WRONG_ALGORITHM'
@@ -9,8 +9,8 @@ export type PqcErrorCode =
   | 'DECRYPTION_FAILED';
 
 /**
- * Error tipado del SDK. Toda falla esperable expone un `code` estable para
- * manejarla programáticamente sin parsear mensajes.
+ * Typed SDK error. Every expected failure exposes a stable `code` so it can
+ * be handled programmatically without parsing messages.
  *
  * @example
  * ```ts
@@ -20,7 +20,7 @@ export type PqcErrorCode =
  *   await pqc.decrypt(ciphertext, secretKey);
  * } catch (error) {
  *   if (error instanceof PqcError && error.code === 'DECRYPTION_FAILED') {
- *     // ciphertext manipulado o key incorrecta
+ *     // tampered ciphertext or wrong key
  *   }
  * }
  * ```
