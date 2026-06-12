@@ -17,45 +17,45 @@ const ML_DSA = 'ML-DSA-65 (pqc.sign / pqc.verify)';
 const ML_KEM = 'ML-KEM-768 + AES-256-GCM (pqc.encrypt / pqc.decrypt)';
 
 const RISKY_PACKAGES: Record<string, { what: string; migrateTo: string }> = {
-  jsonwebtoken: { what: 'JWTs firmados con RSA/ECDSA (RS256/ES256)', migrateTo: ML_DSA },
-  jose: { what: 'JOSE/JWT con algoritmos RSA/ECDSA', migrateTo: ML_DSA },
-  elliptic: { what: 'Curvas elípticas clásicas (ECDSA/ECDH)', migrateTo: `${ML_DSA} y ${ML_KEM}` },
-  secp256k1: { what: 'Firmas ECDSA sobre secp256k1', migrateTo: ML_DSA },
-  'node-rsa': { what: 'Cifrado y firmas RSA', migrateTo: `${ML_KEM} y ${ML_DSA}` },
-  'node-forge': { what: 'RSA/X.509 clásico', migrateTo: `${ML_KEM} y ${ML_DSA}` },
-  tweetnacl: { what: 'Ed25519/X25519 (pre-cuántico)', migrateTo: `${ML_DSA} y ${ML_KEM}` },
+  jsonwebtoken: { what: 'JWTs signed with RSA/ECDSA (RS256/ES256)', migrateTo: ML_DSA },
+  jose: { what: 'JOSE/JWT with RSA/ECDSA algorithms', migrateTo: ML_DSA },
+  elliptic: { what: 'Classic elliptic curves (ECDSA/ECDH)', migrateTo: `${ML_DSA} and ${ML_KEM}` },
+  secp256k1: { what: 'ECDSA signatures over secp256k1', migrateTo: ML_DSA },
+  'node-rsa': { what: 'RSA encryption and signatures', migrateTo: `${ML_KEM} and ${ML_DSA}` },
+  'node-forge': { what: 'Classic RSA/X.509', migrateTo: `${ML_KEM} and ${ML_DSA}` },
+  tweetnacl: { what: 'Ed25519/X25519 (pre-quantum)', migrateTo: `${ML_DSA} and ${ML_KEM}` },
 };
 
 const CODE_PATTERNS: ReadonlyArray<{ re: RegExp; what: string; migrateTo: string }> = [
   {
     re: /create(?:Sign|Verify)\s*\(/,
-    what: 'firma RSA/ECDSA vía node:crypto (createSign/createVerify)',
+    what: 'RSA/ECDSA signing via node:crypto (createSign/createVerify)',
     migrateTo: ML_DSA,
   },
   {
     re: /createECDH\s*\(|\.diffieHellman\s*\(/,
-    what: 'intercambio de claves ECDH/DH',
+    what: 'ECDH/DH key exchange',
     migrateTo: ML_KEM,
   },
   {
     re: /publicEncrypt\s*\(|privateDecrypt\s*\(/,
-    what: 'cifrado RSA (publicEncrypt/privateDecrypt)',
+    what: 'RSA encryption (publicEncrypt/privateDecrypt)',
     migrateTo: ML_KEM,
   },
   {
     re: /generateKeyPair(?:Sync)?\s*\(\s*['"](?:rsa|rsa-pss|dsa|ec|ed25519|ed448|x25519|x448)['"]/,
-    what: 'generación de keypair pre-cuántico',
-    migrateTo: 'pqc.keys.generate (ML-KEM-768 para cifrado, ML-DSA-65 para firmas)',
+    what: 'pre-quantum keypair generation',
+    migrateTo: 'pqc.keys.generate (ML-KEM-768 for encryption, ML-DSA-65 for signatures)',
   },
   {
     re: /['"`](?:RS|ES|PS)(?:256|384|512)['"`]/,
-    what: 'JWT con algoritmo de firma RSA/ECDSA',
+    what: 'JWT with an RSA/ECDSA signing algorithm',
     migrateTo: ML_DSA,
   },
   {
     re: /['"`](?:RSA-OAEP|ECDH|ECDSA)['"`]/,
-    what: 'WebCrypto con algoritmo pre-cuántico',
-    migrateTo: `${ML_KEM} o ${ML_DSA}`,
+    what: 'WebCrypto with a pre-quantum algorithm',
+    migrateTo: `${ML_KEM} or ${ML_DSA}`,
   },
 ];
 
@@ -116,25 +116,25 @@ async function auditSources(cwd: string): Promise<Finding[]> {
 export const audit = defineCommand({
   meta: {
     name: 'audit',
-    description: 'Detecta crypto pre-cuántico y sugiere el equivalente PQC',
+    description: 'Detect pre-quantum crypto and suggest the PQC equivalent',
   },
   async run() {
     const cwd = process.cwd();
     const findings = [...(await auditPackageJson(cwd)), ...(await auditSources(cwd))];
 
     if (findings.length === 0) {
-      ok('Sin crypto pre-cuántico detectado.');
+      ok('No pre-quantum crypto detected.');
       return;
     }
 
-    heading(`Crypto pre-cuántico detectado (${findings.length} hallazgos):`);
+    heading(`Pre-quantum crypto detected (${findings.length} findings):`);
     for (const f of findings) {
       finding(f.location, f.what, f.migrateTo);
     }
     console.log();
     console.log(
       pc.yellow(
-        `${findings.length} usos a migrar. Guía de algoritmos: FIPS 203 (ML-KEM) cifrado, FIPS 204 (ML-DSA) firmas.`,
+        `${findings.length} usages to migrate. Algorithm guide: FIPS 203 (ML-KEM) encryption, FIPS 204 (ML-DSA) signatures.`,
       ),
     );
     process.exitCode = 1;

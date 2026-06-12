@@ -17,23 +17,23 @@ export type {
 } from './types.js';
 export { encrypt, decrypt, sign, verify, generate, serialize, deserialize };
 
-// Inyectada en build time desde el package.json (`define` en tsup.config.ts y vitest.config.ts).
+// Injected at build time from package.json (`define` in tsup.config.ts and vitest.config.ts).
 declare const __PQC_CORE_VERSION__: string;
 
 /**
- * Versión del SDK.
+ * SDK version.
  *
  * @example
  * ```ts
  * import { version } from '@pqc-sdk/core';
  *
- * console.log(version); // p. ej. "0.1.0"
+ * console.log(version); // e.g. "0.1.0"
  * ```
  */
 export const version = __PQC_CORE_VERSION__;
 
 /**
- * Algoritmos PQC implementados (FIPS 203 y FIPS 204).
+ * Implemented PQC algorithms (FIPS 203 and FIPS 204).
  *
  * @example
  * ```ts
@@ -47,22 +47,22 @@ export const SUPPORTED_ALGORITHMS = ['ml-kem-768', 'ml-dsa-65'] as const;
 export type SupportedAlgorithm = (typeof SUPPORTED_ALGORITHMS)[number];
 
 /**
- * Punto de entrada del SDK: cifrado híbrido post-cuántico y firmas digitales
- * con defaults seguros, sin configuración.
+ * SDK entry point: post-quantum hybrid encryption and digital signatures
+ * with safe defaults, zero configuration.
  *
  * @example
  * ```ts
  * import { pqc } from '@pqc-sdk/core';
  *
- * // Cifrado (ML-KEM-768 + AES-256-GCM)
+ * // Encryption (ML-KEM-768 + AES-256-GCM)
  * const pair = await pqc.keys.generate();
- * const ciphertext = await pqc.encrypt('hola', pair.publicKey);
+ * const ciphertext = await pqc.encrypt('hello', pair.publicKey);
  * const plaintext = await pqc.decrypt(ciphertext, pair.secretKey);
  *
- * // Firmas (ML-DSA-65)
+ * // Signatures (ML-DSA-65)
  * const signer = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
- * const signature = await pqc.sign('documento', signer.secretKey);
- * await pqc.verify('documento', signature, signer.publicKey); // true
+ * const signature = await pqc.sign('document', signer.secretKey);
+ * await pqc.verify('document', signature, signer.publicKey); // true
  * ```
  */
 export const pqc = {

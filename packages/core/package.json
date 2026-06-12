@@ -1,7 +1,7 @@
 {
   "name": "@pqc-sdk/core",
   "version": "0.1.1",
-  "description": "SDK de criptografía post-cuántica para JS/TS (ML-KEM, ML-DSA, SLH-DSA)",
+  "description": "Post-quantum cryptography SDK for JS/TS (ML-KEM, ML-DSA, SLH-DSA)",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

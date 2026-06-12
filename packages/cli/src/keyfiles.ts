@@ -13,13 +13,13 @@ export interface WrittenKeyPair {
 export function assertSupportedAlgorithm(value: string): SupportedAlgorithm {
   if (!(SUPPORTED_ALGORITHMS as readonly string[]).includes(value)) {
     throw new Error(
-      `Algoritmo no soportado: ${value} (soportados: ${SUPPORTED_ALGORITHMS.join(', ')})`,
+      `Unsupported algorithm: ${value} (supported: ${SUPPORTED_ALGORITHMS.join(', ')})`,
     );
   }
   return value as SupportedAlgorithm;
 }
 
-/** Genera un par y lo escribe serializado en base64url, un archivo por key. */
+/** Generates a pair and writes it serialized as base64url, one file per key. */
 export async function writeKeyPair(
   directory: string,
   baseName: string,
@@ -32,7 +32,7 @@ export async function writeKeyPair(
   if (!force) {
     for (const path of [publicPath, secretPath]) {
       if (existsSync(path)) {
-        throw new Error(`${path} ya existe. Usá --force para sobreescribirla.`);
+        throw new Error(`${path} already exists. Use --force to overwrite it.`);
       }
     }
   }

@@ -7,15 +7,15 @@ import type { Algorithm, KeyPair, PqcKey } from './types.js';
 
 const SERIAL_PREFIX = 'pqcv1';
 
-/** Opciones de {@link generate}. */
+/** Options for {@link generate}. */
 export interface GenerateOptions<A extends Algorithm = Algorithm> {
-  /** Algoritmo del par. Default: `'ml-kem-768'` (cifrado). */
+  /** Algorithm of the pair. Default: `'ml-kem-768'` (encryption). */
   readonly algorithm?: A;
 }
 
 /**
- * Genera un par de keys post-cuánticas. Sin opciones genera ML-KEM-768,
- * listo para `pqc.encrypt`.
+ * Generates a post-quantum key pair. With no options it generates ML-KEM-768,
+ * ready for `pqc.encrypt`.
  *
  * @example
  * ```ts
@@ -37,15 +37,15 @@ export async function generate(options?: GenerateOptions): Promise<KeyPair> {
 }
 
 /**
- * Generación determinística a partir de una seed. Uso interno y de tests
- * (vectores NIST). Para uso normal preferir {@link generate}.
+ * Deterministic generation from a seed. Internal and test use (NIST vectors).
+ * Prefer {@link generate} for normal use.
  */
 export function generateKeyPairFromSeed(algorithm: Algorithm, seed: Uint8Array): KeyPair {
   const spec = getAlgorithm(algorithm);
   if (seed.length !== spec.seedLength) {
     throw new PqcError(
       'INVALID_KEY',
-      `Seed de ${algorithm} debe medir ${spec.seedLength} bytes, recibió ${seed.length}`,
+      `${algorithm} seed must be ${spec.seedLength} bytes, got ${seed.length}`,
     );
   }
   const material = spec.kind === 'kem' ? spec.kem.keygen(seed) : spec.signer.keygen(seed);
@@ -57,7 +57,7 @@ export function generateKeyPairFromSeed(algorithm: Algorithm, seed: Uint8Array):
 }
 
 /**
- * Serializa una key a un string portable: `pqcv1.<algoritmo>.<uso>.<base64url>`.
+ * Serializes a key to a portable string: `pqcv1.<algorithm>.<use>.<base64url>`.
  *
  * @example
  * ```ts
@@ -71,21 +71,21 @@ export function generateKeyPairFromSeed(algorithm: Algorithm, seed: Uint8Array):
 export function serialize(key: PqcKey): string {
   const spec = getAlgorithm(key.algorithm);
   if (key.bytes.length !== keyLengthFor(spec, key.use)) {
-    throw new PqcError('INVALID_KEY', `Key ${key.algorithm} ${key.use} con longitud inválida`);
+    throw new PqcError('INVALID_KEY', `${key.algorithm} ${key.use} key has invalid length`);
   }
   return `${SERIAL_PREFIX}.${key.algorithm}.${key.use}.${toBase64Url(key.bytes)}`;
 }
 
 /**
- * Reconstruye una key desde el formato de {@link serialize}. Valida versión,
- * algoritmo, uso y longitud; ante cualquier problema lanza {@link PqcError}
- * con código `INVALID_SERIALIZED_KEY` o `INVALID_KEY`.
+ * Rebuilds a key from the {@link serialize} format. Validates version,
+ * algorithm, use and length; on any problem it throws {@link PqcError} with
+ * code `INVALID_SERIALIZED_KEY` or `INVALID_KEY`.
  *
  * @example
  * ```ts
  * import { pqc } from '@pqc-sdk/core';
  *
- * const publicKey = pqc.keys.deserialize(tokenRecibidoDelCliente);
+ * const publicKey = pqc.keys.deserialize(tokenReceivedFromClient);
  * const ciphertext = await pqc.encrypt(payload, publicKey);
  * ```
  */
@@ -94,13 +94,13 @@ export function deserialize(serialized: string): PqcKey {
   if (parts.length !== 4 || parts[0] !== SERIAL_PREFIX) {
     throw new PqcError(
       'INVALID_SERIALIZED_KEY',
-      'Formato esperado: pqcv1.<algoritmo>.<uso>.<base64url>',
+      'Expected format: pqcv1.<algorithm>.<use>.<base64url>',
     );
   }
   const [, algorithm, use, encoded] = parts as [string, string, string, string];
   const spec = getAlgorithm(algorithm);
   if (use !== 'public' && use !== 'secret') {
-    throw new PqcError('INVALID_SERIALIZED_KEY', `Uso de key desconocido: ${use}`);
+    throw new PqcError('INVALID_SERIALIZED_KEY', `Unknown key use: ${use}`);
   }
   let bytes: Uint8Array;
   try {
@@ -108,14 +108,14 @@ export function deserialize(serialized: string): PqcKey {
   } catch (cause) {
     throw new PqcError(
       'INVALID_SERIALIZED_KEY',
-      cause instanceof Error ? cause.message : 'base64url inválido',
+      cause instanceof Error ? cause.message : 'Invalid base64url',
     );
   }
   const key: PqcKey = { algorithm: algorithm as Algorithm, use, bytes };
   if (bytes.length !== keyLengthFor(spec, key.use)) {
     throw new PqcError(
       'INVALID_KEY',
-      `Key ${algorithm} ${use} debe medir ${keyLengthFor(spec, key.use)} bytes, midió ${bytes.length}`,
+      `${algorithm} ${use} key must be ${keyLengthFor(spec, key.use)} bytes, got ${bytes.length}`,
     );
   }
   return key;
