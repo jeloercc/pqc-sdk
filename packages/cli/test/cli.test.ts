@@ -40,6 +40,17 @@ describe('binario pqc', () => {
     expect(dist.startsWith('#!/usr/bin/env node')).toBe(true);
   });
 
+  it('--version refleja la versión del package.json', async () => {
+    const pkg = JSON.parse(
+      await readFile(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
+    ) as { version: string };
+
+    const result = await runCli(['--version'], await freshDir());
+
+    expect(result.code).toBe(0);
+    expect(result.stdout.trim()).toBe(pkg.version);
+  });
+
   it('--help lista los comandos y sale con 0', async () => {
     const result = await runCli(['--help'], await freshDir());
 
