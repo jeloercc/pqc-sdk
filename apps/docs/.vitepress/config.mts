@@ -7,6 +7,8 @@ export default defineConfig({
   title: 'PQC SDK',
   description: 'Criptografía post-cuántica para JS/TS en 30 minutos',
   lang: 'es',
+  // El sitio se publica en GitHub Pages bajo /pqc-sdk/ (ver .github/workflows/docs.yml).
+  base: '/pqc-sdk/',
   ignoreDeadLinks: true,
   markdown: {
     codeTransformers: [
