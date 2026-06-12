@@ -9,6 +9,14 @@
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
     },
+    "@pqc-sdk/cli#test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@pqc-sdk/docs#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["api/**", "compatibility.md", ".vitepress/dist/**"]
+    },
     "lint": {
       "dependsOn": ["^build"]
     },
