@@ -1,22 +1,22 @@
 # PQC SDK
 
-SDK de criptografía post-cuántica para developers JS/TS.
-Objetivo: que un developer agregue cifrado PQC a su app en 30 minutos.
+Post-quantum cryptography SDK for JS/TS developers.
+Goal: a developer adds PQC encryption to their app in 30 minutes.
 
 ## Stack
 
-- TypeScript strict, ESM + CJS dual build
-- Monorepo con Turborepo + pnpm workspaces
-- Base criptográfica: liboqs (vía @open-quantum-safe o noble si aplica)
-- Algoritmos: ML-KEM-768 (FIPS 203), ML-DSA-65 (FIPS 204), SLH-DSA (FIPS 205)
-- Tests: Vitest con test vectors NIST, coverage mínimo 90%
+- Strict TypeScript, ESM + CJS dual build
+- Monorepo with Turborepo + pnpm workspaces
+- Cryptographic base: liboqs (via @open-quantum-safe or noble where applicable)
+- Algorithms: ML-KEM-768 (FIPS 203), ML-DSA-65 (FIPS 204), SLH-DSA (FIPS 205)
+- Tests: Vitest with NIST test vectors, 90% minimum coverage
 - Targets: Node 20+, React Native, Cloudflare Workers, Deno
 
-## Reglas
+## Rules
 
-- Nunca implementar primitivas criptográficas desde cero
-- API zero-config: defaults seguros siempre
-- Cada función pública debe tener JSDoc con ejemplo de uso
+- Never implement cryptographic primitives from scratch
+- Zero-config API: safe defaults always
+- Every public function must have JSDoc with a usage example
 - Conventional commits
 - All user-facing text MUST be in English: CLI output, error messages, JSDoc,
   READMEs, docs, changesets, code comments, and commit messages. English is
