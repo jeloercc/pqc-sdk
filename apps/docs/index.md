@@ -3,24 +3,24 @@ layout: home
 
 hero:
   name: PQC SDK
-  text: Criptografía post-cuántica para JS/TS
-  tagline: ML-KEM-768 y ML-DSA-65 (FIPS 203/204) con defaults seguros. De cero a cifrado PQC en 30 minutos.
+  text: Post-quantum cryptography for JS/TS
+  tagline: ML-KEM-768 and ML-DSA-65 (FIPS 203/204) with safe defaults. From zero to PQC encryption in 30 minutes.
   actions:
     - theme: brand
-      text: Quickstart de 5 minutos
+      text: 5-minute quickstart
       link: /guide/quickstart
     - theme: alt
-      text: ¿Por qué PQC ahora?
+      text: Why PQC now?
       link: /guide/why-pqc
 
 features:
   - icon: 🔐
     title: Zero-config
-    details: pqc.encrypt y listo. ML-KEM-768 + AES-256-GCM híbrido sin decisiones criptográficas que tomar.
+    details: pqc.encrypt and you're done. Hybrid ML-KEM-768 + AES-256-GCM with no cryptographic decisions to make.
   - icon: 🌍
-    title: Corre en todos lados
-    details: Node 20+, Cloudflare Workers, Deno y React Native. Sin WASM, sin addons nativos, ~20 KB gzip.
+    title: Runs everywhere
+    details: Node 20+, Cloudflare Workers, Deno and React Native. No WASM, no native addons, ~20 KB gzip.
   - icon: ✅
-    title: Validado contra NIST
-    details: Suite de tests con los vectores oficiales ACVP de FIPS 203 y FIPS 204.
+    title: Validated against NIST
+    details: Test suite with the official ACVP vectors for FIPS 203 and FIPS 204.
 ---

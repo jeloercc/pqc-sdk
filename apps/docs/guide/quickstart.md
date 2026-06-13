@@ -1,8 +1,8 @@
-# Quickstart de 5 minutos
+# 5-minute quickstart
 
-De cero a cifrado post-cuántico funcionando.
+From zero to working post-quantum encryption.
 
-## 1. Instalar
+## 1. Install
 
 ::: code-group
 
@@ -16,13 +16,13 @@ npm install @pqc-sdk/core
 
 :::
 
-O inicializá un proyecto completo con el CLI (config + keys de desarrollo + ejemplo):
+Or initialize a full project with the CLI (config + development keys + example):
 
 ```bash
 npx @pqc-sdk/cli init
 ```
 
-## 2. Generar keys
+## 2. Generate keys
 
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
@@ -31,50 +31,52 @@ const pair = await pqc.keys.generate();
 //    ^?
 ```
 
-Sin opciones genera **ML-KEM-768** (FIPS 203), el algoritmo de cifrado. Pasá el cursor
-sobre `pair` para ver el tipo: el algoritmo viaja en el sistema de tipos.
+With no options it generates **ML-KEM-768** (FIPS 203), the encryption
+algorithm. Hover over `pair` to see the type: the algorithm travels in the
+type system.
 
-## 3. Cifrar
+## 3. Encrypt
 
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
 const pair = await pqc.keys.generate();
 // ---cut---
-const ciphertext = await pqc.encrypt('mi primer secreto post-cuántico', pair.publicKey);
+const ciphertext = await pqc.encrypt('my first post-quantum secret', pair.publicKey);
 ```
 
-Acepta `string` (se codifica UTF-8) o `Uint8Array`. El resultado es un único
-`Uint8Array` autocontenido: encapsulamiento ML-KEM + datos cifrados con AES-256-GCM.
+Accepts a `string` (encoded as UTF-8) or a `Uint8Array`. The result is a single
+self-contained `Uint8Array`: ML-KEM encapsulation + data encrypted with
+AES-256-GCM.
 
-## 4. Descifrar
+## 4. Decrypt
 
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
 const pair = await pqc.keys.generate();
-const ciphertext = await pqc.encrypt('mi primer secreto post-cuántico', pair.publicKey);
+const ciphertext = await pqc.encrypt('my first post-quantum secret', pair.publicKey);
 // ---cut---
 const plaintext = await pqc.decrypt(ciphertext, pair.secretKey);
 console.log(new TextDecoder().decode(plaintext));
-// "mi primer secreto post-cuántico"
+// "my first post-quantum secret"
 ```
 
-Si el ciphertext fue manipulado, `decrypt` lanza un `PqcError` con código
-`DECRYPTION_FAILED` — nunca devuelve datos corruptos.
+If the ciphertext was tampered with, `decrypt` throws a `PqcError` with code
+`DECRYPTION_FAILED` — it never returns corrupted data.
 
-## Bonus: persistir keys
+## Bonus: persisting keys
 
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
 const pair = await pqc.keys.generate();
 // ---cut---
 const token = pqc.keys.serialize(pair.publicKey);
-// "pqcv1.ml-kem-768.public.h1q3…" — base64url con metadata
+// "pqcv1.ml-kem-768.public.h1q3…" — base64url with metadata
 
 const restored = pqc.keys.deserialize(token);
 ```
 
-## Siguientes pasos
+## Next steps
 
-- [Cifrado híbrido KEM+AES, explicado](./hybrid-encryption) — qué pasa adentro de `encrypt`
-- [Cifrar archivos](./encrypt-files) — el caso de uso más común
-- [Firmar JWTs con ML-DSA](./sign-jwt) — firmas digitales post-cuánticas
+- [Hybrid KEM+AES encryption, explained](./hybrid-encryption) — what happens inside `encrypt`
+- [Encrypting files](./encrypt-files) — the most common use case
+- [Signing JWTs with ML-DSA](./sign-jwt) — post-quantum digital signatures
