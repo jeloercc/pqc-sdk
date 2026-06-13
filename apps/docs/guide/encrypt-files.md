@@ -1,40 +1,41 @@
-# Cifrar archivos
+# Encrypting files
 
-El caso de uso más común: cifrar un archivo para alguien que tiene un par de keys
-ML-KEM-768, de modo que solo esa persona pueda abrirlo.
+The most common use case: encrypting a file for someone who has an ML-KEM-768
+key pair, so that only that person can open it.
 
-## Preparación: el receptor genera y comparte su public key
+## Setup: the recipient generates and shares their public key
 
 ```bash
 npx @pqc-sdk/cli keygen --out keys/
-# keys/ml-kem-768.public.pqc  → se comparte (mail, repo, donde sea)
-# keys/ml-kem-768.secret.pqc  → NO sale de la máquina del receptor
+# keys/ml-kem-768.public.pqc  → shared (mail, repo, wherever)
+# keys/ml-kem-768.secret.pqc  → NEVER leaves the recipient's machine
 ```
 
-## Cifrar (lado emisor)
+## Encrypt (sender side)
 
 ```ts twoslash
 import { readFile, writeFile } from 'node:fs/promises';
 import { pqc } from '@pqc-sdk/core';
 
-// La public key del receptor, recibida como texto serializado
+// The recipient's public key, received as serialized text
 const publicKey = pqc.keys.deserialize(
   (await readFile('keys/ml-kem-768.public.pqc', 'utf8')).trim(),
 );
 
-const contents = await readFile('informe-confidencial.pdf');
+const contents = await readFile('confidential-report.pdf');
 const ciphertext = await pqc.encrypt(contents, publicKey as never);
-await writeFile('informe-confidencial.pdf.pqc', ciphertext);
+await writeFile('confidential-report.pdf.pqc', ciphertext);
 ```
 
-::: tip El cast `as never`
-`deserialize` devuelve el tipo amplio `PqcKey` porque el algoritmo se conoce
-recién en runtime. La validación es runtime: si la key no es ML-KEM-768 pública,
-`encrypt` lanza `PqcError('WRONG_ALGORITHM')`. En tu código podés encapsular esto
-en un helper que valide `key.algorithm` y devuelva el tipo angosto.
+::: tip The `as never` cast
+`deserialize` returns the wide `PqcKey` type because the algorithm is only
+known at runtime. Validation is runtime: if the key is not an ML-KEM-768
+public key, `encrypt` throws `PqcError('WRONG_ALGORITHM')`. In your code you
+can wrap this in a helper that validates `key.algorithm` and returns the
+narrow type.
 :::
 
-## Descifrar (lado receptor)
+## Decrypt (recipient side)
 
 ```ts twoslash
 import { readFile, writeFile } from 'node:fs/promises';
@@ -44,16 +45,16 @@ const secretKey = pqc.keys.deserialize(
   (await readFile('keys/ml-kem-768.secret.pqc', 'utf8')).trim(),
 );
 
-const ciphertext = await readFile('informe-confidencial.pdf.pqc');
+const ciphertext = await readFile('confidential-report.pdf.pqc');
 const contents = await pqc.decrypt(new Uint8Array(ciphertext), secretKey as never);
-await writeFile('informe-confidencial.pdf', contents);
+await writeFile('confidential-report.pdf', contents);
 ```
 
-Si el archivo `.pqc` fue alterado en tránsito — aunque sea un bit — `decrypt`
-lanza `DECRYPTION_FAILED` en vez de devolver un PDF corrupto: AES-GCM autentica
-todo el contenido.
+If the `.pqc` file was altered in transit — even a single bit — `decrypt`
+throws `DECRYPTION_FAILED` instead of returning a corrupted PDF: AES-GCM
+authenticates the whole content.
 
-## Manejo de errores
+## Error handling
 
 ```ts twoslash
 import { pqc, PqcError } from '@pqc-sdk/core';
@@ -65,16 +66,16 @@ try {
 } catch (error) {
   if (error instanceof PqcError) {
     switch (error.code) {
-      case 'INVALID_CIPHERTEXT': // no es un archivo .pqc o está truncado
-      case 'DECRYPTION_FAILED': // manipulado, o la key no corresponde
+      case 'INVALID_CIPHERTEXT': // not a .pqc file, or truncated
+      case 'DECRYPTION_FAILED': // tampered with, or the key does not match
         console.error(error.message);
     }
   }
 }
 ```
 
-## Archivos grandes
+## Large files
 
-`encrypt` opera en memoria: para archivos de cientos de MB considerá cifrar por
-chunks (cada chunk es un `encrypt` independiente con su propio encapsulamiento) o
-esperá la API de streaming del SDK. El overhead por mensaje es de 1118 bytes.
+`encrypt` operates in memory: for files of hundreds of MB consider encrypting
+in chunks (each chunk is an independent `encrypt` with its own encapsulation)
+or wait for the SDK's streaming API. The per-message overhead is 1118 bytes.

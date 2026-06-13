@@ -1,4 +1,4 @@
-// Copia docs/compatibility.md (fuente de verdad del repo) a la página del sitio.
+// Copies docs/compatibility.md (the repo's source of truth) to the site page.
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,6 @@ const target = join(here, '../compatibility.md');
 
 const content = await readFile(source, 'utf8');
 const banner =
-  '<!-- GENERADO desde docs/compatibility.md por scripts/sync.mjs — no editar acá -->\n\n';
+  '<!-- GENERATED from docs/compatibility.md by scripts/sync.mjs — do not edit here -->\n\n';
 await writeFile(target, banner + content);
-console.log('compatibility.md sincronizado');
+console.log('compatibility.md synced');
