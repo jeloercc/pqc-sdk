@@ -1,46 +1,48 @@
-# Contribuir
+# Contributing
 
-## Correr el repo
+## Running the repo
 
-Requisitos: Node 20+ y pnpm (la versión exacta está en el campo
-`packageManager` del `package.json`; con `corepack enable` alcanza).
+Requirements: Node 20+ and pnpm (the exact version is in the `packageManager`
+field of `package.json`; `corepack enable` is enough).
 
 ```bash
 pnpm install
 pnpm build          # turbo run build (core → cli → docs)
-pnpm test           # tests con Vitest; core corre con --coverage (mínimo 90%)
+pnpm test           # Vitest; core runs with --coverage (90% minimum)
 pnpm lint           # eslint + tsc --noEmit
 pnpm format         # prettier --write
 ```
 
-Para iterar sobre un paquete: `pnpm dev --filter=@pqc-sdk/core` (o `cli`, o
-`@pqc-sdk/docs` para el sitio).
+To iterate on a single package: `pnpm dev --filter=@pqc-sdk/core` (or `cli`,
+or `@pqc-sdk/docs` for the site).
 
-## Reglas del proyecto
+## Project rules
 
-- **Nunca implementamos primitivas criptográficas.** Vienen de `@noble/*`;
-  un PR que implemente una primitiva desde cero se rechaza directo.
-- TypeScript strict. Cada función pública lleva JSDoc con ejemplo de uso.
-- Defaults seguros, API zero-config.
+- **We never implement cryptographic primitives.** They come from `@noble/*`;
+  a PR implementing a primitive from scratch gets rejected outright.
+- Strict TypeScript. Every public function carries JSDoc with a usage example.
+- Safe defaults, zero-config API.
+- All user-facing text is in English: CLI output, error messages, JSDoc,
+  READMEs, docs, changesets, code comments, and commit messages.
 
 ## Commits
 
-Usamos [Conventional Commits](https://www.conventionalcommits.org/):
+We use [Conventional Commits](https://www.conventionalcommits.org/):
 `fix(core): ...`, `feat(cli): ...`, `docs: ...`, `ci: ...`, etc.
 
 ## Changesets
 
-Todo PR que cambie un paquete publicable (`packages/*`) necesita un changeset:
+Every PR that changes a publishable package (`packages/*`) needs a changeset:
 
 ```bash
 pnpm changeset
 ```
 
-Elegí el bump (`patch`/`minor`) y describí el cambio de cara al usuario — ese
-texto va al CHANGELOG. Los cambios de docs, CI o ejemplos no lo necesitan.
-El release es automático: al mergear a `main`, el bot de changesets abre un
-PR de versiones y publica a npm cuando se mergea.
+Pick the bump (`patch`/`minor`) and describe the change from the user's
+perspective — that text goes into the CHANGELOG. Docs, CI or example changes
+don't need one. Releases are automated: on merge to `main`, the changesets bot
+opens a version PR and publishes to npm when it gets merged.
 
-## Reportes de seguridad
+## Security reports
 
-No abras issues públicos por vulnerabilidades: ver [SECURITY.md](./SECURITY.md).
+Do not open public issues for vulnerabilities: see [SECURITY.md](./SECURITY.md).
