@@ -1,6 +1,6 @@
 import { pqc } from '@pqc-sdk/core';
 
-const message = 'roundtrip en Cloudflare Workers';
+const message = 'roundtrip on Cloudflare Workers';
 
 export default {
   async fetch(): Promise<Response> {
