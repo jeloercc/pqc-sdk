@@ -1,84 +1,83 @@
-# Compatibilidad por runtime
+# Runtime compatibility
 
-Resultados de los ejemplos de `examples/` (roundtrip generate → encrypt →
-decrypt con ML-KEM-768 + AES-256-GCM), verificados el 2026-06-11 (Hermes:
-2026-06-12).
+Results from the `examples/` projects (generate → encrypt → decrypt roundtrip
+with ML-KEM-768 + AES-256-GCM), verified on 2026-06-11 (Hermes: 2026-06-12).
 
-| Runtime               | Versión probada            | Resultado          | Flags/config necesarios                                                             |
-| --------------------- | -------------------------- | ------------------ | ----------------------------------------------------------------------------------- |
-| Node                  | 24.11 (target ≥20)         | ✅                 | Ninguno                                                                             |
-| Deno                  | 2.8.2                      | ✅                 | Import map mientras no esté publicado; `--allow-read`                               |
-| Cloudflare Workers    | wrangler 4 / workerd local | ✅                 | Ninguno — no requiere `nodejs_compat`                                               |
-| Hermes (engine de RN) | CLI standalone 0.12        | ✅ engine validado | Polyfill de `crypto.getRandomValues`; transpilar `class` (Metro lo hace en RN)      |
-| React Native          | —                          | Engine ✅ / app ⏳ | Falta validar en app real con `react-native-get-random-values` (ver sección Hermes) |
+| Runtime              | Tested version             | Result              | Required flags/config                                                               |
+| -------------------- | -------------------------- | ------------------- | ----------------------------------------------------------------------------------- |
+| Node                 | 24.11 (target ≥20)         | ✅                  | None                                                                                |
+| Deno                 | 2.8.2                      | ✅                  | Import map until published; `--allow-read`                                          |
+| Cloudflare Workers   | wrangler 4 / local workerd | ✅                  | None — does not require `nodejs_compat`                                             |
+| Hermes (RN's engine) | standalone CLI 0.12        | ✅ engine validated | `crypto.getRandomValues` polyfill; transpile `class` (Metro does this in RN)        |
+| React Native         | —                          | Engine ✅ / app ⏳  | Pending validation in a real app with `react-native-get-random-values` (see Hermes) |
 
 ## Node (`examples/node`)
 
-Sin limitaciones. ESM directo, sin flags. El build CJS también funciona
-(`require('@pqc-sdk/core')`), verificado en los smoke tests del paso anterior.
+No limitations. Direct ESM, no flags. The CJS build also works
+(`require('@pqc-sdk/core')`), verified in the previous step's smoke tests.
 
 ## Deno (`examples/deno`)
 
-Funciona, con dos particularidades **temporales** (desaparecen al publicar en npm):
+Works, with two **temporary** caveats (they disappear once published to npm):
 
-1. Como `@pqc-sdk/core` no está publicado, el import map de `deno.json` apunta
-   al build local y debe mapear también los bare specifiers `@noble/*` que el
-   bundle ESM deja como externals (Deno los resuelve vía `npm:`). Publicado el
-   paquete, basta `"@pqc-sdk/core": "npm:@pqc-sdk/core"`.
-2. `--allow-read` para leer el dist local. Con el paquete desde npm no hace falta.
+1. Since `@pqc-sdk/core` is not published, the import map in `deno.json` points
+   to the local build and must also map the `@noble/*` bare specifiers that the
+   ESM bundle leaves as externals (Deno resolves them via `npm:`). Once the
+   package is published, `"@pqc-sdk/core": "npm:@pqc-sdk/core"` is enough.
+2. `--allow-read` to read the local dist. Not needed with the package from npm.
 
-No se necesitó `node_modules` ni `nodeModulesDir`: la resolución `npm:` de Deno
-maneja las dependencias transitivas (@noble/hashes) sola.
+No `node_modules` or `nodeModulesDir` was needed: Deno's `npm:` resolution
+handles the transitive dependencies (@noble/hashes) on its own.
 
 ## Cloudflare Workers (`examples/cloudflare-workers`)
 
-- **No requiere `nodejs_compat`**: el SDK solo usa APIs estándar
+- **Does not require `nodejs_compat`**: the SDK only uses standard APIs
   (`crypto.getRandomValues`, `TextEncoder`/`TextDecoder`, `Uint8Array`).
-  Verificado con `compatibility_date = 2025-01-01` en workerd local.
-- **Bundle**: 78 KiB / 20 KiB gzip de upload total (SDK + @noble/\*), medido con
-  `wrangler deploy --dry-run`. Muy por debajo del límite de 1 MiB del plan free.
-- **CPU**: el request completo (keygen + encapsulate + AES + decapsulate) tardó
-  ~51 ms wall-clock en dev local. El plan free de Workers limita a 10 ms de CPU
-  por request: hacer **keygen + encrypt + decrypt en un mismo request** puede
-  excederlo. En uso real (una sola operación por request, keys persistidas) cada
-  operación individual queda dentro del presupuesto, pero conviene medir con
-  `wrangler dev --remote` antes de producción en plan free. En planes pagos
-  (límite 30 s) no hay problema.
+  Verified with `compatibility_date = 2025-01-01` on local workerd.
+- **Bundle**: 78 KiB / 20 KiB gzip total upload (SDK + @noble/\*), measured
+  with `wrangler deploy --dry-run`. Far below the free plan's 1 MiB limit.
+- **CPU**: the full request (keygen + encapsulate + AES + decapsulate) took
+  ~51 ms wall-clock in local dev. The Workers free plan limits CPU to 10 ms
+  per request: doing **keygen + encrypt + decrypt in a single request** can
+  exceed it. In real usage (one operation per request, persisted keys) each
+  individual operation stays within budget, but measure with
+  `wrangler dev --remote` before going to production on the free plan. On paid
+  plans (30 s limit) there is no issue.
 
-## Hermes standalone (`examples/hermes-standalone`)
+## Standalone Hermes (`examples/hermes-standalone`)
 
-Validado el 2026-06-12 con el CLI standalone de Hermes (binarios del release
-[v0.13.0](https://github.com/facebook/hermes/releases/tag/v0.13.0), ago 2024,
-el binario reporta 0.12.0 — son los últimos publicados standalone; el Hermes
-embebido en React Native actual es más nuevo). Roundtrip completo OK, tanto
-interpretando el JS como ejecutando bytecode precompilado con `hermesc`
-(el formato que despliega RN).
+Validated on 2026-06-12 with the standalone Hermes CLI (binaries from the
+[v0.13.0](https://github.com/facebook/hermes/releases/tag/v0.13.0) release,
+Aug 2024, the binary reports 0.12.0 — the latest published standalone; the
+Hermes embedded in current React Native is newer). Full roundtrip OK, both
+interpreting the JS and executing bytecode precompiled with `hermesc` (the
+format RN ships).
 
-**Qué trae Hermes 0.12 de lo que el SDK necesita:**
+**What Hermes 0.12 provides of what the SDK needs:**
 
 - ✅ `TextEncoder`, `BigInt`, `async/await`, generators, `??`/`?.`
-- ❌ `crypto.getRandomValues` — en RN lo provee `react-native-get-random-values`
-  (importarlo **antes** que el SDK); en el ejemplo standalone se shimea solo
-  para validar el engine (el polyfill real usa NativeModules y no corre sin RN).
-- ❌ Sintaxis `class` — no es problema en RN (Metro/Babel la transpila siempre);
-  standalone se transpiló con `@babel/plugin-transform-classes`.
-- ❌ `TextDecoder` — el SDK no lo usa internamente (`decrypt` devuelve
-  `Uint8Array`), pero si tu app decodifica a string necesita un polyfill
-  (p. ej. `text-encoding-polyfill` o `fast-text-encoding`).
+- ❌ `crypto.getRandomValues` — in RN it is provided by
+  `react-native-get-random-values` (import it **before** the SDK); in the
+  standalone example it is shimmed only to validate the engine (the real
+  polyfill uses NativeModules and cannot run without RN).
+- ❌ `class` syntax — not a problem in RN (Metro/Babel always transpiles it);
+  standalone it was transpiled with `@babel/plugin-transform-classes`.
+- ❌ `TextDecoder` — the SDK does not use it internally (`decrypt` returns a
+  `Uint8Array`), but if your app decodes to a string it needs a polyfill
+  (e.g. `text-encoding-polyfill` or `fast-text-encoding`).
 
-**Tiempos medidos** (bytecode, x86_64, interpretado — Hermes no tiene JIT):
-keygen 34 ms, encrypt 35 ms, decrypt 43 ms, sign+verify ML-DSA-65 449 ms.
-Más lento que V8 pero usable; las firmas ML-DSA conviene no hacerlas en el
-hilo de UI.
+**Measured timings** (bytecode, x86_64, interpreted — Hermes has no JIT):
+keygen 34 ms, encrypt 35 ms, decrypt 43 ms, ML-DSA-65 sign+verify 449 ms.
+Slower than V8 but usable; keep ML-DSA signing off the UI thread.
 
-**Qué falta para marcar React Native como ✅:** correr el roundtrip en una app
-RN real (device o simulador) con `react-native-get-random-values` como fuente
-de entropía — el shim standalone solo replica su superficie, no valida el
-native module ni la integración con Metro.
+**What's missing to mark React Native as ✅:** running the roundtrip in a real
+RN app (device or simulator) with `react-native-get-random-values` as the
+entropy source — the standalone shim only replicates its surface; it validates
+neither the native module nor the Metro integration.
 
-## Limitaciones generales (heredadas de @noble/post-quantum)
+## General limitations (inherited from @noble/post-quantum)
 
-- Sin garantías constant-time (JS con JIT); documentado en la investigación.
-- React Native: engine Hermes validado standalone (ver arriba); pendiente la
-  validación en app real. Hermes no trae `crypto.getRandomValues`: importar
-  `react-native-get-random-values` antes que el SDK.
+- No constant-time guarantees (JS with JIT); documented in the research notes.
+- React Native: Hermes engine validated standalone (see above); validation in
+  a real app is pending. Hermes does not ship `crypto.getRandomValues`: import
+  `react-native-get-random-values` before the SDK.
