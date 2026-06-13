@@ -1,65 +1,67 @@
-# Cifrado híbrido KEM+AES, explicado
+# Hybrid KEM+AES encryption, explained
 
-`pqc.encrypt` parece una caja negra. No lo es — esto es exactamente lo que pasa adentro.
+`pqc.encrypt` looks like a black box. It isn't — this is exactly what happens inside.
 
-## El problema que resuelve
+## The problem it solves
 
-ML-KEM no es un cifrador de datos: es un **mecanismo de encapsulamiento de claves**
-(KEM). No puede cifrar tu JSON de 2 MB; lo único que sabe hacer es acordar un
-secreto de 32 bytes entre dos partes de forma resistente a computadoras cuánticas.
+ML-KEM is not a data cipher: it is a **key encapsulation mechanism** (KEM). It
+cannot encrypt your 2 MB JSON; the only thing it knows how to do is agree on a
+32-byte secret between two parties in a way that resists quantum computers.
 
-El patrón estándar (el mismo de TLS) es **híbrido**: el KEM acuerda el secreto,
-y un cifrador simétrico rápido — AES-256-GCM — cifra los datos con ese secreto.
+The standard pattern (the same one TLS uses) is **hybrid**: the KEM agrees on
+the secret, and a fast symmetric cipher — AES-256-GCM — encrypts the data with
+that secret.
 
-## Paso a paso
+## Step by step
 
 ```
 encrypt(data, publicKey):
 
   1. ML-KEM-768.encapsulate(publicKey)
-       → cipherText (1088 bytes)      lo que viaja
-       → sharedSecret (32 bytes)      NUNCA viaja
+       → cipherText (1088 bytes)      what travels
+       → sharedSecret (32 bytes)      NEVER travels
 
   2. nonce = random(12 bytes)
 
   3. sealed = AES-256-GCM(key = sharedSecret, nonce).encrypt(data)
-       → incluye tag de autenticación (16 bytes)
+       → includes the authentication tag (16 bytes)
 
-  4. resultado = [versión|alg|cipherText|nonce|sealed]
+  4. result = [version|alg|cipherText|nonce|sealed]
 ```
 
-El receptor invierte el proceso: `decapsulate(cipherText, secretKey)` reconstruye
-el **mismo** `sharedSecret` de 32 bytes, y AES-GCM descifra y **verifica
-integridad**. Un solo bit alterado y el tag no valida: `decrypt` lanza
-`PqcError('DECRYPTION_FAILED')`.
+The recipient reverses the process: `decapsulate(cipherText, secretKey)`
+reconstructs the **same** 32-byte `sharedSecret`, and AES-GCM decrypts and
+**verifies integrity**. A single flipped bit and the tag fails to validate:
+`decrypt` throws `PqcError('DECRYPTION_FAILED')`.
 
-## Por qué estas decisiones
+## Why these decisions
 
-- **El shared secret de ML-KEM se usa directo como key AES-256.** FIPS 203
-  garantiza que es uniformemente aleatorio, así que no necesita KDF intermedio.
-- **GCM** aporta confidencialidad _y_ autenticación en una pasada — sin
-  cifrar-luego-firmar manual, sin oráculos de padding.
-- **Nonce aleatorio por mensaje**: cifrar dos veces lo mismo produce ciphertexts
-  distintos.
-- **Overhead fijo**: 1118 bytes por mensaje (2 header + 1088 KEM + 12 nonce +
-  16 tag), sea el payload de 1 byte o de 100 MB.
+- **ML-KEM's shared secret is used directly as the AES-256 key.** FIPS 203
+  guarantees it is uniformly random, so no intermediate KDF is needed.
+- **GCM** provides confidentiality _and_ authentication in one pass — no
+  manual encrypt-then-sign, no padding oracles.
+- **Random nonce per message**: encrypting the same thing twice produces
+  different ciphertexts.
+- **Fixed overhead**: 1118 bytes per message (2 header + 1088 KEM + 12 nonce +
+  16 tag), whether the payload is 1 byte or 100 MB.
 
-## En código
+## In code
 
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
 
 const pair = await pqc.keys.generate();
 
-const a = await pqc.encrypt('mismo mensaje', pair.publicKey);
-const b = await pqc.encrypt('mismo mensaje', pair.publicKey);
-console.log(a.length === b.length); // true — overhead fijo
-// pero a ≠ b: encapsulamiento y nonce frescos en cada llamada
+const a = await pqc.encrypt('same message', pair.publicKey);
+const b = await pqc.encrypt('same message', pair.publicKey);
+console.log(a.length === b.length); // true — fixed overhead
+// but a ≠ b: fresh encapsulation and nonce on every call
 ```
 
-## Qué NO hace
+## What it does NOT do
 
-- **No autentica al emisor.** Cualquiera con tu public key puede cifrarte mensajes.
-  Si necesitás saber quién lo mandó, combiná con [firmas ML-DSA](./sign-jwt).
-- **No protege la secret key.** Guardala como cualquier secreto (KMS, env vars
-  cifradas — y fuera de git).
+- **It does not authenticate the sender.** Anyone with your public key can
+  encrypt messages to you. If you need to know who sent it, combine with
+  [ML-DSA signatures](./sign-jwt).
+- **It does not protect the secret key.** Store it like any secret (KMS,
+  encrypted env vars — and out of git).

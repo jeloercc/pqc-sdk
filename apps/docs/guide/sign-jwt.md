@@ -1,17 +1,17 @@
-# Firmar JWTs con ML-DSA
+# Signing JWTs with ML-DSA
 
-Los JWT clásicos se firman con RS256 (RSA) o ES256 (ECDSA) — ambos quedan
-deprecados hacia 2030 y prohibidos en 2035 según NIST IR 8547. Esta guía arma un
-JWT firmado con **ML-DSA-65** (FIPS 204) usando el SDK.
+Classic JWTs are signed with RS256 (RSA) or ES256 (ECDSA) — both become
+deprecated around 2030 and disallowed in 2035 per NIST IR 8547. This guide
+builds a JWT signed with **ML-DSA-65** (FIPS 204) using the SDK.
 
-::: warning Estado de la estandarización
-El registro de `alg` para ML-DSA en JOSE todavía está en proceso en el IETF
-(draft `ML-DSA` para COSE/JOSE). Mientras tanto este patrón usa un valor de
-`alg` propio — perfecto para JWTs **internos** entre tus propios servicios,
-que es donde hoy tiene sentido migrar primero.
+::: warning Standardization status
+The `alg` registration for ML-DSA in JOSE is still in progress at the IETF
+(`ML-DSA` draft for COSE/JOSE). In the meantime this pattern uses a custom
+`alg` value — perfect for **internal** JWTs between your own services, which
+is where migrating first makes sense today.
 :::
 
-## Emitir el token
+## Issuing the token
 
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
@@ -33,11 +33,12 @@ const signature = await pqc.sign(signingInput, pair.secretKey);
 const jwt = `${signingInput}.${b64url(signature)}`;
 ```
 
-La firma ML-DSA-65 mide **3309 bytes** (~4,4 KB en base64url). Un JWT RS256 ronda
-los 800 bytes: el token post-cuántico es ~6x más grande. Para cookies con límite
-de 4 KB no entra — usalo en headers `Authorization` o tokens server-to-server.
+The ML-DSA-65 signature is **3309 bytes** (~4.4 KB in base64url). An RS256 JWT
+is around 800 bytes: the post-quantum token is ~6x larger. It won't fit in
+cookies with a 4 KB limit — use it in `Authorization` headers or
+server-to-server tokens.
 
-## Verificar el token
+## Verifying the token
 
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
@@ -52,22 +53,22 @@ const valid = await pqc.verify(
   pair.publicKey,
 );
 
-if (!valid) throw new Error('token inválido');
+if (!valid) throw new Error('invalid token');
 
 const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString()) as {
   sub: string;
   exp: number;
 };
-if (payload.exp < Date.now() / 1000) throw new Error('token expirado');
+if (payload.exp < Date.now() / 1000) throw new Error('expired token');
 ```
 
-`verify` devuelve `false` ante cualquier firma alterada o malformada — nunca
-lanza por una firma corrupta, así que el flujo de validación queda lineal.
+`verify` returns `false` for any altered or malformed signature — it never
+throws because of a corrupted signature, so the validation flow stays linear.
 
-## Aislar audiencias con context strings
+## Isolating audiences with context strings
 
-FIPS 204 define _context strings_: la misma key puede firmar dominios distintos
-sin que un token de un dominio valide en otro.
+FIPS 204 defines _context strings_: the same key can sign different domains
+without a token from one domain validating in another.
 
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
@@ -78,20 +79,20 @@ const ctx = new TextEncoder().encode('auth-service:v1');
 const signature = await pqc.sign('payload', pair.secretKey, { context: ctx });
 
 await pqc.verify('payload', signature, pair.publicKey, { context: ctx }); // true
-await pqc.verify('payload', signature, pair.publicKey); // false: otro contexto
+await pqc.verify('payload', signature, pair.publicKey); // false: different context
 ```
 
-## Distribuir la public key
+## Distributing the public key
 
-La public key de verificación se serializa y publica como cualquier JWKS:
+The verification public key serializes and gets published like any JWKS:
 
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
 const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
 // ---cut---
-// En el emisor:
+// On the issuer:
 const published = pqc.keys.serialize(pair.publicKey);
 
-// En cada verificador:
+// On each verifier:
 const verificationKey = pqc.keys.deserialize(published);
 ```
