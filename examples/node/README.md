@@ -1,8 +1,8 @@
-# Ejemplo: Node puro
+# Example: plain Node
 
-Roundtrip generate → encrypt → decrypt con `@pqc-sdk/core` en Node 20+.
+Generate → encrypt → decrypt roundtrip with `@pqc-sdk/core` on Node 20+.
 
 ```bash
-pnpm install   # desde la raíz del monorepo
+pnpm install   # from the monorepo root
 pnpm --filter @pqc-sdk/example-node start
 ```

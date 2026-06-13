@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { pqc } from '@pqc-sdk/core';
 
-const message = 'roundtrip en Node puro';
+const message = 'roundtrip on plain Node';
 
 const pair = await pqc.keys.generate();
 const ciphertext = await pqc.encrypt(message, pair.publicKey);
@@ -11,4 +11,4 @@ const decoded = new TextDecoder().decode(plaintext);
 
 assert.equal(decoded, message);
 console.log('✅ Node: generate → encrypt → decrypt OK');
-console.log(`   algoritmo: ${pair.algorithm}, ciphertext: ${ciphertext.length} bytes`);
+console.log(`   algorithm: ${pair.algorithm}, ciphertext: ${ciphertext.length} bytes`);

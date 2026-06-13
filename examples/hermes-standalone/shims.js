@@ -1,12 +1,12 @@
-// Shims mínimos para correr el SDK en el CLI standalone de Hermes.
+// Minimal shims to run the SDK on the standalone Hermes CLI.
 //
-// En una app React Native real estos globals NO se shimean así:
-// - crypto.getRandomValues lo provee `react-native-get-random-values`
-//   (entropía nativa del SO vía SecRandomCopyBytes/SecureRandom). Ese
-//   polyfill necesita el runtime de RN (NativeModules), así que acá se
-//   replica solo su superficie. Math.random NO es criptográficamente
-//   seguro: este shim existe únicamente para validar el engine.
-// - console existe en RN; el CLI de Hermes solo trae print().
+// In a real React Native app these globals are NOT shimmed like this:
+// - crypto.getRandomValues is provided by `react-native-get-random-values`
+//   (native OS entropy via SecRandomCopyBytes/SecureRandom). That polyfill
+//   needs the RN runtime (NativeModules), so only its surface is replicated
+//   here. Math.random is NOT cryptographically secure: this shim exists
+//   solely to validate the engine.
+// - console exists in RN; the Hermes CLI only ships print().
 
 if (typeof globalThis.console === 'undefined') {
   globalThis.console = {

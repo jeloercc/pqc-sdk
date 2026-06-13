@@ -1,14 +1,14 @@
-# Ejemplo: Deno
+# Example: Deno
 
-Roundtrip generate → encrypt → decrypt en Deno 2+.
+Generate → encrypt → decrypt roundtrip on Deno 2+.
 
-Mientras `@pqc-sdk/core` no esté publicado en npm, el import map de
-`deno.json` apunta al build local (`packages/core/dist`) y resuelve las
-dependencias `@noble/*` vía `npm:`. Una vez publicado bastará con
-`"@pqc-sdk/core": "npm:@pqc-sdk/core@^0.0.1"`.
+While `@pqc-sdk/core` is not published to npm, the import map in `deno.json`
+points to the local build (`packages/core/dist`) and resolves the `@noble/*`
+dependencies via `npm:`. Once published,
+`"@pqc-sdk/core": "npm:@pqc-sdk/core@^0.0.1"` will be enough.
 
 ```bash
-pnpm build      # desde la raíz: genera packages/core/dist
+pnpm build      # from the root: generates packages/core/dist
 cd examples/deno
 deno task start
 ```
