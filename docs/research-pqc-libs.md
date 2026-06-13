@@ -1,58 +1,78 @@
-# Investigación: librerías PQC para JS/TS (junio 2026)
+# Research: PQC libraries for JS/TS (June 2026)
 
-Comparación de bases criptográficas candidatas para el SDK.
-Conclusión: **usar `@noble/post-quantum` como base**.
+Comparison of candidate cryptographic foundations for the SDK.
+Conclusion: **use `@noble/post-quantum` as the base**.
 
-## Comparación
+## Comparison
 
-| Criterio           | @noble/post-quantum                               | mlkem (dajiaji)                            | @oqs/liboqs-js (WASM)                                                       | liboqs-node (nativo)   |
-| ------------------ | ------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------- | ---------------------- |
-| Última publicación | v0.6.1 · abr 2026                                 | v2.7.0 · mar 2026                          | v0.15.1 · feb 2026                                                          | v0.1.0 · 2022 (muerto) |
-| Descargas/semana   | ~122.000                                          | ~7.800                                     | ~650                                                                        | ~280                   |
-| ML-KEM (FIPS 203)  | ✅ final                                          | ✅ final                                   | ✅ final                                                                    | Kyber pre-estándar     |
-| ML-DSA (FIPS 204)  | ✅ final                                          | ❌ solo KEM                                | ✅ final                                                                    | Dilithium pre-estándar |
-| SLH-DSA (FIPS 205) | ✅ final                                          | ❌                                         | ✅ final                                                                    | SPHINCS+ pre-estándar  |
-| Cloudflare Workers | ✅                                                | ✅                                         | Posible, no documentado                                                     | ❌ (addon nativo)      |
-| React Native       | ✅ (polyfill getRandomValues)                     | Probable (puro TS)                         | ❌ (WASM en Hermes)                                                         | ❌                     |
-| Deno / Bun         | ✅ (JSR)                                          | ✅                                         | ✅                                                                          | ❌                     |
-| Bundle             | ~16 KB gzip (todo)                                | Pequeño (puro TS, tree-shakable)           | 80–500 KB WASM por algoritmo                                                | N/A                    |
-| Dependencias       | Solo @noble/\* (mismo autor)                      | Cero                                       | liboqs compilado                                                            | node-pre-gyp, etc.     |
-| Auditoría          | Self-audit 0.6.1; sin auditoría independiente aún | Sin auditoría; pasa KATs (NIST, C2SP/CCTV) | Hereda liboqs (bien revisado, "experimental, not for production" según OQS) | —                      |
+| Criterion          | @noble/post-quantum                        | mlkem (dajiaji)                         | @oqs/liboqs-js (WASM)                                                       | liboqs-node (native)   |
+| ------------------ | ------------------------------------------ | --------------------------------------- | --------------------------------------------------------------------------- | ---------------------- |
+| Latest release     | v0.6.1 · Apr 2026                          | v2.7.0 · Mar 2026                       | v0.15.1 · Feb 2026                                                          | v0.1.0 · 2022 (dead)   |
+| Downloads/week     | ~122,000                                   | ~7,800                                  | ~650                                                                        | ~280                   |
+| ML-KEM (FIPS 203)  | ✅ final                                   | ✅ final                                | ✅ final                                                                    | Pre-standard Kyber     |
+| ML-DSA (FIPS 204)  | ✅ final                                   | ❌ KEM only                             | ✅ final                                                                    | Pre-standard Dilithium |
+| SLH-DSA (FIPS 205) | ✅ final                                   | ❌                                      | ✅ final                                                                    | Pre-standard SPHINCS+  |
+| Cloudflare Workers | ✅                                         | ✅                                      | Possible, undocumented                                                      | ❌ (native addon)      |
+| React Native       | ✅ (getRandomValues polyfill)              | Likely (pure TS)                        | ❌ (WASM on Hermes)                                                         | ❌                     |
+| Deno / Bun         | ✅ (JSR)                                   | ✅                                      | ✅                                                                          | ❌                     |
+| Bundle             | ~16 KB gzip (everything)                   | Small (pure TS, tree-shakable)          | 80–500 KB WASM per algorithm                                                | N/A                    |
+| Dependencies       | Only @noble/\* (same author)               | Zero                                    | Compiled liboqs                                                             | node-pre-gyp, etc.     |
+| Audit              | Self-audit 0.6.1; no independent audit yet | No audit; passes KATs (NIST, C2SP/CCTV) | Inherits liboqs (well reviewed; "experimental, not for production" per OQS) | —                      |
 
-## Notas por librería
+## Notes per library
 
-### @noble/post-quantum (recomendada)
+### @noble/post-quantum (recommended)
 
-- Cubre exactamente los 3 algoritmos del CLAUDE.md (ML-KEM-768, ML-DSA-65, SLH-DSA) con los FIPS finales, en un solo paquete TypeScript auditable.
-- Corre en todos los targets del proyecto: Node 20+, Workers, Deno y React Native (este último necesita polyfill de `crypto.getRandomValues`, p. ej. `react-native-get-random-values`).
-- Caveats a documentar en el SDK: sin protecciones constant-time garantizadas (limitación de todo JS con JIT) y sin auditoría independiente todavía (self-audit en 0.6.1, abr 2026). Falcon incluido es Round 3, no FN-DSA final — no usarlo.
-- Diseñar la capa de proveedores del SDK (`packages/core/src/providers/`) para poder swapear el backend si más adelante conviene WASM/nativo en algún runtime.
+- Covers exactly the 3 algorithms in CLAUDE.md (ML-KEM-768, ML-DSA-65,
+  SLH-DSA) with the final FIPS, in a single auditable TypeScript package.
+- Runs on every project target: Node 20+, Workers, Deno and React Native (the
+  latter needs a `crypto.getRandomValues` polyfill, e.g.
+  `react-native-get-random-values`).
+- Caveats to document in the SDK: no guaranteed constant-time protections (a
+  limitation of all JIT-compiled JS) and no independent audit yet (self-audit
+  in 0.6.1, Apr 2026). The included Falcon is Round 3, not final FN-DSA — do
+  not use it.
+- Design the SDK's provider layer (`packages/core/src/providers/`) so the
+  backend can be swapped if WASM/native becomes worthwhile on some runtime
+  later.
 
 ### mlkem / crystals-kyber-js (dajiaji)
 
-- Excelente implementación pura TS de ML-KEM (afirma ~5x más rápida que la referencia, pasa KATs de NIST, C2SP/CCTV y pq-crystals), pero **solo KEM**: obligaría a mezclar autores/estilos para ML-DSA y SLH-DSA.
-- Candidata como backend alternativo de ML-KEM si los benchmarks lo justifican.
+- Excellent pure-TS ML-KEM implementation (claims ~5x faster than the
+  reference, passes NIST, C2SP/CCTV and pq-crystals KATs), but **KEM only**:
+  it would force mixing authors/styles for ML-DSA and SLH-DSA.
+- A candidate as an alternative ML-KEM backend if benchmarks justify it.
 
-### Alternativas WASM (@oqs/liboqs-js)
+### WASM alternatives (@oqs/liboqs-js)
 
-- Es el sucesor oficial: openforge-sh/liboqs-node fue archivado en feb 2026 y adoptado por Open Quantum Safe como `@oqs/liboqs-js`. WASM por algoritmo (80–500 KB cada uno), requiere Node 22+ por SIMD.
-- Pros: hereda la madurez de liboqs (v0.15, activo). Contras: bundle 5–30x mayor, sin React Native, adopción mínima (~650 descargas/semana), y OQS advierte que liboqs es para experimentación.
-- Reevaluar si aparece auditoría formal o si se necesita rendimiento nativo en server.
+- It is the official successor: openforge-sh/liboqs-node was archived in Feb
+  2026 and adopted by Open Quantum Safe as `@oqs/liboqs-js`. WASM per
+  algorithm (80–500 KB each), requires Node 22+ for SIMD.
+- Pros: inherits liboqs maturity (v0.15, active). Cons: 5–30x larger bundle,
+  no React Native, minimal adoption (~650 downloads/week), and OQS warns that
+  liboqs is for experimentation.
+- Re-evaluate if a formal audit appears or if native server performance is
+  needed.
 
-### liboqs-node (TapuCosmo y forks)
+### liboqs-node (TapuCosmo and forks)
 
-- El original está muerto (v0.1.0, 2022, algoritmos pre-estándar). El fork @skairipaapps tuvo actividad hasta jun 2025. Addon nativo: incompatible con Workers/RN/Deno. **Descartada.**
+- The original is dead (v0.1.0, 2022, pre-standard algorithms). The
+  @skairipaapps fork had activity until Jun 2025. Native addon: incompatible
+  with Workers/RN/Deno. **Discarded.**
 
-## Decisión
+## Decision
 
-`@noble/post-quantum` como dependencia base de `@pqc-sdk/core`:
+`@noble/post-quantum` as the base dependency of `@pqc-sdk/core`:
 
-1. Único paquete mantenido que cubre FIPS 203 + 204 + 205 finales.
-2. Único compatible con los 4 targets del proyecto (Node, Workers, RN, Deno).
-3. Bundle ~16 KB vs 80–500 KB por algoritmo en WASM.
-4. Mantenimiento muy activo (release abr 2026) y adopción dominante (~122k/sem).
-5. Cumple la regla "nunca implementar primitivas desde cero" delegando en una implementación con KATs y track record (ecosistema noble).
+1. The only maintained package covering final FIPS 203 + 204 + 205.
+2. The only one compatible with the project's 4 targets (Node, Workers, RN,
+   Deno).
+3. ~16 KB bundle vs 80–500 KB per algorithm in WASM.
+4. Very active maintenance (Apr 2026 release) and dominant adoption
+   (~122k/week).
+5. Satisfies the "never implement primitives from scratch" rule by delegating
+   to an implementation with KATs and a track record (the noble ecosystem).
 
-Fuentes: github.com/paulmillr/noble-post-quantum · github.com/dajiaji/crystals-kyber-js ·
-github.com/openforge-sh/liboqs-node (archivado → @oqs/liboqs-js) · github.com/TapuCosmo/liboqs-node ·
-openquantumsafe.org/liboqs · registry.npmjs.org / api.npmjs.org (versiones y descargas, 2026-06-11)
+Sources: github.com/paulmillr/noble-post-quantum · github.com/dajiaji/crystals-kyber-js ·
+github.com/openforge-sh/liboqs-node (archived → @oqs/liboqs-js) · github.com/TapuCosmo/liboqs-node ·
+openquantumsafe.org/liboqs · registry.npmjs.org / api.npmjs.org (versions and downloads, 2026-06-11)
