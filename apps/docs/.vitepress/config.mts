@@ -5,9 +5,9 @@ import typedocSidebar from '../api/typedoc-sidebar.json';
 
 export default defineConfig({
   title: 'PQC SDK',
-  description: 'Criptografía post-cuántica para JS/TS en 30 minutos',
-  lang: 'es',
-  // El sitio se publica en GitHub Pages bajo /pqc-sdk/ (ver .github/workflows/docs.yml).
+  description: 'Post-quantum cryptography for JS/TS in 30 minutes',
+  lang: 'en',
+  // The site is published on GitHub Pages under /pqc-sdk/ (see .github/workflows/docs.yml).
   base: '/pqc-sdk/',
   ignoreDeadLinks: true,
   markdown: {
@@ -24,31 +24,31 @@ export default defineConfig({
   },
   themeConfig: {
     nav: [
-      { text: 'Guía', link: '/guide/quickstart' },
+      { text: 'Guide', link: '/guide/quickstart' },
       { text: 'API', link: '/api/' },
-      { text: 'Compatibilidad', link: '/compatibility' },
+      { text: 'Compatibility', link: '/compatibility' },
     ],
     sidebar: [
       {
-        text: 'Empezar',
+        text: 'Getting started',
         items: [
-          { text: 'Quickstart (5 minutos)', link: '/guide/quickstart' },
-          { text: '¿Por qué PQC ahora?', link: '/guide/why-pqc' },
+          { text: 'Quickstart (5 minutes)', link: '/guide/quickstart' },
+          { text: 'Why PQC now?', link: '/guide/why-pqc' },
         ],
       },
       {
-        text: 'Guías por caso de uso',
+        text: 'Use-case guides',
         items: [
-          { text: 'Cifrado híbrido KEM+AES, explicado', link: '/guide/hybrid-encryption' },
-          { text: 'Cifrar archivos', link: '/guide/encrypt-files' },
-          { text: 'Firmar JWTs con ML-DSA', link: '/guide/sign-jwt' },
+          { text: 'Hybrid KEM+AES encryption, explained', link: '/guide/hybrid-encryption' },
+          { text: 'Encrypting files', link: '/guide/encrypt-files' },
+          { text: 'Signing JWTs with ML-DSA', link: '/guide/sign-jwt' },
         ],
       },
       {
-        text: 'Referencia',
+        text: 'Reference',
         items: [
-          { text: 'Compatibilidad por runtime', link: '/compatibility' },
-          { text: 'API de @pqc-sdk/core', link: '/api/', items: typedocSidebar },
+          { text: 'Runtime compatibility', link: '/compatibility' },
+          { text: '@pqc-sdk/core API', link: '/api/', items: typedocSidebar },
         ],
       },
     ],
