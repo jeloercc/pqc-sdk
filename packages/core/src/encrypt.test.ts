@@ -81,6 +81,50 @@ describe('pqc.encrypt / pqc.decrypt', () => {
     });
   });
 
+  it('roundtrips after the header is bound as AES-GCM additional data', async () => {
+    const pair = await pqc.keys.generate();
+
+    const ciphertext = await pqc.encrypt('header is authenticated', pair.publicKey);
+    const plaintext = await pqc.decrypt(ciphertext, pair.secretKey);
+
+    expect(new TextDecoder().decode(plaintext)).toBe('header is authenticated');
+  });
+
+  it('fails with INVALID_CIPHERTEXT when a header byte is tampered with', async () => {
+    const pair = await pqc.keys.generate();
+    const ciphertext = await pqc.encrypt('intact data', pair.publicKey);
+
+    // Both header bytes (FORMAT_VERSION at 0, headerId at 1) are rejected by the
+    // fail-fast header check before AES-GCM ever runs.
+    for (const index of [0, 1]) {
+      const tampered = new Uint8Array(ciphertext);
+      tampered[index] = tampered[index]! ^ 0xff;
+
+      await expect(pqc.decrypt(tampered, pair.secretKey)).rejects.toMatchObject({
+        code: 'INVALID_CIPHERTEXT',
+      });
+    }
+  });
+
+  it('fails with DECRYPTION_FAILED when a body byte is tampered with', async () => {
+    const pair = await pqc.keys.generate();
+    const ciphertext = await pqc.encrypt('intact data', pair.publicKey);
+
+    // One byte inside each body region: KEM ciphertext, nonce and the sealed
+    // AES-GCM output (header is 2 bytes, KEM ciphertext is 1088 bytes, nonce 12).
+    const kemCiphertextByte = 2;
+    const nonceByte = 2 + 1088;
+    const sealedByte = 2 + 1088 + 12;
+    for (const index of [kemCiphertextByte, nonceByte, sealedByte]) {
+      const tampered = new Uint8Array(ciphertext);
+      tampered[index] = tampered[index]! ^ 0xff;
+
+      await expect(pqc.decrypt(tampered, pair.secretKey)).rejects.toMatchObject({
+        code: 'DECRYPTION_FAILED',
+      });
+    }
+  });
+
   it('rejects truncated ciphertexts or unknown headers', async () => {
     const pair = await pqc.keys.generate();
 

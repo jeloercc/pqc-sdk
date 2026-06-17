@@ -37,11 +37,14 @@ export async function encrypt(
 
   const { cipherText, sharedSecret } = spec.kem.encapsulate(publicKey.bytes);
   const nonce = randomBytes(NONCE_LENGTH);
-  const sealed = gcm(sharedSecret, nonce).encrypt(plaintext);
+
+  // Bind the 2-byte header (FORMAT_VERSION, headerId) as AES-GCM additional
+  // authenticated data so it is covered by the GCM tag (see decrypt).
+  const header = new Uint8Array([FORMAT_VERSION, spec.headerId]);
+  const sealed = gcm(sharedSecret, nonce, header).encrypt(plaintext);
 
   const out = new Uint8Array(2 + cipherText.length + nonce.length + sealed.length);
-  out[0] = FORMAT_VERSION;
-  out[1] = spec.headerId;
+  out.set(header, 0);
   out.set(cipherText, 2);
   out.set(nonce, 2 + cipherText.length);
   out.set(sealed, 2 + cipherText.length + nonce.length);
@@ -74,6 +77,12 @@ export async function decrypt(
       'Ciphertext is truncated or was not produced by pqc.encrypt',
     );
   }
+  // This equality check is fail-fast input validation: it discriminates the
+  // version and algorithm with a clear INVALID_CIPHERTEXT error before any
+  // cryptographic work. The AAD binding below is the *cryptographic* integrity
+  // of the header — it becomes the only line of defence once more versions or
+  // algorithms share this layout (a tampered-but-known header would pass this
+  // check yet fail the GCM tag). Do not remove either guard in a refactor.
   if (ciphertext[0] !== FORMAT_VERSION || ciphertext[1] !== spec.headerId) {
     throw new PqcError(
       'INVALID_CIPHERTEXT',
@@ -81,6 +90,9 @@ export async function decrypt(
     );
   }
 
+  // Reconstruct the AAD from the header bytes actually present in the message
+  // so AES-GCM authenticates them as part of the tag.
+  const header = ciphertext.subarray(0, 2);
   const kemCiphertext = ciphertext.subarray(2, 2 + spec.ciphertextLength);
   const nonce = ciphertext.subarray(
     2 + spec.ciphertextLength,
@@ -90,7 +102,7 @@ export async function decrypt(
 
   const sharedSecret = spec.kem.decapsulate(kemCiphertext, secretKey.bytes);
   try {
-    return Promise.resolve(gcm(sharedSecret, nonce).decrypt(sealed));
+    return Promise.resolve(gcm(sharedSecret, nonce, header).decrypt(sealed));
   } catch {
     throw new PqcError(
       'DECRYPTION_FAILED',

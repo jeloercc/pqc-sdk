@@ -38,5 +38,11 @@ export function fromBase64Url(encoded: string): Uint8Array {
       out[outIndex++] = (buffer >> bits) & 0xff;
     }
   }
+  // Reject non-canonical input: the leftover bits of the final group (those that
+  // do not complete a byte) must be zero, otherwise the string is not the
+  // canonical encoding of any byte sequence.
+  if ((buffer & ((1 << bits) - 1)) !== 0) {
+    throw new TypeError('Invalid base64url: non-canonical trailing bits');
+  }
   return out;
 }
