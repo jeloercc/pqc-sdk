@@ -19,10 +19,11 @@ const utf8 = new TextEncoder();
 function buildHybridCiphertext(kemCiphertext: Uint8Array, sharedSecret: Uint8Array) {
   const plaintext = utf8.encode('vector check');
   const nonce = new Uint8Array(12).fill(7);
-  const sealed = gcm(sharedSecret, nonce).encrypt(plaintext);
+  // The 2-byte header is bound as AES-GCM additional data, mirroring pqc.encrypt.
+  const header = new Uint8Array([1, 1]); // format version, ml-kem-768 header id
+  const sealed = gcm(sharedSecret, nonce, header).encrypt(plaintext);
   const out = new Uint8Array(2 + kemCiphertext.length + nonce.length + sealed.length);
-  out[0] = 1; // format version
-  out[1] = 1; // ml-kem-768 header id
+  out.set(header, 0);
   out.set(kemCiphertext, 2);
   out.set(nonce, 2 + kemCiphertext.length);
   out.set(sealed, 2 + kemCiphertext.length + nonce.length);
