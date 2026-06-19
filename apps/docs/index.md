@@ -24,3 +24,7 @@ features:
     title: Validated against NIST
     details: Test suite with the official ACVP vectors for FIPS 203 and FIPS 204.
 ---
+
+"Hybrid ML-KEM-768 + AES-256-GCM" above means the KEM-DEM construction — a
+post-quantum KEM wrapping a symmetric cipher — not a classical+post-quantum
+hybrid. [Two senses of "hybrid" →](/guide/hybrid-encryption#two-senses-of-hybrid)
