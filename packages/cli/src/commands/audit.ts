@@ -1,17 +1,24 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { defineCommand } from 'citty';
 import pc from 'picocolors';
 
-import { finding, heading, ok } from '../ui.js';
+import { finding, heading, note, ok } from '../ui.js';
 
 interface Finding {
   location: string;
   what: string;
   migrateTo: string;
 }
+
+/**
+ * Upper bound on the size of a single source file the scanner will read. Files
+ * larger than this are skipped: they are almost never hand-written source, and
+ * reading them would slow the scan with no useful signal.
+ */
+const MAX_FILE_BYTES = 1024 * 1024; // 1 MiB
 
 const ML_DSA = 'ML-DSA-65 (pqc.sign / pqc.verify)';
 const ML_KEM = 'ML-KEM-768 + AES-256-GCM (pqc.encrypt / pqc.decrypt)';
@@ -98,9 +105,20 @@ async function auditPackageJson(cwd: string): Promise<Finding[]> {
     .map((name) => ({ location: `package.json (${name})`, ...RISKY_PACKAGES[name]! }));
 }
 
-async function auditSources(cwd: string): Promise<Finding[]> {
+interface SourceScan {
+  findings: Finding[];
+  /** Files skipped because they exceed {@link MAX_FILE_BYTES}, relative to cwd. */
+  skipped: string[];
+}
+
+async function auditSources(cwd: string): Promise<SourceScan> {
   const findings: Finding[] = [];
+  const skipped: string[] = [];
   for (const file of await collectSourceFiles(cwd)) {
+    if ((await stat(file)).size > MAX_FILE_BYTES) {
+      skipped.push(relative(cwd, file));
+      continue;
+    }
     const lines = (await readFile(file, 'utf8')).split('\n');
     lines.forEach((line, index) => {
       for (const { re, what, migrateTo } of CODE_PATTERNS) {
@@ -110,17 +128,28 @@ async function auditSources(cwd: string): Promise<Finding[]> {
       }
     });
   }
-  return findings;
+  return { findings, skipped };
 }
 
 export const audit = defineCommand({
   meta: {
     name: 'audit',
-    description: 'Detect pre-quantum crypto and suggest the PQC equivalent',
+    description:
+      'Heuristically detect pre-quantum crypto (best-effort regex scan) and suggest the PQC equivalent',
   },
   async run() {
     const cwd = process.cwd();
-    const findings = [...(await auditPackageJson(cwd)), ...(await auditSources(cwd))];
+    const { findings: sourceFindings, skipped } = await auditSources(cwd);
+    const findings = [...(await auditPackageJson(cwd)), ...sourceFindings];
+
+    note(
+      'Heuristic, best-effort regex scan — expect occasional false positives and false negatives.',
+    );
+    if (skipped.length > 0) {
+      note(
+        `Skipped ${skipped.length} file(s) larger than ${MAX_FILE_BYTES / 1024 / 1024} MiB: ${skipped.join(', ')}`,
+      );
+    }
 
     if (findings.length === 0) {
       ok('No pre-quantum crypto detected.');
