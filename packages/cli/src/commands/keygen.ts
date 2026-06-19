@@ -1,6 +1,6 @@
 import { defineCommand } from 'citty';
 
-import { assertSupportedAlgorithm, writeKeyPair } from '../keyfiles.js';
+import { assertSafeName, assertSupportedAlgorithm, writeKeyPair } from '../keyfiles.js';
 import { item, ok, warn } from '../ui.js';
 
 export const keygen = defineCommand({
@@ -13,6 +13,10 @@ export const keygen = defineCommand({
       type: 'string',
       description: 'Algorithm of the pair (ml-kem-768 or ml-dsa-65)',
       default: 'ml-kem-768',
+    },
+    name: {
+      type: 'string',
+      description: 'Base file name for the key pair (default: the algorithm, e.g. ml-kem-768)',
     },
     out: {
       type: 'string',
@@ -27,7 +31,8 @@ export const keygen = defineCommand({
   },
   async run({ args }) {
     const algorithm = assertSupportedAlgorithm(args.algorithm);
-    const keys = await writeKeyPair(args.out, algorithm, algorithm, args.force);
+    const baseName = args.name === undefined ? algorithm : assertSafeName(args.name);
+    const keys = await writeKeyPair(args.out, baseName, algorithm, args.force);
 
     ok(`${algorithm} pair generated:`);
     item(`public: ${keys.publicPath}`);

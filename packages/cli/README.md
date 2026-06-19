@@ -13,12 +13,15 @@ npx @pqc-sdk/cli init
 # Generate keys serialized as base64url
 npx @pqc-sdk/cli keygen --algorithm ml-dsa-65 --out keys/
 
-# Detect pre-quantum crypto (RSA/ECDSA/ECDH) and what to migrate to PQC
+# Heuristically detect pre-quantum crypto (RSA/ECDSA/ECDH) and what to migrate to PQC
 npx @pqc-sdk/cli audit
 ```
 
-`audit` exits with code 1 when it finds crypto to migrate — usable as a CI
-gate. Output uses colors only when there is a TTY: readable in logs and pipes.
+`audit` is a best-effort regex scan of your dependencies and source: expect the
+occasional false positive or false negative, and treat it as a starting point,
+not a proof. Files larger than 1 MiB are skipped and reported. It exits with
+code 1 when it finds crypto to migrate — usable as a CI gate. Output uses colors
+only when there is a TTY: readable in logs and pipes.
 
 ## License
 
