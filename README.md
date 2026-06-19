@@ -10,6 +10,11 @@ Post-quantum cryptography for JS/TS with safe defaults and zero configuration:
 (FIPS 204) for signatures, validated against the official NIST ACVP test
 vectors. The goal: add post-quantum encryption to your app in 30 minutes.
 
+> Here "hybrid encryption" means the classic KEM-DEM scheme — ML-KEM-768
+> encapsulating an AES-256-GCM key — **not** a classical+post-quantum hybrid.
+> A combined X25519 + ML-KEM-768 mode is on the roadmap; see
+> [hybrid encryption explained](https://jeloercc.github.io/pqc-sdk/guide/hybrid-encryption).
+
 ## Quickstart
 
 ```bash
