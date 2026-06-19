@@ -45,6 +45,42 @@ reconstructs the **same** 32-byte `sharedSecret`, and AES-GCM decrypts and
 - **Fixed overhead**: 1118 bytes per message (2 header + 1088 KEM + 12 nonce +
   16 tag), whether the payload is 1 byte or 100 MB.
 
+## Two senses of "hybrid"
+
+"Hybrid encryption" on this page means the classic **KEM-DEM** construction: a
+public-key KEM (ML-KEM-768) agrees on a symmetric key, and a symmetric cipher
+(AES-256-GCM) encrypts the data. ML-KEM-768's 32-byte shared secret is used
+directly as the AES-256 key. This is the long-standing meaning of the term —
+public-key to establish a key, symmetric to move the bytes — and the one TLS
+uses.
+
+It is **not** a classical+post-quantum hybrid. Today the SDK uses ML-KEM-768 on
+its own as the post-quantum KEM; there is no classical algorithm (such as
+X25519 or RSA) combined alongside it.
+
+### Why a classical+PQC hybrid can matter
+
+A classical+PQC hybrid runs two key-establishment algorithms and combines their
+secrets, so the result stays secure as long as _either_ one holds. That is a
+meaningful safety margin: ML-KEM is standardized but relatively new, and the
+transition guidance from NIST and the IETF recommends running a
+well-understood classical algorithm alongside a post-quantum one during the
+migration period. The trade-off is larger ciphertexts and a second key
+exchange.
+
+`pqc.encrypt` does not provide this property today: if ML-KEM-768 were ever
+broken, the confidentiality of these ciphertexts would not fall back to a
+second algorithm.
+
+### Roadmap
+
+A classical+PQC hybrid mode (X25519 + ML-KEM-768) is planned. It will follow an
+established combiner such as
+[X-Wing](https://datatracker.ietf.org/doc/draft-connolly-cfrg-xwing-kem/)
+rather than a homegrown construction, so the security argument is one that has
+already been reviewed. There is no committed version or date yet, and the mode
+will be additive — today's KEM-DEM `encrypt`/`decrypt` keeps working unchanged.
+
 ## In code
 
 ```ts twoslash
