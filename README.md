@@ -47,10 +47,10 @@ npx @pqc-sdk/cli init
 
 ## Packages
 
-| Package                                                        | What it does                                                                       |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK: hybrid encryption, signatures, key handling. Node 20+, Deno, Workers, RN. |
-| [`@pqc-sdk/cli`](https://www.npmjs.com/package/@pqc-sdk/cli)   | `pqc init` / `keygen` / `audit`: scaffolding, keys and legacy-crypto detection.    |
+| Package                                                        | What it does                                                                              |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK: hybrid encryption, signatures, key handling. Node 20+, Deno, Workers, RN.        |
+| [`@pqc-sdk/cli`](https://www.npmjs.com/package/@pqc-sdk/cli)   | `pqc init` / `keygen` / `audit`: scaffolding, keys and heuristic legacy-crypto detection. |
 
 ## Monorepo structure
 
