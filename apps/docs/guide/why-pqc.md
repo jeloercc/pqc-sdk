@@ -69,6 +69,9 @@ And to find out how much pre-quantum crypto your codebase has today:
 npx @pqc-sdk/cli audit
 ```
 
+`audit` is a heuristic, best-effort regex scan — a quick first pass that can
+have false positives and false negatives, not an exhaustive guarantee.
+
 Sources: [NSA CNSA 2.0 FAQ](https://media.defense.gov/2022/Sep/07/2003071836/-1/-1/0/CSI_CNSA_2.0_FAQ_.PDF) ·
 [NIST IR 8547](https://csrc.nist.gov/pubs/ir/8547/ipd) ·
 [FIPS 203](https://csrc.nist.gov/pubs/fips/203/final) ·
