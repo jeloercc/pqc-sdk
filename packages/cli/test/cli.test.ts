@@ -162,6 +162,28 @@ describe('pqc keygen', () => {
     expect(result.stdout + result.stderr).toMatch(/unsupported/i);
   });
 
+  it('honors --name as the base file name (overriding the algorithm default)', async () => {
+    const dir = await freshDir();
+    const result = await runCli(['keygen', '--name', 'payments'], dir);
+
+    expect(result.code).toBe(0);
+    const key = pqc.keys.deserialize(
+      (await readFile(join(dir, 'keys/payments.public.pqc'), 'utf8')).trim(),
+    );
+    expect(key.algorithm).toBe('ml-kem-768');
+    await readFile(join(dir, 'keys/payments.secret.pqc'), 'utf8');
+  });
+
+  it('rejects --name with path separators or traversal', async () => {
+    const slash = await runCli(['keygen', '--name', 'sub/payments'], await freshDir());
+    expect(slash.code).not.toBe(0);
+    expect(slash.stdout + slash.stderr).toMatch(/invalid.*name/i);
+
+    const traversal = await runCli(['keygen', '--name', '../escape'], await freshDir());
+    expect(traversal.code).not.toBe(0);
+    expect(traversal.stdout + traversal.stderr).toMatch(/invalid.*name/i);
+  });
+
   it('does not overwrite existing keys without --force', async () => {
     const dir = await freshDir();
     await runCli(['keygen'], dir);
@@ -225,5 +247,25 @@ describe('pqc audit', () => {
     const result = await runCli(['audit'], dir);
 
     expect(result.code).toBe(0);
+  });
+
+  it('skips files larger than 1 MiB but still scans normal ones', async () => {
+    const dir = await freshDir();
+    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'mixed' }));
+    // Oversized file (> 1 MiB) carrying a known pattern: must be skipped, not flagged.
+    const oversized = `createSign('RSA-SHA256');\n${'x'.repeat(1024 * 1024 + 64)}`;
+    await writeFile(join(dir, 'huge.js'), oversized);
+    // Normal-sized file with a known pattern: must still be detected.
+    await writeFile(join(dir, 'small.js'), "createECDH('prime256v1');\n");
+
+    const result = await runCli(['audit'], dir);
+
+    // small.js is detected, so the scan still works and exits non-zero.
+    expect(result.code).not.toBe(0);
+    expect(result.stdout).toContain('small.js');
+    // huge.js is reported as skipped, not as a finding (no `file:line` for it).
+    expect(result.stdout).toMatch(/skipped/i);
+    expect(result.stdout).toContain('huge.js');
+    expect(result.stdout).not.toMatch(/huge\.js:\d+/);
   });
 });

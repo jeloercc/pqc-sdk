@@ -19,6 +19,25 @@ export function assertSupportedAlgorithm(value: string): SupportedAlgorithm {
   return value as SupportedAlgorithm;
 }
 
+/**
+ * Validates a base file name for a key pair. The name becomes part of the path
+ * passed to {@link writeKeyPair}, so it must not be empty, contain path
+ * separators (`/` or `\`), or contain `..` — otherwise a caller could write
+ * keys outside the intended output directory.
+ */
+export function assertSafeName(value: string): string {
+  if (value === '') {
+    throw new Error('Invalid --name: must not be empty.');
+  }
+  if (value.includes('/') || value.includes('\\')) {
+    throw new Error('Invalid --name: must not contain path separators ("/" or "\\").');
+  }
+  if (value.includes('..')) {
+    throw new Error('Invalid --name: must not contain "..".');
+  }
+  return value;
+}
+
 /** Generates a pair and writes it serialized as base64url, one file per key. */
 export async function writeKeyPair(
   directory: string,
