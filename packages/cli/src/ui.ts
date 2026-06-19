@@ -25,3 +25,7 @@ export const finding = (location: string, what: string, migrateTo: string): void
 export const heading = (message: string): void => {
   console.log(pc.bold(message));
 };
+
+export const note = (message: string): void => {
+  console.log(pc.dim(message));
+};
