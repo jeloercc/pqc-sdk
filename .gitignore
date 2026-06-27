@@ -13,3 +13,7 @@ apps/docs/compatibility.md
 .env.*
 .DS_Store
 .claude/settings.local.json
+
+# PQC key material — never commit secret keys
+keys/
+*.secret.pqc
