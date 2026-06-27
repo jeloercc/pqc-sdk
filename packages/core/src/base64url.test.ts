@@ -19,6 +19,12 @@ describe('base64url', () => {
     }
   });
 
+  it('rejects strings of an impossible length (length % 4 === 1)', () => {
+    // A single base64url character cannot encode any whole byte.
+    expect(() => fromBase64Url('A')).toThrow(/impossible length/i);
+    expect(() => fromBase64Url('AAAAA')).toThrow(/impossible length/i);
+  });
+
   it('rejects non-canonical encodings whose trailing bits are not zero', () => {
     // "AB" decodes the single byte 0x00, but the 4 trailing bits of 'B' (value 1)
     // are non-zero, so it is not the canonical encoding of any byte sequence.

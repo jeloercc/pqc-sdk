@@ -5,6 +5,7 @@ export type PqcErrorCode =
   | 'WRONG_KEY_USE'
   | 'INVALID_KEY'
   | 'INVALID_SERIALIZED_KEY'
+  | 'INVALID_CONTEXT'
   | 'INVALID_CIPHERTEXT'
   | 'DECRYPTION_FAILED';
 
