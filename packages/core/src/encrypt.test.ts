@@ -42,22 +42,18 @@ describe('pqc.encrypt / pqc.decrypt', () => {
     }
   });
 
-  it(
-    'roundtrips a multi-megabyte payload',
-    async () => {
-      const pair = await pqc.keys.generate();
-      const big = new Uint8Array(3 * 1024 * 1024).map((_, i) => i % 251);
+  // ~2.5s solo, but `turbo run test` runs the core and cli suites concurrently and
+  // v8 coverage instrumentation makes the 3 MB encrypt+decrypt several times slower
+  // under that CPU contention. A generous fixed timeout keeps it from flaking in CI;
+  // the default 5s is too tight for this one test.
+  it('roundtrips a multi-megabyte payload', async () => {
+    const pair = await pqc.keys.generate();
+    const big = new Uint8Array(3 * 1024 * 1024).map((_, i) => i % 251);
 
-      const plaintext = await pqc.decrypt(await pqc.encrypt(big, pair.publicKey), pair.secretKey);
+    const plaintext = await pqc.decrypt(await pqc.encrypt(big, pair.publicKey), pair.secretKey);
 
-      expect(Buffer.from(plaintext).equals(Buffer.from(big))).toBe(true);
-    },
-    // ~2.5s solo, but `turbo run test` runs the core and cli suites concurrently
-    // and v8 coverage instrumentation makes the 3 MB encrypt+decrypt several
-    // times slower under that CPU contention. A generous fixed timeout keeps it
-    // from flaking in CI; the default 5s is too tight for this one test.
-    30_000,
-  );
+    expect(Buffer.from(plaintext).equals(Buffer.from(big))).toBe(true);
+  }, 30_000);
 
   it('rejects a key with the right algorithm and use but a wrong byte length', async () => {
     const malformed = {

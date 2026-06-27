@@ -66,77 +66,92 @@ describe('property: key serialization', () => {
 });
 
 describe('property: hybrid encryption', () => {
-  it('decrypt(encrypt(x)) deep-equals x for any payload', async () => {
-    const pair = await pqc.keys.generate();
-    await fc.assert(
-      fc.asyncProperty(fc.uint8Array({ maxLength: 2048 }), async (payload) => {
-        const plaintext = await pqc.decrypt(await pqc.encrypt(payload, pair.publicKey), pair.secretKey);
-        expect(bytesEqual(plaintext, payload)).toBe(true);
-      }),
-      kem,
-    );
-  }, CRYPTO_TIMEOUT);
-
-  it('any single-byte tamper fails closed — never returns plaintext', async () => {
-    const pair = await pqc.keys.generate();
-    await fc.assert(
-      fc.asyncProperty(
-        fc.uint8Array({ minLength: 1, maxLength: 512 }),
-        fc.nat(),
-        fc.integer({ min: 1, max: 255 }),
-        async (payload, indexSeed, xor) => {
-          const ciphertext = await pqc.encrypt(payload, pair.publicKey);
-          const index = indexSeed % ciphertext.length;
-          const tampered = Uint8Array.from(ciphertext);
-          // xor in [1,255] guarantees the byte actually changes.
-          tampered[index] = tampered[index]! ^ xor;
-
-          // The real security invariant: an authenticated scheme must throw on
-          // ANY tamper and never return plaintext (right or wrong). The two
-          // header bytes fail fast as INVALID_CIPHERTEXT; every other byte as
-          // DECRYPTION_FAILED — both are documented fail-closed PqcError codes.
-          const error = await pqc.decrypt(tampered, pair.secretKey).then(
-            () => {
-              throw new Error(`tamper at byte ${index} did not throw`);
-            },
-            (cause: unknown) => cause,
+  it(
+    'decrypt(encrypt(x)) deep-equals x for any payload',
+    async () => {
+      const pair = await pqc.keys.generate();
+      await fc.assert(
+        fc.asyncProperty(fc.uint8Array({ maxLength: 2048 }), async (payload) => {
+          const plaintext = await pqc.decrypt(
+            await pqc.encrypt(payload, pair.publicKey),
+            pair.secretKey,
           );
-          expect(error).toBeInstanceOf(PqcError);
-          const code = (error as PqcError).code;
-          expect(index < 2 ? ['INVALID_CIPHERTEXT', 'DECRYPTION_FAILED'] : ['DECRYPTION_FAILED']).toContain(
-            code,
-          );
-        },
-      ),
-      kem,
-    );
-  }, CRYPTO_TIMEOUT);
+          expect(bytesEqual(plaintext, payload)).toBe(true);
+        }),
+        kem,
+      );
+    },
+    CRYPTO_TIMEOUT,
+  );
+
+  it(
+    'any single-byte tamper fails closed — never returns plaintext',
+    async () => {
+      const pair = await pqc.keys.generate();
+      await fc.assert(
+        fc.asyncProperty(
+          fc.uint8Array({ minLength: 1, maxLength: 512 }),
+          fc.nat(),
+          fc.integer({ min: 1, max: 255 }),
+          async (payload, indexSeed, xor) => {
+            const ciphertext = await pqc.encrypt(payload, pair.publicKey);
+            const index = indexSeed % ciphertext.length;
+            const tampered = Uint8Array.from(ciphertext);
+            // xor in [1,255] guarantees the byte actually changes.
+            tampered[index] = tampered[index]! ^ xor;
+
+            // The real security invariant: an authenticated scheme must throw on
+            // ANY tamper and never return plaintext (right or wrong). The two
+            // header bytes fail fast as INVALID_CIPHERTEXT; every other byte as
+            // DECRYPTION_FAILED — both are documented fail-closed PqcError codes.
+            const error = await pqc.decrypt(tampered, pair.secretKey).then(
+              () => {
+                throw new Error(`tamper at byte ${index} did not throw`);
+              },
+              (cause: unknown) => cause,
+            );
+            expect(error).toBeInstanceOf(PqcError);
+            const code = (error as PqcError).code;
+            expect(
+              index < 2 ? ['INVALID_CIPHERTEXT', 'DECRYPTION_FAILED'] : ['DECRYPTION_FAILED'],
+            ).toContain(code);
+          },
+        ),
+        kem,
+      );
+    },
+    CRYPTO_TIMEOUT,
+  );
 });
 
 describe('property: signatures', () => {
-  it('verify accepts a genuine signature and rejects any single-byte tamper', async () => {
-    const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
-    await fc.assert(
-      fc.asyncProperty(
-        fc.uint8Array({ minLength: 1, maxLength: 256 }),
-        fc.nat(),
-        fc.integer({ min: 1, max: 255 }),
-        async (message, indexSeed, xor) => {
-          const signature = await pqc.sign(message, pair.secretKey);
-          expect(await pqc.verify(message, signature, pair.publicKey)).toBe(true);
+  it(
+    'verify accepts a genuine signature and rejects any single-byte tamper',
+    async () => {
+      const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
+      await fc.assert(
+        fc.asyncProperty(
+          fc.uint8Array({ minLength: 1, maxLength: 256 }),
+          fc.nat(),
+          fc.integer({ min: 1, max: 255 }),
+          async (message, indexSeed, xor) => {
+            const signature = await pqc.sign(message, pair.secretKey);
+            expect(await pqc.verify(message, signature, pair.publicKey)).toBe(true);
 
-          const tamperedSig = Uint8Array.from(signature);
-          const sigIndex = indexSeed % signature.length;
-          tamperedSig[sigIndex] = tamperedSig[sigIndex]! ^ xor;
-          expect(await pqc.verify(message, tamperedSig, pair.publicKey)).toBe(false);
+            const tamperedSig = Uint8Array.from(signature);
+            const sigIndex = indexSeed % signature.length;
+            tamperedSig[sigIndex] = tamperedSig[sigIndex]! ^ xor;
+            expect(await pqc.verify(message, tamperedSig, pair.publicKey)).toBe(false);
 
-          const tamperedMsg = Uint8Array.from(message);
-          const msgIndex = indexSeed % message.length;
-          tamperedMsg[msgIndex] = tamperedMsg[msgIndex]! ^ xor;
-          expect(await pqc.verify(tamperedMsg, signature, pair.publicKey)).toBe(false);
-        },
-      ),
-      sig,
-    );
-  }, CRYPTO_TIMEOUT);
+            const tamperedMsg = Uint8Array.from(message);
+            const msgIndex = indexSeed % message.length;
+            tamperedMsg[msgIndex] = tamperedMsg[msgIndex]! ^ xor;
+            expect(await pqc.verify(tamperedMsg, signature, pair.publicKey)).toBe(false);
+          },
+        ),
+        sig,
+      );
+    },
+    CRYPTO_TIMEOUT,
+  );
 });
