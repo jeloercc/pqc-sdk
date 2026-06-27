@@ -34,8 +34,8 @@
     "vitest": "^3.2.2"
   },
   "dependencies": {
-    "@noble/ciphers": "^2.2.0",
-    "@noble/post-quantum": "^0.6.1"
+    "@noble/ciphers": "2.2.0",
+    "@noble/post-quantum": "0.6.1"
   },
   "license": "MIT",
   "homepage": "https://jeloercc.github.io/pqc-sdk/",

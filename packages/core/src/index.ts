@@ -3,7 +3,7 @@ import { deserialize, generate, serialize } from './keys.js';
 import { sign, verify } from './sign.js';
 
 export { PqcError, type PqcErrorCode } from './errors.js';
-export type { GenerateOptions } from './keys.js';
+export type { ExpectedKey, GenerateOptions } from './keys.js';
 export type {
   Algorithm,
   KemAlgorithm,
