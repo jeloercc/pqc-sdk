@@ -1,5 +1,16 @@
 # @pqc-sdk/cli
 
+## 0.3.0
+
+### Patch Changes
+
+- a900943: Protect generated secret keys from accidental commits. `init` and `keygen` now
+  ensure the project `.gitignore` excludes `keys/` and `*.secret.pqc` (creating or
+  appending idempotently) and report what they added. `init` also no longer
+  overwrites an existing `example.ts`.
+- Updated dependencies [499b31f]
+  - @pqc-sdk/core@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
