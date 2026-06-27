@@ -1,8 +1,31 @@
-import { chmod, mkdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { SUPPORTED_ALGORITHMS, pqc, type SupportedAlgorithm } from '@pqc-sdk/core';
+
+/** Patterns that keep generated secret keys out of version control. */
+export const KEY_IGNORE_PATTERNS = ['keys/', '*.secret.pqc'] as const;
+
+/**
+ * Ensures the project `.gitignore` ignores generated key material so a secret
+ * key is never committed by an accidental `git add .`. Creates `.gitignore`
+ * when it is missing, or appends only the patterns not already present.
+ * Idempotent. Returns the patterns it added (empty when nothing changed).
+ */
+export async function ensureKeysIgnored(cwd: string): Promise<string[]> {
+  const gitignorePath = join(cwd, '.gitignore');
+  const current = existsSync(gitignorePath) ? await readFile(gitignorePath, 'utf8') : '';
+  const present = new Set(current.split(/\r?\n/).map((line) => line.trim()));
+  const missing = KEY_IGNORE_PATTERNS.filter((pattern) => !present.has(pattern));
+  if (missing.length === 0) {
+    return [];
+  }
+  const prefix = current === '' ? '' : current.endsWith('\n') ? '\n' : '\n\n';
+  const block = `${prefix}# PQC key material — never commit secret keys\n${missing.join('\n')}\n`;
+  await writeFile(gitignorePath, current + block);
+  return [...missing];
+}
 
 export interface WrittenKeyPair {
   algorithm: SupportedAlgorithm;
