@@ -13,8 +13,9 @@ secrets, diplomatic communications) captured today is retroactively exposed the
 day one does.
 
 NIST standardized the answer in August 2024: **FIPS 203 (ML-KEM)** for key
-exchange, **FIPS 204 (ML-DSA)** and **FIPS 205 (SLH-DSA)** for signatures.
-Those are the algorithms this SDK implements.
+exchange, **FIPS 204 (ML-DSA)** and **FIPS 205 (SLH-DSA)** for signatures. This
+SDK implements **FIPS 203 (ML-KEM-768)** and **FIPS 204 (ML-DSA-65)** today;
+SLH-DSA (FIPS 205) is on the roadmap, not yet implemented.
 
 ## The deadlines
 
