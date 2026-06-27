@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 
 import { defineCommand } from 'citty';
 
-import { writeKeyPair } from '../keyfiles.js';
+import { ensureKeysIgnored, writeKeyPair } from '../keyfiles.js';
 import { heading, item, ok, warn } from '../ui.js';
 
 const CONFIG_FILE = 'pqc.config.json';
@@ -49,12 +49,23 @@ export const init = defineCommand({
 
     await writeFile(CONFIG_FILE, `${JSON.stringify(CONFIG, null, 2)}\n`);
     const keys = await writeKeyPair(CONFIG.keysDir, 'dev', CONFIG.defaultAlgorithm, false);
-    await writeFile('example.ts', EXAMPLE);
+    const ignored = await ensureKeysIgnored(process.cwd());
+    const exampleWritten = !existsSync('example.ts');
+    if (exampleWritten) {
+      await writeFile('example.ts', EXAMPLE);
+    }
 
     heading('PQC project initialized:');
     item(`${CONFIG_FILE} — configuration with safe defaults`);
     item(`${keys.publicPath} / ${keys.secretPath} — development ${keys.algorithm} pair`);
-    item('example.ts — full roundtrip ready to run');
+    if (ignored.length > 0) {
+      item(`.gitignore — added ${ignored.join(', ')} so secret keys are never committed`);
+    }
+    if (exampleWritten) {
+      item('example.ts — full roundtrip ready to run');
+    } else {
+      warn('example.ts already exists — left untouched.');
+    }
     console.log();
     warn('The keys/dev.* keys are for development ONLY — do NOT use them in production.');
     ok(`Next step: run example.ts (node --experimental-strip-types example.ts or tsx)`);

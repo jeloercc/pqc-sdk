@@ -128,6 +128,39 @@ describe('pqc init', () => {
     expect(second.code).not.toBe(0);
     expect(second.stdout + second.stderr).toMatch(/already (exists|initialized)/i);
   });
+
+  it('writes a .gitignore that excludes secret keys', async () => {
+    const dir = await freshDir();
+    const result = await runCli(['init'], dir);
+
+    expect(result.code).toBe(0);
+    const gitignore = await readFile(join(dir, '.gitignore'), 'utf8');
+    expect(gitignore).toContain('keys/');
+    expect(gitignore).toContain('*.secret.pqc');
+  });
+
+  it('appends key patterns to an existing .gitignore without dropping its content', async () => {
+    const dir = await freshDir();
+    await writeFile(join(dir, '.gitignore'), 'node_modules/\n');
+
+    const result = await runCli(['init'], dir);
+
+    expect(result.code).toBe(0);
+    const gitignore = await readFile(join(dir, '.gitignore'), 'utf8');
+    expect(gitignore).toContain('node_modules/');
+    expect(gitignore).toContain('*.secret.pqc');
+  });
+
+  it('does not overwrite an existing example.ts', async () => {
+    const dir = await freshDir();
+    await writeFile(join(dir, 'example.ts'), '// my own example\n');
+
+    const result = await runCli(['init'], dir);
+
+    expect(result.code).toBe(0);
+    expect(await readFile(join(dir, 'example.ts'), 'utf8')).toBe('// my own example\n');
+    expect(result.stdout + result.stderr).toMatch(/example\.ts already exists/i);
+  });
 });
 
 describe('pqc keygen', () => {
@@ -196,6 +229,20 @@ describe('pqc keygen', () => {
     const forced = await runCli(['keygen', '--force'], dir);
     expect(forced.code).toBe(0);
     expect(await readFile(join(dir, 'keys/ml-kem-768.public.pqc'), 'utf8')).not.toBe(original);
+  });
+
+  it('protects secret keys with .gitignore and does not duplicate patterns', async () => {
+    const dir = await freshDir();
+    const first = await runCli(['keygen'], dir);
+
+    expect(first.code).toBe(0);
+    const gitignore = await readFile(join(dir, '.gitignore'), 'utf8');
+    expect(gitignore).toContain('*.secret.pqc');
+
+    // A second run must not append the patterns again (idempotent).
+    await runCli(['keygen', '--name', 'second'], dir);
+    const after = await readFile(join(dir, '.gitignore'), 'utf8');
+    expect(after.match(/\*\.secret\.pqc/g)).toHaveLength(1);
   });
 });
 
