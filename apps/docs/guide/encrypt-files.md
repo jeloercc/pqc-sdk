@@ -17,22 +17,24 @@ npx @pqc-sdk/cli keygen --out keys/
 import { readFile, writeFile } from 'node:fs/promises';
 import { pqc } from '@pqc-sdk/core';
 
-// The recipient's public key, received as serialized text
+// The recipient's public key, received as serialized text. Asserting the
+// expected algorithm and use narrows the type so it drops straight into encrypt.
 const publicKey = pqc.keys.deserialize(
   (await readFile('keys/ml-kem-768.public.pqc', 'utf8')).trim(),
+  { algorithm: 'ml-kem-768', use: 'public' },
 );
 
 const contents = await readFile('confidential-report.pdf');
-const ciphertext = await pqc.encrypt(contents, publicKey as never);
+const ciphertext = await pqc.encrypt(contents, publicKey);
 await writeFile('confidential-report.pdf.pqc', ciphertext);
 ```
 
-::: tip The `as never` cast
-`deserialize` returns the wide `PqcKey` type because the algorithm is only
-known at runtime. Validation is runtime: if the key is not an ML-KEM-768
-public key, `encrypt` throws `PqcError('WRONG_ALGORITHM')`. In your code you
-can wrap this in a helper that validates `key.algorithm` and returns the
-narrow type.
+::: tip Asserting the algorithm and use
+`deserialize(token)` returns the wide `PqcKey` type because the algorithm is
+only known at runtime. Pass `{ algorithm, use }` to assert what you expect: you
+get back a narrow `PublicKey<'ml-kem-768'>` (no `as never` cast), and a
+mismatching token throws `PqcError('WRONG_ALGORITHM')` or `'WRONG_KEY_USE'`
+before any crypto runs.
 :::
 
 ## Decrypt (recipient side)
@@ -43,10 +45,11 @@ import { pqc } from '@pqc-sdk/core';
 
 const secretKey = pqc.keys.deserialize(
   (await readFile('keys/ml-kem-768.secret.pqc', 'utf8')).trim(),
+  { algorithm: 'ml-kem-768', use: 'secret' },
 );
 
 const ciphertext = await readFile('confidential-report.pdf.pqc');
-const contents = await pqc.decrypt(new Uint8Array(ciphertext), secretKey as never);
+const contents = await pqc.decrypt(new Uint8Array(ciphertext), secretKey);
 await writeFile('confidential-report.pdf', contents);
 ```
 

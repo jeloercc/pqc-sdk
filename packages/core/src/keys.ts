@@ -3,7 +3,7 @@ import { randomBytes } from '@noble/post-quantum/utils.js';
 import { getAlgorithm, keyLengthFor } from './algorithms.js';
 import { fromBase64Url, toBase64Url } from './base64url.js';
 import { PqcError } from './errors.js';
-import type { Algorithm, KeyPair, PqcKey } from './types.js';
+import type { Algorithm, KeyPair, KeyUse, PqcKey } from './types.js';
 
 const SERIAL_PREFIX = 'pqcv1';
 
@@ -76,20 +76,38 @@ export function serialize(key: PqcKey): string {
   return `${SERIAL_PREFIX}.${key.algorithm}.${key.use}.${toBase64Url(key.bytes)}`;
 }
 
+/** Asserts the algorithm and use a caller expects from a deserialized key. */
+export interface ExpectedKey<A extends Algorithm = Algorithm, U extends KeyUse = KeyUse> {
+  readonly algorithm: A;
+  readonly use: U;
+}
+
 /**
  * Rebuilds a key from the {@link serialize} format. Validates version,
  * algorithm, use and length; on any problem it throws {@link PqcError} with
  * code `INVALID_SERIALIZED_KEY` or `INVALID_KEY`.
  *
+ * Pass `expected` to assert the algorithm and use, getting back a narrow key
+ * type (e.g. `PublicKey<'ml-kem-768'>`) that drops straight into `encrypt` /
+ * `sign` without an `as never` cast. A mismatch throws `WRONG_ALGORITHM` or
+ * `WRONG_KEY_USE`.
+ *
  * @example
  * ```ts
  * import { pqc } from '@pqc-sdk/core';
  *
- * const publicKey = pqc.keys.deserialize(tokenReceivedFromClient);
- * const ciphertext = await pqc.encrypt(payload, publicKey);
+ * const token = pqc.keys.serialize((await pqc.keys.generate()).publicKey);
+ * // Narrow to a typed key by asserting the expected algorithm and use:
+ * const publicKey = pqc.keys.deserialize(token, { algorithm: 'ml-kem-768', use: 'public' });
+ * const ciphertext = await pqc.encrypt('payload', publicKey);
  * ```
  */
-export function deserialize(serialized: string): PqcKey {
+export function deserialize(serialized: string): PqcKey;
+export function deserialize<A extends Algorithm, U extends KeyUse>(
+  serialized: string,
+  expected: ExpectedKey<A, U>,
+): PqcKey<A, U>;
+export function deserialize(serialized: string, expected?: ExpectedKey): PqcKey {
   const parts = serialized.split('.');
   if (parts.length !== 4 || parts[0] !== SERIAL_PREFIX) {
     throw new PqcError(
@@ -117,6 +135,17 @@ export function deserialize(serialized: string): PqcKey {
       'INVALID_KEY',
       `${algorithm} ${use} key must be ${keyLengthFor(spec, key.use)} bytes, got ${bytes.length}`,
     );
+  }
+  if (expected !== undefined) {
+    if (key.algorithm !== expected.algorithm) {
+      throw new PqcError(
+        'WRONG_ALGORITHM',
+        `Expected an ${expected.algorithm} key, got ${key.algorithm}`,
+      );
+    }
+    if (key.use !== expected.use) {
+      throw new PqcError('WRONG_KEY_USE', `Expected the ${expected.use} key, got ${key.use}`);
+    }
   }
   return key;
 }

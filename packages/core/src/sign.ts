@@ -1,5 +1,9 @@
 import { requireKey } from './algorithms.js';
+import { PqcError } from './errors.js';
 import type { PublicKey, SecretKey, SignatureOptions } from './types.js';
+
+/** FIPS 204 §5.2 caps the signing context string at 255 bytes. */
+const MAX_CONTEXT_LENGTH = 255;
 
 const utf8 = new TextEncoder();
 
@@ -8,7 +12,16 @@ function toBytes(data: Uint8Array | string): Uint8Array {
 }
 
 function toNobleOptions(options?: SignatureOptions): { context: Uint8Array } | undefined {
-  return options?.context ? { context: options.context } : undefined;
+  if (!options?.context) {
+    return undefined;
+  }
+  if (options.context.length > MAX_CONTEXT_LENGTH) {
+    throw new PqcError(
+      'INVALID_CONTEXT',
+      `Signature context must be at most ${MAX_CONTEXT_LENGTH} bytes, got ${options.context.length}`,
+    );
+  }
+  return { context: options.context };
 }
 
 /**
@@ -52,9 +65,12 @@ export async function verify(
   options?: SignatureOptions,
 ): Promise<boolean> {
   const spec = requireKey(publicKey, 'signer', 'public', 'verify');
+  // Validate the context outside the try so an oversized context throws
+  // INVALID_CONTEXT (as sign does) instead of being swallowed as `false`.
+  const nobleOptions = toNobleOptions(options);
   try {
     return Promise.resolve(
-      spec.signer.verify(signature, toBytes(data), publicKey.bytes, toNobleOptions(options)),
+      spec.signer.verify(signature, toBytes(data), publicKey.bytes, nobleOptions),
     );
   } catch {
     return false;
