@@ -1,5 +1,31 @@
 # @pqc-sdk/core
 
+## 0.3.1
+
+### Patch Changes
+
+- 6fcd7a4: Stabilize the multi-megabyte encrypt/decrypt round-trip test against CI flakes.
+  It ran on the default 5s timeout, which is too tight when `turbo run test`
+  executes the core and CLI suites concurrently and v8 coverage instrumentation
+  slows the 3 MB operation under CPU contention. Give it a generous explicit
+  timeout so it cannot flake. Test-only; no API or runtime change.
+- 6fcd7a4: Add property-based tests (fast-check) that assert the core crypto invariants
+  over many generated inputs, complementing the example-based suite:
+  `decrypt(encrypt(x))` round-trips for any payload; any single-byte tamper of a
+  ciphertext fails closed with a `PqcError` and never returns plaintext;
+  `deserialize(serialize(k))` preserves any key; a genuine signature verifies and
+  any single-byte tamper of the signature or message is rejected; and base64url
+  round-trips for any byte array. Runs are seeded for deterministic CI and bounded
+  so test time stays modest. Dev-dependency and tests only; no API or runtime
+  change.
+- 6fcd7a4: Close the last open edge-case coverage gap from the June 2026 audit (finding
+  I1): the `verify` defense-in-depth catch path is now exercised by a focused
+  regression test. It proves `verify` fails closed to `false` if the underlying
+  signer ever throws — no signature byte-pattern makes `@noble`'s verify throw in
+  practice (it returns `false` for every malformed signature), so the signer is
+  stubbed to throw to genuinely cover the branch. Test-only; no API or runtime
+  behavior change.
+
 ## 0.3.0
 
 ### Minor Changes
