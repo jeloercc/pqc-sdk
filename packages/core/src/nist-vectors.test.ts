@@ -49,10 +49,11 @@ describe('NIST ACVP ML-KEM-768 encapDecap (FIPS 203)', () => {
     async ({ dk, c, k }) => {
       const secretKey = pqc.keys.deserialize(
         `pqcv1.ml-kem-768.secret.${Buffer.from(hexToBytes(dk)).toString('base64url')}`,
+        { algorithm: 'ml-kem-768', use: 'secret' },
       );
       const { ciphertext, plaintext } = buildHybridCiphertext(hexToBytes(c), hexToBytes(k));
 
-      const result = await pqc.decrypt(ciphertext, secretKey as never);
+      const result = await pqc.decrypt(ciphertext, secretKey);
 
       expect(Buffer.from(result).equals(Buffer.from(plaintext))).toBe(true);
     },
@@ -63,10 +64,11 @@ describe('NIST ACVP ML-KEM-768 encapDecap (FIPS 203)', () => {
     async ({ dk, c, k }) => {
       const secretKey = pqc.keys.deserialize(
         `pqcv1.ml-kem-768.secret.${Buffer.from(hexToBytes(dk)).toString('base64url')}`,
+        { algorithm: 'ml-kem-768', use: 'secret' },
       );
       const { ciphertext, plaintext } = buildHybridCiphertext(hexToBytes(c), hexToBytes(k));
 
-      const result = await pqc.decrypt(ciphertext, secretKey as never);
+      const result = await pqc.decrypt(ciphertext, secretKey);
 
       expect(Buffer.from(result).equals(Buffer.from(plaintext))).toBe(true);
     },
@@ -88,16 +90,12 @@ describe('NIST ACVP ML-DSA-65 sigVer (FIPS 204, pure)', () => {
     async ({ pk, message, context, signature, testPassed }) => {
       const publicKey = pqc.keys.deserialize(
         `pqcv1.ml-dsa-65.public.${Buffer.from(hexToBytes(pk)).toString('base64url')}`,
+        { algorithm: 'ml-dsa-65', use: 'public' },
       );
 
-      const result = await pqc.verify(
-        hexToBytes(message),
-        hexToBytes(signature),
-        publicKey as never,
-        {
-          context: hexToBytes(context),
-        },
-      );
+      const result = await pqc.verify(hexToBytes(message), hexToBytes(signature), publicKey, {
+        context: hexToBytes(context),
+      });
 
       expect(result).toBe(testPassed);
     },

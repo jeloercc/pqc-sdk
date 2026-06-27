@@ -100,10 +100,17 @@ export async function decrypt(
   );
   const sealed = ciphertext.subarray(2 + spec.ciphertextLength + NONCE_LENGTH);
 
-  const sharedSecret = spec.kem.decapsulate(kemCiphertext, secretKey.bytes);
+  // decapsulate stays inside the try: ML-KEM uses implicit rejection and does
+  // not throw for a valid-length secret key, but any edge case where it (or GCM)
+  // throws must still surface as the documented DECRYPTION_FAILED, never a raw
+  // upstream error.
   try {
+    const sharedSecret = spec.kem.decapsulate(kemCiphertext, secretKey.bytes);
     return Promise.resolve(gcm(sharedSecret, nonce, header).decrypt(sealed));
-  } catch {
+  } catch (cause) {
+    if (cause instanceof PqcError) {
+      throw cause;
+    }
     throw new PqcError(
       'DECRYPTION_FAILED',
       'Decryption failed: tampered ciphertext or wrong secret key',
