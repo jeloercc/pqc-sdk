@@ -42,6 +42,28 @@ describe('pqc.encrypt / pqc.decrypt', () => {
     }
   });
 
+  it('roundtrips a multi-megabyte payload', async () => {
+    const pair = await pqc.keys.generate();
+    const big = new Uint8Array(3 * 1024 * 1024).map((_, i) => i % 251);
+
+    const plaintext = await pqc.decrypt(await pqc.encrypt(big, pair.publicKey), pair.secretKey);
+
+    expect(Buffer.from(plaintext).equals(Buffer.from(big))).toBe(true);
+  });
+
+  it('rejects a key with the right algorithm and use but a wrong byte length', async () => {
+    const malformed = {
+      algorithm: 'ml-kem-768',
+      use: 'public',
+      bytes: new Uint8Array(10),
+    } as const;
+
+    await expect(
+      // Hand-built / truncated-in-memory key reaching the operation entry point.
+      pqc.encrypt('x', malformed as never),
+    ).rejects.toMatchObject({ code: 'INVALID_KEY' });
+  });
+
   it('rejects encrypt with a non-ML-KEM key', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
 
