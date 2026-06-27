@@ -10,7 +10,7 @@ permissions:
   pages: write
   id-token: write
 
-# Un solo deploy a la vez; no cancelar en progreso para no dejar Pages a medias.
+# One deploy at a time; do not cancel in progress so Pages is never left half-updated.
 concurrency:
   group: pages
   cancel-in-progress: false

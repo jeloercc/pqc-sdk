@@ -7,9 +7,9 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: write # crear el PR de versiones, tags y releases
+  contents: write # create the version PR, tags and releases
   pull-requests: write
-  id-token: write # OIDC para npm provenance
+  id-token: write # OIDC for npm provenance
 
 jobs:
   release:
