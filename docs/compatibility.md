@@ -10,7 +10,7 @@ React Native app harness: 2026-07-01).
 | Deno                 | 2.8.2                      | ✅                           | Import map until published; `--allow-read`                                   |
 | Cloudflare Workers   | wrangler 4 / local workerd | ✅                           | None — does not require `nodejs_compat`                                      |
 | Hermes (RN's engine) | standalone CLI 0.12        | ✅ engine validated          | `crypto.getRandomValues` polyfill; transpile `class` (Metro does this in RN) |
-| React Native         | Expo SDK 56 / RN 0.85      | Harness ready / on-device ⏳ | `react-native-get-random-values` imported before the SDK; see notes below    |
+| React Native         | Expo SDK 54 / RN 0.81      | Harness ready / on-device ⏳ | `react-native-get-random-values` imported before the SDK; see notes below    |
 
 ## Node (`examples/node`)
 
@@ -85,10 +85,12 @@ This is the genuine entropy polyfill (native OS randomness via
 `SecRandomCopyBytes` / `SecureRandom`), not the `Math.random` shim used to
 validate the Hermes engine standalone.
 
-**Target: Expo SDK 56** (matches Expo Go's current Play Store release as of
-July 2026). SDK 57 support is pending Expo Go's own store approval — not a
-PQC SDK limitation — and will be revisited once Expo Go 57 ships on both
-stores.
+**Target: Expo SDK 54** (matches the Expo Go version actually installed on
+the test device, v54.0.8, which only supports SDK 54). Play Store rollout of
+newer Expo Go builds lags per-device, so the example tracks what is
+installable on the test hardware, not the latest SDK. Newer SDK support —
+not a PQC SDK limitation — will be revisited once a newer Expo Go build
+reaches the device.
 
 **Status: harness ready, on-device/simulator run pending — not marked ✅.**
 This environment has no Xcode app (`xcrun simctl` unavailable, command line
@@ -97,9 +99,9 @@ launched here. What was verified instead:
 
 - TypeScript compiles clean against the real `react-native` and
   `@pqc-sdk/core` types (`tsc --noEmit`).
-- `npx expo export --platform ios` bundles the app through the real Metro/
+- `npx expo export --platform android` bundles the app through the real Metro/
   Babel pipeline RN ships (not esbuild, unlike the standalone Hermes example):
-  595 modules, including `@pqc-sdk/core`, `@noble/post-quantum`,
+  588 modules, including `@pqc-sdk/core`, `@noble/post-quantum`,
   `@noble/ciphers`, and `react-native-get-random-values`, with no resolution
   or transform errors, producing Hermes bytecode.
 - Running that genuine bundle on the standalone Hermes CLI (the same fallback
