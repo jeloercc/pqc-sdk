@@ -1,5 +1,16 @@
 # @pqc-sdk/core
 
+## 0.3.4
+
+### Patch Changes
+
+- 914b654: Fold `prettier --check .` into the `lint` turbo task (as a `//#format:check`
+  root task dependency), so a single `pnpm lint` — locally and in CI — surfaces
+  formatting issues alongside eslint/tsc, instead of relying on a separate
+  `format:check` step that's easy to skip when running the gate by hand. Removes
+  the now-redundant standalone "Format check" step from `.github/workflows/ci.yml`.
+  No runtime or public API change.
+
 ## 0.3.3
 
 ### Patch Changes
