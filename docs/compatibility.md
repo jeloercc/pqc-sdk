@@ -2,7 +2,7 @@
 
 Results from the `examples/` projects (generate → encrypt → decrypt roundtrip
 with ML-KEM-768 + AES-256-GCM), verified on 2026-06-11 (Hermes: 2026-06-12,
-React Native app harness: 2026-06-30).
+React Native app harness: 2026-07-01).
 
 | Runtime              | Tested version             | Result                       | Required flags/config                                                        |
 | -------------------- | -------------------------- | ---------------------------- | ---------------------------------------------------------------------------- |
@@ -10,7 +10,7 @@ React Native app harness: 2026-06-30).
 | Deno                 | 2.8.2                      | ✅                           | Import map until published; `--allow-read`                                   |
 | Cloudflare Workers   | wrangler 4 / local workerd | ✅                           | None — does not require `nodejs_compat`                                      |
 | Hermes (RN's engine) | standalone CLI 0.12        | ✅ engine validated          | `crypto.getRandomValues` polyfill; transpile `class` (Metro does this in RN) |
-| React Native         | Expo SDK 57 / RN 0.86      | Harness ready / on-device ⏳ | `react-native-get-random-values` imported before the SDK; see notes below    |
+| React Native         | Expo SDK 56 / RN 0.85      | Harness ready / on-device ⏳ | `react-native-get-random-values` imported before the SDK; see notes below    |
 
 ## Node (`examples/node`)
 
@@ -84,6 +84,11 @@ ML-DSA-65 sign → verify on a single screen, rendering PASS/FAIL with timings.
 This is the genuine entropy polyfill (native OS randomness via
 `SecRandomCopyBytes` / `SecureRandom`), not the `Math.random` shim used to
 validate the Hermes engine standalone.
+
+**Target: Expo SDK 56** (matches Expo Go's current Play Store release as of
+July 2026). SDK 57 support is pending Expo Go's own store approval — not a
+PQC SDK limitation — and will be revisited once Expo Go 57 ships on both
+stores.
 
 **Status: harness ready, on-device/simulator run pending — not marked ✅.**
 This environment has no Xcode app (`xcrun simctl` unavailable, command line
