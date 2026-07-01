@@ -18,7 +18,10 @@
       "outputs": ["api/**", "compatibility.md", ".vitepress/dist/**"]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "//#format:check"]
+    },
+    "//#format:check": {
+      "outputs": []
     },
     "dev": {
       "cache": false,
