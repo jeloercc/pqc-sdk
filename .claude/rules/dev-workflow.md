@@ -1,5 +1,11 @@
 # Development workflow
 
+## Scope
+
+- This session's scope is the pqc-sdk repo only. Never read or write paths
+  outside the repository root (e.g. sibling project directories) unless
+  explicitly instructed with the full path and a reason.
+
 ## Branching
 
 - One branch per work unit, always cut from a freshly updated `main`
