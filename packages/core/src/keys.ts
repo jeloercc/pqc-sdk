@@ -40,7 +40,10 @@ export async function generate(options?: GenerateOptions): Promise<KeyPair> {
  * Deterministic generation from a seed. Internal and test use (NIST vectors).
  * Prefer {@link generate} for normal use.
  */
-export function generateKeyPairFromSeed(algorithm: Algorithm, seed: Uint8Array): KeyPair {
+export function generateKeyPairFromSeed<A extends Algorithm>(
+  algorithm: A,
+  seed: Uint8Array,
+): KeyPair<A> {
   const spec = getAlgorithm(algorithm);
   if (seed.length !== spec.seedLength) {
     throw new PqcError(
