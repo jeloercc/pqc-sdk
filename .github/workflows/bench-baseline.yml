@@ -1,0 +1,43 @@
+name: Bench baseline
+
+# Regenerates the committed benchmark baseline ON THE CI RUNNER and uploads it
+# as an artifact. Download it and commit it in the PR that legitimately shifted
+# performance — see packages/core/bench/README.md for the full procedure.
+on:
+  workflow_dispatch:
+  # TEMPORARY bootstrap trigger: produces the very first baseline for the
+  # day4/perf-benchmarks PR (workflow_dispatch only works once the workflow
+  # exists on the default branch). Removed in the commit that lands
+  # baseline.json.
+  push:
+    branches: [day4/perf-benchmarks]
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run benchmarks
+        run: pnpm --filter @pqc-sdk/core bench
+
+      - name: Snapshot baseline
+        working-directory: packages/core
+        run: node bench/bench-gate.mjs snapshot --results bench/results.json --out bench/baseline.json
+
+      - name: Upload baseline artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-baseline
+          path: packages/core/bench/baseline.json
+          if-no-files-found: error
