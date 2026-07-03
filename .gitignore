@@ -20,3 +20,6 @@ packages/core/bench/results.json
 # PQC key material — never commit secret keys
 keys/
 *.secret.pqc
+
+# Transient vitepress config bundle (orphaned when a build is interrupted)
+*.timestamp-*.mjs
