@@ -29,3 +29,27 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  # Runs the crypto benchmarks and fails only above 2.5x the committed
+  # baseline (packages/core/bench/baseline.json). Numbers land in the job
+  # summary on every PR. Baseline refresh: see packages/core/bench/README.md.
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run benchmarks
+        run: pnpm --filter @pqc-sdk/core bench
+
+      - name: Check for regressions
+        run: pnpm --filter @pqc-sdk/core bench:check
