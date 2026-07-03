@@ -14,6 +14,9 @@ apps/docs/compatibility.md
 .DS_Store
 .claude/settings.local.json
 
+# Local benchmark output (only the committed baseline.json belongs in git)
+packages/core/bench/results.json
+
 # PQC key material — never commit secret keys
 keys/
 *.secret.pqc

@@ -25,6 +25,8 @@
     "dev": "tsup --watch",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
+    "bench": "vitest bench --run --outputJson bench/results.json",
+    "bench:check": "node bench/bench-gate.mjs check --results bench/results.json --baseline bench/baseline.json",
     "lint": "eslint . && tsc --noEmit"
   },
   "devDependencies": {
