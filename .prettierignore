@@ -7,3 +7,4 @@ pnpm-lock.yaml
 .vitepress/dist
 apps/docs/api
 apps/docs/compatibility.md
+*.timestamp-*.mjs

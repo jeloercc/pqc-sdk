@@ -19,3 +19,12 @@
   secrets, or plaintext in error messages, test names, docs, commits, or CI
   logs. Errors carry only lengths, algorithm names, and key use. This applies
   to review artifacts and session output too.
+- **Serialization stability.** Any change touching a serialized layout (key
+  token segments, ciphertext byte layout, version/header-id values, CLI
+  key-file format) requires, in the same PR: updating
+  `docs/serialization-format.md`, regenerating the golden vectors
+  (`packages/core/scripts/generate-golden-vectors.mjs`), and an explicit
+  acknowledgment in the PR description that it is a breaking change requiring
+  a **major version bump**. The golden-vector suite failing is the intended
+  tripwire — never "fix" those tests or fixtures to match new output without
+  that acknowledgment.
