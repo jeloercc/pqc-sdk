@@ -5,12 +5,6 @@ name: Bench baseline
 # performance — see packages/core/bench/README.md for the full procedure.
 on:
   workflow_dispatch:
-  # TEMPORARY bootstrap trigger: produces the very first baseline for the
-  # day4/perf-benchmarks PR (workflow_dispatch only works once the workflow
-  # exists on the default branch). Removed in the commit that lands
-  # baseline.json.
-  push:
-    branches: [day4/perf-benchmarks]
 
 jobs:
   baseline:
