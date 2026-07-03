@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-07-03T22:19:12.616Z",
+  "commit": "0ee857c5ddd08c6844cf407bedb42080156f16a0",
+  "runner": "ubuntu24",
+  "node": "20.20.2",
+  "benchmarks": {
+    "ml-kem-768 > keygen": {
+      "mean": 0.8514
+    },
+    "ml-kem-768 > encrypt 1KiB": {
+      "mean": 1.0276
+    },
+    "ml-kem-768 > encrypt 100KiB": {
+      "mean": 3.5038
+    },
+    "ml-kem-768 > decrypt 1KiB": {
+      "mean": 1.3456
+    },
+    "ml-kem-768 > decrypt 100KiB": {
+      "mean": 3.7116
+    },
+    "ml-dsa-65 > keygen": {
+      "mean": 2.8952
+    },
+    "ml-dsa-65 > sign 1KiB": {
+      "mean": 16.534
+    },
+    "ml-dsa-65 > verify 1KiB": {
+      "mean": 3.229
+    }
+  }
+}
