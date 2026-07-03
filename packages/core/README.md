@@ -44,16 +44,22 @@ No WASM or native addons: pure TypeScript on top of
 
 ## Benchmarks
 
-Node 24, x86_64 (1 KB messages):
+GitHub Actions `ubuntu-latest` (x86_64, Node 20), `vitest bench` means, July 2026:
 
 | Operation         | Time       | Throughput |
 | ----------------- | ---------- | ---------- |
-| keygen ML-KEM-768 | 1.3 ms/op  | 768 ops/s  |
-| encrypt           | 1.7 ms/op  | 585 ops/s  |
-| decrypt           | 2.3 ms/op  | 440 ops/s  |
-| keygen ML-DSA-65  | 4.8 ms/op  | 210 ops/s  |
-| sign              | 20.2 ms/op | 50 ops/s   |
-| verify            | 5.1 ms/op  | 195 ops/s  |
+| keygen ML-KEM-768 | 0.9 ms/op  | 1175 ops/s |
+| encrypt (1 KiB)   | 1.0 ms/op  | 973 ops/s  |
+| decrypt (1 KiB)   | 1.3 ms/op  | 743 ops/s  |
+| encrypt (100 KiB) | 3.5 ms/op  | 285 ops/s  |
+| decrypt (100 KiB) | 3.7 ms/op  | 269 ops/s  |
+| keygen ML-DSA-65  | 2.9 ms/op  | 345 ops/s  |
+| sign (1 KiB)      | 16.5 ms/op | 60 ops/s   |
+| verify (1 KiB)    | 3.2 ms/op  | 310 ops/s  |
+
+CI re-runs these on every PR and fails on regressions above 2.5x the
+committed baseline (`bench/baseline.json` in the repo — see
+`bench/README.md` for how the baseline is refreshed).
 
 ## Documentation
 
