@@ -2,7 +2,15 @@ import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { SUPPORTED_ALGORITHMS, pqc, type SupportedAlgorithm } from '@pqc-sdk/core';
+import {
+  SUPPORTED_ALGORITHMS,
+  pqc,
+  type Algorithm,
+  type ExpectedKey,
+  type KeyUse,
+  type PqcKey,
+  type SupportedAlgorithm,
+} from '@pqc-sdk/core';
 
 /** Patterns that keep generated secret keys out of version control. */
 export const KEY_IGNORE_PATTERNS = ['keys/', '*.secret.pqc'] as const;
@@ -59,6 +67,38 @@ export function assertSafeName(value: string): string {
     throw new Error('Invalid --name: must not contain "..".');
   }
   return value;
+}
+
+/**
+ * Reads a key file written by `pqc keygen` (the serialized key on one line)
+ * and deserializes it, asserting the algorithm and use the caller expects.
+ * Throws with the file path in the message when the file is missing or does
+ * not contain the expected kind of key.
+ *
+ * @example
+ * ```ts
+ * import { readKeyFile } from './keyfiles.js';
+ *
+ * const publicKey = await readKeyFile('keys/ml-kem-768.public.pqc', {
+ *   algorithm: 'ml-kem-768',
+ *   use: 'public',
+ * });
+ * ```
+ */
+export async function readKeyFile<A extends Algorithm, U extends KeyUse>(
+  path: string,
+  expected: ExpectedKey<A, U>,
+): Promise<PqcKey<A, U>> {
+  if (!existsSync(path)) {
+    throw new Error(`Key file not found: ${path}`);
+  }
+  const contents = await readFile(path, 'utf8');
+  try {
+    return pqc.keys.deserialize(contents.trim(), expected);
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(`${path} is not a valid ${expected.algorithm} ${expected.use} key: ${reason}`);
+  }
 }
 
 /** Generates a pair and writes it serialized as base64url, one file per key. */
