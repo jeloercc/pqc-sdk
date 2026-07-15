@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -314,5 +315,115 @@ describe('pqc audit', () => {
     expect(result.stdout).toMatch(/skipped/i);
     expect(result.stdout).toContain('huge.js');
     expect(result.stdout).not.toMatch(/huge\.js:\d+/);
+  });
+});
+
+describe('encrypt / decrypt', () => {
+  it('round-trips a binary file through keygen, encrypt, and decrypt', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    // Binary payload (not UTF-8) so byte fidelity is actually exercised.
+    const payload = Buffer.from(Array.from({ length: 512 }, (_, i) => i % 256));
+    await writeFile(join(dir, 'will.pdf'), payload);
+
+    const enc = await runCli(['encrypt', 'will.pdf', '--key', 'keys/alice.public.pqc'], dir);
+    expect(enc.code).toBe(0);
+    expect(enc.stdout).toContain('will.pdf.enc');
+
+    // The envelope must not contain the plaintext.
+    const envelope = await readFile(join(dir, 'will.pdf.enc'));
+    expect(envelope.includes(payload.subarray(0, 64))).toBe(false);
+
+    const dec = await runCli(
+      ['decrypt', 'will.pdf.enc', '--key', 'keys/alice.secret.pqc', '--out', 'restored.pdf'],
+      dir,
+    );
+    expect(dec.code).toBe(0);
+
+    const restored = await readFile(join(dir, 'restored.pdf'));
+    expect(restored.equals(payload)).toBe(true);
+  });
+
+  it('decrypt defaults the output to the input without .enc', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    await writeFile(join(dir, 'note.txt'), 'sealed until the end');
+    await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+
+    // Default decrypt target is note.txt, which still exists: refuse first…
+    const refused = await runCli(
+      ['decrypt', 'note.txt.enc', '--key', 'keys/alice.secret.pqc'],
+      dir,
+    );
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr + refused.stdout).toContain('--force');
+
+    // …and overwrite with --force.
+    const forced = await runCli(
+      ['decrypt', 'note.txt.enc', '--key', 'keys/alice.secret.pqc', '--force'],
+      dir,
+    );
+    expect(forced.code).toBe(0);
+    expect((await readFile(join(dir, 'note.txt'), 'utf8')).toString()).toBe('sealed until the end');
+  });
+
+  it('decrypt fails cleanly with the wrong secret key', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    await runCli(['keygen', '--name', 'mallory'], dir);
+    await writeFile(join(dir, 'note.txt'), 'for alice only');
+    await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+
+    const result = await runCli(
+      ['decrypt', 'note.txt.enc', '--key', 'keys/mallory.secret.pqc', '--out', 'leak.txt'],
+      dir,
+    );
+
+    expect(result.code).not.toBe(0);
+    expect(existsSync(join(dir, 'leak.txt'))).toBe(false);
+  });
+
+  it('rejects a public key where a secret key is expected', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    await writeFile(join(dir, 'note.txt'), 'x');
+    await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+
+    const result = await runCli(
+      ['decrypt', 'note.txt.enc', '--key', 'keys/alice.public.pqc', '--out', 'other.txt'],
+      dir,
+    );
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr + result.stdout).toMatch(/secret key/i);
+  });
+
+  it('encrypt output interoperates with the SDK (and vice versa)', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    const secretSerialized = (await readFile(join(dir, 'keys/alice.secret.pqc'), 'utf8')).trim();
+    const publicSerialized = (await readFile(join(dir, 'keys/alice.public.pqc'), 'utf8')).trim();
+    const secretKey = pqc.keys.deserialize(secretSerialized, {
+      algorithm: 'ml-kem-768',
+      use: 'secret',
+    });
+    const publicKey = pqc.keys.deserialize(publicSerialized, {
+      algorithm: 'ml-kem-768',
+      use: 'public',
+    });
+
+    // CLI encrypt -> SDK decrypt
+    await writeFile(join(dir, 'a.txt'), 'from the CLI');
+    await runCli(['encrypt', 'a.txt', '--key', 'keys/alice.public.pqc'], dir);
+    const cliEnvelope = await readFile(join(dir, 'a.txt.enc'));
+    const sdkPlain = await pqc.decrypt(new Uint8Array(cliEnvelope), secretKey);
+    expect(Buffer.from(sdkPlain).toString()).toBe('from the CLI');
+
+    // SDK encrypt -> CLI decrypt
+    const sdkEnvelope = await pqc.encrypt('from the SDK', publicKey);
+    await writeFile(join(dir, 'b.enc'), sdkEnvelope);
+    const result = await runCli(['decrypt', 'b.enc', '--key', 'keys/alice.secret.pqc'], dir);
+    expect(result.code).toBe(0);
+    expect(await readFile(join(dir, 'b'), 'utf8')).toBe('from the SDK');
   });
 });
