@@ -1,6 +1,8 @@
 import { defineCommand, runMain } from 'citty';
 
 import { audit } from './commands/audit.js';
+import { decrypt } from './commands/decrypt.js';
+import { encrypt } from './commands/encrypt.js';
 import { init } from './commands/init.js';
 import { keygen } from './commands/keygen.js';
 
@@ -16,6 +18,8 @@ const main = defineCommand({
   subCommands: {
     init,
     keygen,
+    encrypt,
+    decrypt,
     audit,
   },
 });
