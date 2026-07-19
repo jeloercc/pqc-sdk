@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -11,6 +11,9 @@ import {
   type PqcKey,
   type SupportedAlgorithm,
 } from '@pqc-sdk/core';
+
+import { UsageError } from './errors.js';
+import { warn } from './ui.js';
 
 /** Patterns that keep generated secret keys out of version control. */
 export const KEY_IGNORE_PATTERNS = ['keys/', '*.secret.pqc'] as const;
@@ -43,7 +46,7 @@ export interface WrittenKeyPair {
 
 export function assertSupportedAlgorithm(value: string): SupportedAlgorithm {
   if (!(SUPPORTED_ALGORITHMS as readonly string[]).includes(value)) {
-    throw new Error(
+    throw new UsageError(
       `Unsupported algorithm: ${value} (supported: ${SUPPORTED_ALGORITHMS.join(', ')})`,
     );
   }
@@ -58,13 +61,13 @@ export function assertSupportedAlgorithm(value: string): SupportedAlgorithm {
  */
 export function assertSafeName(value: string): string {
   if (value === '') {
-    throw new Error('Invalid --name: must not be empty.');
+    throw new UsageError('Invalid --name: must not be empty.');
   }
   if (value.includes('/') || value.includes('\\')) {
-    throw new Error('Invalid --name: must not contain path separators ("/" or "\\").');
+    throw new UsageError('Invalid --name: must not contain path separators ("/" or "\\").');
   }
   if (value.includes('..')) {
-    throw new Error('Invalid --name: must not contain "..".');
+    throw new UsageError('Invalid --name: must not contain "..".');
   }
   return value;
 }
@@ -90,14 +93,39 @@ export async function readKeyFile<A extends Algorithm, U extends KeyUse>(
   expected: ExpectedKey<A, U>,
 ): Promise<PqcKey<A, U>> {
   if (!existsSync(path)) {
-    throw new Error(`Key file not found: ${path}`);
+    throw new UsageError(`Key file not found: ${path}`);
+  }
+  if (expected.use === 'secret') {
+    await warnIfSecretKeyTooOpen(path);
   }
   const contents = await readFile(path, 'utf8');
   try {
     return pqc.keys.deserialize(contents.trim(), expected);
   } catch (cause) {
     const reason = cause instanceof Error ? cause.message : String(cause);
-    throw new Error(`${path} is not a valid ${expected.algorithm} ${expected.use} key: ${reason}`);
+    throw new UsageError(
+      `${path} is not a valid ${expected.algorithm} ${expected.use} key: ${reason}`,
+    );
+  }
+}
+
+/**
+ * Warns (ssh-style, without refusing) when a secret key file is readable or
+ * writable by group/others. `pqc keygen` writes secret keys with mode 0600,
+ * but a key that was copied, restored from a backup, or checked out of version
+ * control can lose that. Skipped on Windows, where POSIX mode bits are not
+ * meaningful.
+ */
+async function warnIfSecretKeyTooOpen(path: string): Promise<void> {
+  if (process.platform === 'win32') {
+    return;
+  }
+  const mode = (await stat(path)).mode & 0o777;
+  if ((mode & 0o077) !== 0) {
+    const octal = mode.toString(8).padStart(4, '0');
+    warn(
+      `Permissions ${octal} for ${path} are too open: the secret key should be accessible only by you. Fix it with: chmod 600 ${path}`,
+    );
   }
 }
 
@@ -114,7 +142,7 @@ export async function writeKeyPair(
   if (!force) {
     for (const path of [publicPath, secretPath]) {
       if (existsSync(path)) {
-        throw new Error(`${path} already exists. Use --force to overwrite it.`);
+        throw new UsageError(`${path} already exists. Use --force to overwrite it.`);
       }
     }
   }

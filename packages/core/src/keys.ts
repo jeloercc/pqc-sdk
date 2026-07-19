@@ -2,7 +2,7 @@ import { randomBytes } from '@noble/post-quantum/utils.js';
 
 import { getAlgorithm, keyLengthFor } from './algorithms.js';
 import { fromBase64Url, toBase64Url } from './base64url.js';
-import { PqcError } from './errors.js';
+import { PqcError, truncateForError } from './errors.js';
 import type { Algorithm, KeyPair, KeyUse, PqcKey } from './types.js';
 
 const SERIAL_PREFIX = 'pqcv1';
@@ -121,7 +121,8 @@ export function deserialize(serialized: string, expected?: ExpectedKey): PqcKey 
   const [, algorithm, use, encoded] = parts as [string, string, string, string];
   const spec = getAlgorithm(algorithm);
   if (use !== 'public' && use !== 'secret') {
-    throw new PqcError('INVALID_SERIALIZED_KEY', `Unknown key use: ${use}`);
+    // The segment comes from an untrusted serialized token: bound the echo.
+    throw new PqcError('INVALID_SERIALIZED_KEY', `Unknown key use: ${truncateForError(use)}`);
   }
   let bytes: Uint8Array;
   try {
