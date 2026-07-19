@@ -1,10 +1,12 @@
 import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 
 import { pqc } from '@pqc-sdk/core';
 import { defineCommand } from 'citty';
 
+import { friendlyRun, UsageError } from '../errors.js';
 import { readKeyFile } from '../keyfiles.js';
+import { writeOutput } from '../output.js';
 import { item, ok } from '../ui.js';
 
 export const encrypt = defineCommand({
@@ -33,13 +35,13 @@ export const encrypt = defineCommand({
       default: false,
     },
   },
-  async run({ args }) {
+  run: friendlyRun(async ({ args }) => {
+    if (!existsSync(args.input)) {
+      throw new UsageError(`Input file not found: ${args.input}`);
+    }
     const outPath = args.out ?? `${args.input}.enc`;
     if (!args.force && existsSync(outPath)) {
-      throw new Error(`${outPath} already exists. Use --force to overwrite it.`);
-    }
-    if (!existsSync(args.input)) {
-      throw new Error(`Input file not found: ${args.input}`);
+      throw new UsageError(`${outPath} already exists. Use --force to overwrite it.`);
     }
 
     const publicKey = await readKeyFile(args.key, {
@@ -48,10 +50,10 @@ export const encrypt = defineCommand({
     });
     const plaintext = await readFile(args.input);
     const envelope = await pqc.encrypt(new Uint8Array(plaintext), publicKey);
-    await writeFile(outPath, envelope);
+    await writeOutput(outPath, envelope, { force: args.force });
 
     ok(`Encrypted ${args.input} (${plaintext.length} bytes):`);
     item(`output: ${outPath} (${envelope.length} bytes, ML-KEM-768 + AES-256-GCM)`);
     item('only the matching secret key can decrypt it');
-  },
+  }),
 });

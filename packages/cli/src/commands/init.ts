@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 
 import { defineCommand } from 'citty';
 
+import { friendlyRun, UsageError } from '../errors.js';
 import { ensureKeysIgnored, writeKeyPair } from '../keyfiles.js';
 import { heading, item, ok, warn } from '../ui.js';
 
@@ -42,9 +43,9 @@ export const init = defineCommand({
     name: 'init',
     description: 'Initialize a project: config, development keys and example',
   },
-  async run() {
+  run: friendlyRun(async () => {
     if (existsSync(CONFIG_FILE)) {
-      throw new Error(`${CONFIG_FILE} already exists: the project is already initialized.`);
+      throw new UsageError(`${CONFIG_FILE} already exists: the project is already initialized.`);
     }
 
     await writeFile(CONFIG_FILE, `${JSON.stringify(CONFIG, null, 2)}\n`);
@@ -69,5 +70,5 @@ export const init = defineCommand({
     console.log();
     warn('The keys/dev.* keys are for development ONLY — do NOT use them in production.');
     ok(`Next step: run example.ts (node --experimental-strip-types example.ts or tsx)`);
-  },
+  }),
 });

@@ -431,6 +431,36 @@ describe('encrypt / decrypt', () => {
     },
   );
 
+  it('prints expected errors as one clean line on stderr, without a stack trace', async () => {
+    const dir = await freshDir();
+
+    const missing = await runCli(['decrypt', 'missing.enc', '--key', 'nokey.pqc'], dir);
+    expect(missing.code).toBe(1);
+    expect(missing.stderr).toContain('Input file not found: missing.enc');
+    // No stack frames for user-correctable errors (that would be finding F2).
+    expect(missing.stdout + missing.stderr).not.toMatch(/^\s+at /m);
+
+    await runCli(['keygen', '--name', 'alice'], dir);
+    await writeFile(join(dir, 'note.txt'), 'x');
+    await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+    const exists = await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+    expect(exists.code).toBe(1);
+    expect(exists.stderr).toContain('note.txt.enc already exists. Use --force to overwrite it.');
+    expect(exists.stdout + exists.stderr).not.toMatch(/^\s+at /m);
+  });
+
+  it('reports a missing input before a missing --force on the output', async () => {
+    const dir = await freshDir();
+    // Input nothere.enc does not exist AND its default output (nothere)
+    // already exists: the input error must win.
+    await writeFile(join(dir, 'nothere'), 'existing default decrypt target');
+
+    const result = await runCli(['decrypt', 'nothere.enc', '--key', 'nokey.pqc'], dir);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('Input file not found');
+    expect(result.stderr).not.toContain('already exists');
+  });
+
   it('decrypt fails cleanly with the wrong secret key', async () => {
     const dir = await freshDir();
     await runCli(['keygen', '--name', 'alice'], dir);

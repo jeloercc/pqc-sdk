@@ -1,5 +1,6 @@
 import { defineCommand } from 'citty';
 
+import { friendlyRun } from '../errors.js';
 import {
   assertSafeName,
   assertSupportedAlgorithm,
@@ -34,7 +35,7 @@ export const keygen = defineCommand({
       default: false,
     },
   },
-  async run({ args }) {
+  run: friendlyRun(async ({ args }) => {
     const algorithm = assertSupportedAlgorithm(args.algorithm);
     const baseName = args.name === undefined ? algorithm : assertSafeName(args.name);
     const keys = await writeKeyPair(args.out, baseName, algorithm, args.force);
@@ -47,5 +48,5 @@ export const keygen = defineCommand({
       item(`.gitignore: added ${ignored.join(', ')} so secret keys are never committed`);
     }
     warn('The secret key must not be committed or leave this environment.');
-  },
+  }),
 });
