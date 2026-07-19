@@ -9,6 +9,11 @@ export const ok = (message: string): void => {
   console.log(`${pc.green('✓')} ${message}`);
 };
 
+/** Errors go to stderr so stdout stays clean for pipes. */
+export const error = (message: string): void => {
+  console.error(`${pc.red('✗')} ${message}`);
+};
+
 export const warn = (message: string): void => {
   console.log(`${pc.yellow('⚠')} ${pc.yellow(message)}`);
 };

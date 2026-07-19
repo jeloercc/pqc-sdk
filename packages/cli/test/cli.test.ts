@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, stat, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -367,6 +367,117 @@ describe('encrypt / decrypt', () => {
     expect((await readFile(join(dir, 'note.txt'), 'utf8')).toString()).toBe('sealed until the end');
   });
 
+  it.skipIf(process.platform === 'win32')(
+    'warns when the secret key file is group- or other-readable',
+    async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'alice'], dir);
+      await writeFile(join(dir, 'note.txt'), 'quiet');
+      await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+      await chmod(join(dir, 'keys/alice.secret.pqc'), 0o644);
+
+      const result = await runCli(
+        ['decrypt', 'note.txt.enc', '--key', 'keys/alice.secret.pqc', '--out', 'other.txt'],
+        dir,
+      );
+
+      // A warning, not a refusal: the decryption still succeeds.
+      expect(result.code).toBe(0);
+      expect(result.stdout + result.stderr).toMatch(/0644 .* too open/);
+      expect(result.stdout + result.stderr).toContain('chmod 600');
+    },
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'does not warn about permissions of the public key on encrypt',
+    async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'alice'], dir);
+      await writeFile(join(dir, 'note.txt'), 'quiet');
+
+      const result = await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+
+      expect(result.code).toBe(0);
+      expect(result.stdout + result.stderr).not.toMatch(/too open/);
+    },
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'writes the recovered plaintext readable only by its owner (0600)',
+    async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'alice'], dir);
+      await writeFile(join(dir, 'note.txt'), 'owner eyes only');
+      await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+
+      // Pre-create the output with wide permissions: --force must not keep them.
+      await writeFile(join(dir, 'restored.txt'), 'stale', { mode: 0o644 });
+      const result = await runCli(
+        [
+          'decrypt',
+          'note.txt.enc',
+          '--key',
+          'keys/alice.secret.pqc',
+          '--out',
+          'restored.txt',
+          '--force',
+        ],
+        dir,
+      );
+
+      expect(result.code).toBe(0);
+      expect((await stat(join(dir, 'restored.txt'))).mode & 0o777).toBe(0o600);
+      expect(await readFile(join(dir, 'restored.txt'), 'utf8')).toBe('owner eyes only');
+    },
+  );
+
+  it('prints expected errors as one clean line on stderr, without a stack trace', async () => {
+    const dir = await freshDir();
+
+    const missing = await runCli(['decrypt', 'missing.enc', '--key', 'nokey.pqc'], dir);
+    expect(missing.code).toBe(1);
+    expect(missing.stderr).toContain('Input file not found: missing.enc');
+    // No stack frames for user-correctable errors (that would be finding F2).
+    expect(missing.stdout + missing.stderr).not.toMatch(/^\s+at /m);
+
+    await runCli(['keygen', '--name', 'alice'], dir);
+    await writeFile(join(dir, 'note.txt'), 'x');
+    await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+    const exists = await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+    expect(exists.code).toBe(1);
+    expect(exists.stderr).toContain('note.txt.enc already exists. Use --force to overwrite it.');
+    expect(exists.stdout + exists.stderr).not.toMatch(/^\s+at /m);
+  });
+
+  it('reports a missing input before a missing --force on the output', async () => {
+    const dir = await freshDir();
+    // Input nothere.enc does not exist AND its default output (nothere)
+    // already exists: the input error must win.
+    await writeFile(join(dir, 'nothere'), 'existing default decrypt target');
+
+    const result = await runCli(['decrypt', 'nothere.enc', '--key', 'nokey.pqc'], dir);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('Input file not found');
+    expect(result.stderr).not.toContain('already exists');
+  });
+
+  it('refuses inputs above the 1 GiB in-memory limit with a clear error', async () => {
+    const dir = await freshDir();
+    // A sparse file: instant to create, stat.size is what the guard checks.
+    await writeFile(join(dir, 'huge.bin'), '');
+    await truncate(join(dir, 'huge.bin'), 1024 * 1024 * 1024 + 1);
+
+    const enc = await runCli(['encrypt', 'huge.bin', '--key', 'nokey.pqc'], dir);
+    expect(enc.code).toBe(1);
+    expect(enc.stderr).toMatch(/1 GiB limit/);
+    expect(enc.stderr).toContain('memory');
+    expect(enc.stdout + enc.stderr).not.toMatch(/^\s+at /m);
+
+    const dec = await runCli(['decrypt', 'huge.bin', '--key', 'nokey.pqc'], dir);
+    expect(dec.code).toBe(1);
+    expect(dec.stderr).toMatch(/1 GiB limit/);
+  });
+
   it('decrypt fails cleanly with the wrong secret key', async () => {
     const dir = await freshDir();
     await runCli(['keygen', '--name', 'alice'], dir);
@@ -381,6 +492,50 @@ describe('encrypt / decrypt', () => {
 
     expect(result.code).not.toBe(0);
     expect(existsSync(join(dir, 'leak.txt'))).toBe(false);
+  });
+
+  it('decrypt fails closed on a tampered envelope, through the real binary', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    await writeFile(join(dir, 'note.txt'), 'integrity matters');
+    await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+    const envelope = await readFile(join(dir, 'note.txt.enc'));
+
+    // Sealed payload region: flip one bit of the last byte (inside the GCM tag).
+    const sealedTampered = Buffer.from(envelope);
+    sealedTampered[sealedTampered.length - 1]! ^= 0x01;
+    await writeFile(join(dir, 'sealed.enc'), sealedTampered);
+    const sealed = await runCli(
+      ['decrypt', 'sealed.enc', '--key', 'keys/alice.secret.pqc', '--out', 'sealed.out'],
+      dir,
+    );
+    expect(sealed.code).toBe(1);
+    expect(sealed.stderr).toMatch(/tampered ciphertext or wrong secret key/i);
+    expect(sealed.stdout + sealed.stderr).not.toMatch(/^\s+at /m);
+    expect(existsSync(join(dir, 'sealed.out'))).toBe(false);
+
+    // Header region: an unknown version byte is rejected before any crypto.
+    const headerTampered = Buffer.from(envelope);
+    headerTampered[0]! ^= 0xff;
+    await writeFile(join(dir, 'header.enc'), headerTampered);
+    const header = await runCli(
+      ['decrypt', 'header.enc', '--key', 'keys/alice.secret.pqc', '--out', 'header.out'],
+      dir,
+    );
+    expect(header.code).toBe(1);
+    expect(header.stderr).toMatch(/unknown header/i);
+    expect(existsSync(join(dir, 'header.out'))).toBe(false);
+
+    // KEM ciphertext region: implicit rejection ends in the same clean failure.
+    const kemTampered = Buffer.from(envelope);
+    kemTampered[2]! ^= 0x01;
+    await writeFile(join(dir, 'kem.enc'), kemTampered);
+    const kem = await runCli(
+      ['decrypt', 'kem.enc', '--key', 'keys/alice.secret.pqc', '--out', 'kem.out'],
+      dir,
+    );
+    expect(kem.code).toBe(1);
+    expect(existsSync(join(dir, 'kem.out'))).toBe(false);
   });
 
   it('rejects a public key where a secret key is expected', async () => {
