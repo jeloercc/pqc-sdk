@@ -1,7 +1,7 @@
 import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
 import { ml_kem768 } from '@noble/post-quantum/ml-kem.js';
 
-import { PqcError } from './errors.js';
+import { PqcError, truncateForError } from './errors.js';
 import type { Algorithm, KemAlgorithm, KeyUse, PqcKey, SignatureAlgorithm } from './types.js';
 
 interface AlgorithmSpec {
@@ -54,7 +54,11 @@ export const ALGORITHMS: Record<Algorithm, KemSpec | SignerSpec> = {
 export function getAlgorithm(algorithm: string): KemSpec | SignerSpec {
   const spec = (ALGORITHMS as Record<string, KemSpec | SignerSpec>)[algorithm];
   if (!spec) {
-    throw new PqcError('UNSUPPORTED_ALGORITHM', `Unsupported algorithm: ${algorithm}`);
+    // The name can come from an untrusted serialized key: bound the echo.
+    throw new PqcError(
+      'UNSUPPORTED_ALGORITHM',
+      `Unsupported algorithm: ${truncateForError(algorithm)}`,
+    );
   }
   return spec;
 }
