@@ -5,6 +5,7 @@ import { join, relative } from 'node:path';
 import { defineCommand } from 'citty';
 import pc from 'picocolors';
 
+import { friendlyRun } from '../errors.js';
 import { finding, heading, note, ok } from '../ui.js';
 
 interface Finding {
@@ -137,7 +138,7 @@ export const audit = defineCommand({
     description:
       'Heuristically detect pre-quantum crypto (best-effort regex scan) and suggest the PQC equivalent',
   },
-  async run() {
+  run: friendlyRun(async () => {
     const cwd = process.cwd();
     const { findings: sourceFindings, skipped } = await auditSources(cwd);
     const findings = [...(await auditPackageJson(cwd)), ...sourceFindings];
@@ -167,5 +168,5 @@ export const audit = defineCommand({
       ),
     );
     process.exitCode = 1;
-  },
+  }),
 });
