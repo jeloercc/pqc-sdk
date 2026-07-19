@@ -1,10 +1,13 @@
 import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 
 import { pqc } from '@pqc-sdk/core';
 import { defineCommand } from 'citty';
 
+import { friendlyRun, UsageError } from '../errors.js';
+import { assertReadableInput } from '../input.js';
 import { readKeyFile } from '../keyfiles.js';
+import { writeOutput } from '../output.js';
 import { item, ok } from '../ui.js';
 
 export const encrypt = defineCommand({
@@ -15,7 +18,7 @@ export const encrypt = defineCommand({
   args: {
     input: {
       type: 'positional',
-      description: 'File to encrypt',
+      description: 'File to encrypt (loaded fully into memory; 1 GiB maximum)',
       required: true,
     },
     key: {
@@ -33,25 +36,25 @@ export const encrypt = defineCommand({
       default: false,
     },
   },
-  async run({ args }) {
+  run: friendlyRun(async ({ args }) => {
+    await assertReadableInput(args.input);
     const outPath = args.out ?? `${args.input}.enc`;
     if (!args.force && existsSync(outPath)) {
-      throw new Error(`${outPath} already exists. Use --force to overwrite it.`);
-    }
-    if (!existsSync(args.input)) {
-      throw new Error(`Input file not found: ${args.input}`);
+      throw new UsageError(`${outPath} already exists. Use --force to overwrite it.`);
     }
 
     const publicKey = await readKeyFile(args.key, {
       algorithm: 'ml-kem-768',
       use: 'public',
     });
+    // A Buffer already is a Uint8Array: no defensive copy (the file can be
+    // large, and encrypt never mutates its input).
     const plaintext = await readFile(args.input);
-    const envelope = await pqc.encrypt(new Uint8Array(plaintext), publicKey);
-    await writeFile(outPath, envelope);
+    const envelope = await pqc.encrypt(plaintext, publicKey);
+    await writeOutput(outPath, envelope, { force: args.force });
 
     ok(`Encrypted ${args.input} (${plaintext.length} bytes):`);
     item(`output: ${outPath} (${envelope.length} bytes, ML-KEM-768 + AES-256-GCM)`);
     item('only the matching secret key can decrypt it');
-  },
+  }),
 });

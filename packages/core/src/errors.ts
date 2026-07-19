@@ -35,3 +35,21 @@ export class PqcError extends Error {
     this.code = code;
   }
 }
+
+/**
+ * Bounds a value taken from untrusted input (a serialized-key segment, an
+ * algorithm name from a file) before echoing it in an error message, so a
+ * malformed input cannot inject unbounded content into errors that end up in
+ * logs. Internal — not part of the public API.
+ *
+ * @example
+ * ```ts
+ * import { truncateForError } from './errors.js';
+ *
+ * truncateForError('ml-kem-768'); // 'ml-kem-768'
+ * truncateForError('x'.repeat(100)); // first 32 chars followed by '…'
+ * ```
+ */
+export function truncateForError(value: string, maxLength = 32): string {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength)}…`;
+}
