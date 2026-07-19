@@ -150,3 +150,51 @@ describe('pqc.keys low-level guards', () => {
     expectPqcCode(() => generateKeyPairFromSeed('ml-kem-768', new Uint8Array(10)), 'INVALID_KEY');
   });
 });
+
+describe('deserialize error hygiene', () => {
+  it('bounds the echoed algorithm segment of an untrusted token to 32 chars', () => {
+    const junk = 'a'.repeat(100);
+    const token = `pqcv1.${junk}.public.AAAA`;
+
+    let caught: unknown;
+    try {
+      pqc.keys.deserialize(token);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(PqcError);
+    const message = (caught as PqcError).message;
+    expect((caught as PqcError).code).toBe('UNSUPPORTED_ALGORITHM');
+    expect(message).toContain(`${'a'.repeat(32)}…`);
+    expect(message).not.toContain('a'.repeat(33));
+  });
+
+  it('bounds the echoed use segment of an untrusted token to 32 chars', () => {
+    const junk = 'b'.repeat(100);
+    const token = `pqcv1.ml-kem-768.${junk}.AAAA`;
+
+    let caught: unknown;
+    try {
+      pqc.keys.deserialize(token);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(PqcError);
+    const message = (caught as PqcError).message;
+    expect((caught as PqcError).code).toBe('INVALID_SERIALIZED_KEY');
+    expect(message).toContain(`${'b'.repeat(32)}…`);
+    expect(message).not.toContain('b'.repeat(33));
+  });
+
+  it('leaves short legitimate values untouched in error messages', () => {
+    let caught: unknown;
+    try {
+      pqc.keys.deserialize('pqcv1.rsa-2048.public.AAAA');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(PqcError);
+    expect((caught as PqcError).message).toContain('rsa-2048');
+    expect((caught as PqcError).message).not.toContain('…');
+  });
+});
