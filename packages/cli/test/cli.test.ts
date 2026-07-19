@@ -494,6 +494,50 @@ describe('encrypt / decrypt', () => {
     expect(existsSync(join(dir, 'leak.txt'))).toBe(false);
   });
 
+  it('decrypt fails closed on a tampered envelope, through the real binary', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    await writeFile(join(dir, 'note.txt'), 'integrity matters');
+    await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+    const envelope = await readFile(join(dir, 'note.txt.enc'));
+
+    // Sealed payload region: flip one bit of the last byte (inside the GCM tag).
+    const sealedTampered = Buffer.from(envelope);
+    sealedTampered[sealedTampered.length - 1]! ^= 0x01;
+    await writeFile(join(dir, 'sealed.enc'), sealedTampered);
+    const sealed = await runCli(
+      ['decrypt', 'sealed.enc', '--key', 'keys/alice.secret.pqc', '--out', 'sealed.out'],
+      dir,
+    );
+    expect(sealed.code).toBe(1);
+    expect(sealed.stderr).toMatch(/tampered ciphertext or wrong secret key/i);
+    expect(sealed.stdout + sealed.stderr).not.toMatch(/^\s+at /m);
+    expect(existsSync(join(dir, 'sealed.out'))).toBe(false);
+
+    // Header region: an unknown version byte is rejected before any crypto.
+    const headerTampered = Buffer.from(envelope);
+    headerTampered[0]! ^= 0xff;
+    await writeFile(join(dir, 'header.enc'), headerTampered);
+    const header = await runCli(
+      ['decrypt', 'header.enc', '--key', 'keys/alice.secret.pqc', '--out', 'header.out'],
+      dir,
+    );
+    expect(header.code).toBe(1);
+    expect(header.stderr).toMatch(/unknown header/i);
+    expect(existsSync(join(dir, 'header.out'))).toBe(false);
+
+    // KEM ciphertext region: implicit rejection ends in the same clean failure.
+    const kemTampered = Buffer.from(envelope);
+    kemTampered[2]! ^= 0x01;
+    await writeFile(join(dir, 'kem.enc'), kemTampered);
+    const kem = await runCli(
+      ['decrypt', 'kem.enc', '--key', 'keys/alice.secret.pqc', '--out', 'kem.out'],
+      dir,
+    );
+    expect(kem.code).toBe(1);
+    expect(existsSync(join(dir, 'kem.out'))).toBe(false);
+  });
+
   it('rejects a public key where a secret key is expected', async () => {
     const dir = await freshDir();
     await runCli(['keygen', '--name', 'alice'], dir);
