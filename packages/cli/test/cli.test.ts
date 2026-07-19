@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, stat, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -459,6 +459,23 @@ describe('encrypt / decrypt', () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('Input file not found');
     expect(result.stderr).not.toContain('already exists');
+  });
+
+  it('refuses inputs above the 1 GiB in-memory limit with a clear error', async () => {
+    const dir = await freshDir();
+    // A sparse file: instant to create, stat.size is what the guard checks.
+    await writeFile(join(dir, 'huge.bin'), '');
+    await truncate(join(dir, 'huge.bin'), 1024 * 1024 * 1024 + 1);
+
+    const enc = await runCli(['encrypt', 'huge.bin', '--key', 'nokey.pqc'], dir);
+    expect(enc.code).toBe(1);
+    expect(enc.stderr).toMatch(/1 GiB limit/);
+    expect(enc.stderr).toContain('memory');
+    expect(enc.stdout + enc.stderr).not.toMatch(/^\s+at /m);
+
+    const dec = await runCli(['decrypt', 'huge.bin', '--key', 'nokey.pqc'], dir);
+    expect(dec.code).toBe(1);
+    expect(dec.stderr).toMatch(/1 GiB limit/);
   });
 
   it('decrypt fails cleanly with the wrong secret key', async () => {

@@ -5,6 +5,7 @@ import { pqc } from '@pqc-sdk/core';
 import { defineCommand } from 'citty';
 
 import { friendlyRun, UsageError } from '../errors.js';
+import { assertReadableInput } from '../input.js';
 import { readKeyFile } from '../keyfiles.js';
 import { writeOutput } from '../output.js';
 import { item, ok } from '../ui.js';
@@ -17,7 +18,7 @@ export const encrypt = defineCommand({
   args: {
     input: {
       type: 'positional',
-      description: 'File to encrypt',
+      description: 'File to encrypt (loaded fully into memory; 1 GiB maximum)',
       required: true,
     },
     key: {
@@ -36,9 +37,7 @@ export const encrypt = defineCommand({
     },
   },
   run: friendlyRun(async ({ args }) => {
-    if (!existsSync(args.input)) {
-      throw new UsageError(`Input file not found: ${args.input}`);
-    }
+    await assertReadableInput(args.input);
     const outPath = args.out ?? `${args.input}.enc`;
     if (!args.force && existsSync(outPath)) {
       throw new UsageError(`${outPath} already exists. Use --force to overwrite it.`);
@@ -48,8 +47,10 @@ export const encrypt = defineCommand({
       algorithm: 'ml-kem-768',
       use: 'public',
     });
+    // A Buffer already is a Uint8Array: no defensive copy (the file can be
+    // large, and encrypt never mutates its input).
     const plaintext = await readFile(args.input);
-    const envelope = await pqc.encrypt(new Uint8Array(plaintext), publicKey);
+    const envelope = await pqc.encrypt(plaintext, publicKey);
     await writeOutput(outPath, envelope, { force: args.force });
 
     ok(`Encrypted ${args.input} (${plaintext.length} bytes):`);
