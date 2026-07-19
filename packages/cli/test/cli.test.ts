@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -366,6 +366,70 @@ describe('encrypt / decrypt', () => {
     expect(forced.code).toBe(0);
     expect((await readFile(join(dir, 'note.txt'), 'utf8')).toString()).toBe('sealed until the end');
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'warns when the secret key file is group- or other-readable',
+    async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'alice'], dir);
+      await writeFile(join(dir, 'note.txt'), 'quiet');
+      await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+      await chmod(join(dir, 'keys/alice.secret.pqc'), 0o644);
+
+      const result = await runCli(
+        ['decrypt', 'note.txt.enc', '--key', 'keys/alice.secret.pqc', '--out', 'other.txt'],
+        dir,
+      );
+
+      // A warning, not a refusal: the decryption still succeeds.
+      expect(result.code).toBe(0);
+      expect(result.stdout + result.stderr).toMatch(/0644 .* too open/);
+      expect(result.stdout + result.stderr).toContain('chmod 600');
+    },
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'does not warn about permissions of the public key on encrypt',
+    async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'alice'], dir);
+      await writeFile(join(dir, 'note.txt'), 'quiet');
+
+      const result = await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+
+      expect(result.code).toBe(0);
+      expect(result.stdout + result.stderr).not.toMatch(/too open/);
+    },
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'writes the recovered plaintext readable only by its owner (0600)',
+    async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'alice'], dir);
+      await writeFile(join(dir, 'note.txt'), 'owner eyes only');
+      await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+
+      // Pre-create the output with wide permissions: --force must not keep them.
+      await writeFile(join(dir, 'restored.txt'), 'stale', { mode: 0o644 });
+      const result = await runCli(
+        [
+          'decrypt',
+          'note.txt.enc',
+          '--key',
+          'keys/alice.secret.pqc',
+          '--out',
+          'restored.txt',
+          '--force',
+        ],
+        dir,
+      );
+
+      expect(result.code).toBe(0);
+      expect((await stat(join(dir, 'restored.txt'))).mode & 0o777).toBe(0o600);
+      expect(await readFile(join(dir, 'restored.txt'), 'utf8')).toBe('owner eyes only');
+    },
+  );
 
   it('decrypt fails cleanly with the wrong secret key', async () => {
     const dir = await freshDir();

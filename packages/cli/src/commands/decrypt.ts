@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { chmod, readFile, writeFile } from 'node:fs/promises';
 
 import { pqc } from '@pqc-sdk/core';
 import { defineCommand } from 'citty';
@@ -49,7 +49,11 @@ export const decrypt = defineCommand({
     });
     const envelope = await readFile(args.input);
     const plaintext = await pqc.decrypt(new Uint8Array(envelope), secretKey);
-    await writeFile(outPath, plaintext);
+    // Recovered plaintext is as sensitive as a secret key: owner-only, like
+    // `pqc keygen` does for .secret.pqc (the chmod covers --force overwrites
+    // of a file that already existed with wider permissions).
+    await writeFile(outPath, plaintext, { mode: 0o600 });
+    await chmod(outPath, 0o600);
 
     ok(`Decrypted ${args.input}:`);
     item(`output: ${outPath} (${plaintext.length} bytes)`);

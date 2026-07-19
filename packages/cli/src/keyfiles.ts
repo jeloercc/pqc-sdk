@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -11,6 +11,8 @@ import {
   type PqcKey,
   type SupportedAlgorithm,
 } from '@pqc-sdk/core';
+
+import { warn } from './ui.js';
 
 /** Patterns that keep generated secret keys out of version control. */
 export const KEY_IGNORE_PATTERNS = ['keys/', '*.secret.pqc'] as const;
@@ -92,12 +94,35 @@ export async function readKeyFile<A extends Algorithm, U extends KeyUse>(
   if (!existsSync(path)) {
     throw new Error(`Key file not found: ${path}`);
   }
+  if (expected.use === 'secret') {
+    await warnIfSecretKeyTooOpen(path);
+  }
   const contents = await readFile(path, 'utf8');
   try {
     return pqc.keys.deserialize(contents.trim(), expected);
   } catch (cause) {
     const reason = cause instanceof Error ? cause.message : String(cause);
     throw new Error(`${path} is not a valid ${expected.algorithm} ${expected.use} key: ${reason}`);
+  }
+}
+
+/**
+ * Warns (ssh-style, without refusing) when a secret key file is readable or
+ * writable by group/others. `pqc keygen` writes secret keys with mode 0600,
+ * but a key that was copied, restored from a backup, or checked out of version
+ * control can lose that. Skipped on Windows, where POSIX mode bits are not
+ * meaningful.
+ */
+async function warnIfSecretKeyTooOpen(path: string): Promise<void> {
+  if (process.platform === 'win32') {
+    return;
+  }
+  const mode = (await stat(path)).mode & 0o777;
+  if ((mode & 0o077) !== 0) {
+    const octal = mode.toString(8).padStart(4, '0');
+    warn(
+      `Permissions ${octal} for ${path} are too open: the secret key should be accessible only by you. Fix it with: chmod 600 ${path}`,
+    );
   }
 }
 
