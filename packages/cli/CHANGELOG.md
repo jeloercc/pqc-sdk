@@ -1,5 +1,15 @@
 # @pqc-sdk/cli
 
+## 0.4.1
+
+### Patch Changes
+
+- 4198e0b: `pqc encrypt` and `pqc decrypt` now refuse inputs above 1 GiB with a clear message instead of an opaque out-of-memory crash or Node's raw 2 GiB `readFile` error — the CLI loads the whole file into memory (streaming is a future core-API project), and the limit is documented in the command help. The redundant full-buffer copy before encryption was also dropped, halving peak memory overhead for large files.
+- 4198e0b: Expected failures (missing input, refusing to overwrite without `--force`, invalid or mismatched keys) now print a single clean message on stderr and exit with code 1 instead of dumping a stack trace. The input file is validated before the output collision check, and output files are created with the `wx` flag when `--force` is absent, so a file appearing between the check and the write is never clobbered.
+- 4198e0b: Key hygiene on read and on write: `pqc decrypt` (and any command reading a `.secret.pqc` file) now warns — ssh-style, without refusing — when the secret key is group- or other-readable, and recovered plaintext is written with owner-only permissions (0600), including when `--force` overwrites a file that had wider permissions.
+- Updated dependencies [4198e0b]
+  - @pqc-sdk/core@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
