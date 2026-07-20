@@ -153,32 +153,34 @@ unchanged structurally.
 the choice, which also means a serialized key fully determines the format a
 peer will receive.
 
-### Default: `keys.generate()` flips to `x-wing` (recommendation)
+### Default: opt-in at 0.5.0, flip at v1.0 (DECIDED 2026-07-19)
 
-Proposal: `pqc.keys.generate()` with no arguments generates `x-wing` in
-0.5.0. Rationale:
+**Decision (review of this proposal):** 0.5.0 ships X-Wing **opt-in** —
+`pqc.keys.generate({ algorithm: 'x-wing' })` — and `pqc.keys.generate()`
+with no arguments keeps returning `ml-kem-768`. Docs strongly recommend
+hybrid for long-term data. Rationale for deferring the flip:
 
-- The project's hard rule is _zero-config = safe defaults_. The
-  industry-consensus safe default for new deployments in 2026 is hybrid, not
-  pure ML-KEM — TLS (`X25519MLKEM768` in Chrome/Firefox), Signal (PQXDH), and
-  Apple (PQ3) all ship PQ/T hybrids so that a break of either component
-  (including an ML-KEM implementation flaw) does not expose traffic.
-- The cost is small now: we are pre-1.0 with a small adopter base, and
-  `decrypt`/`deserialize` accept both algorithms, so every same-version
-  deployment keeps working untouched.
-- The risk is mixed-version fleets (a 0.5.0 writer with 0.4.x readers). The
-  changeset, README, and migration note call this out; anyone needing the old
-  behavior passes `{ algorithm: 'ml-kem-768' }` explicitly.
+- Changing the no-arg return type of `keys.generate()` breaks TypeScript
+  consumers (the inferred `KeyPair<'ml-kem-768'>` becomes a different type)
+  — a compile-level break that does not belong in a minor.
+- A mixed fleet has no negotiation path: a 0.3.x/0.4.x peer receiving an
+  `x-wing` key fails closed with no way to ask for the older algorithm.
+  Opt-in keeps the choice with the party who can verify both ends.
 
-Fallback if the reviewer disagrees: ship `x-wing` opt-in in 0.5.0 and flip
-the default in the next minor after an adoption window. The plan proceeds
-identically either way; only one default constant and its docs differ.
+**The default flips to `x-wing` at v1.0**, the API-freeze milestone, where a
+breaking change is expected and announced. The v1.0 release notes must carry
+the migration note (pass `{ algorithm: 'ml-kem-768' }` to keep the old
+behavior) and the mixed-fleet upgrade order (readers before writers). The
+original rationale for hybrid-by-default stands — industry consensus (TLS
+`X25519MLKEM768`, Signal PQXDH, Apple PQ3) is PQ/T hybrid so a break of
+either component does not expose traffic — it is only the _timing_ that
+moves to v1.0.
 
 ### CLI
 
-- `pqc keygen` gains `--algorithm x-wing` (and inherits whatever default the
-  decision above lands on; key file naming defaults to the algorithm name as
-  today).
+- `pqc keygen` gains `--algorithm x-wing`; its default stays `ml-kem-768`
+  until v1.0, matching the SDK decision above (key file naming defaults to
+  the algorithm name as today).
 - `pqc encrypt` accepts either KEM public key and writes the matching
   envelope version; `pqc decrypt` accepts either secret key and both envelope
   versions. `readKeyFile`'s expectation loosens from "exactly ml-kem-768" to
@@ -207,7 +209,8 @@ documented `PqcError` codes, fail-closed; regenerate golden vectors additively
 negotiation rules). Deliverable: PR acknowledged as _additive minor_ per §3.
 
 **Day 3 — API surface + CLI + docs (core + cli)**
-`keys.generate` default decision wired + typed; CLI keygen/encrypt/decrypt
+`keys.generate({ algorithm: 'x-wing' })` opt-in wired + typed (no-arg default
+unchanged until v1.0); CLI keygen/encrypt/decrypt
 support; CLI interop tests (CLI↔SDK both directions, both versions, plus the
 tamper-through-the-binary suite extended to v2); README + docs site + audit
 hints; compatibility matrix rows stay honest (only runtimes with a real
