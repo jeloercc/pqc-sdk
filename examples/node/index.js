@@ -10,5 +10,15 @@ const plaintext = await pqc.decrypt(ciphertext, pair.secretKey);
 const decoded = new TextDecoder().decode(plaintext);
 
 assert.equal(decoded, message);
-console.log('✅ Node: generate → encrypt → decrypt OK');
+console.log('✅ Node: generate → encrypt → decrypt OK (ml-kem-768)');
 console.log(`   algorithm: ${pair.algorithm}, ciphertext: ${ciphertext.length} bytes`);
+
+// Hybrid KEM (X25519 + ML-KEM-768, pqcenc.v2): same API, an x-wing key pair.
+const hybridPair = await pqc.keys.generate({ algorithm: 'x-wing' });
+const hybridCiphertext = await pqc.encrypt(message, hybridPair.publicKey);
+const hybridPlaintext = await pqc.decrypt(hybridCiphertext, hybridPair.secretKey);
+const hybridDecoded = new TextDecoder().decode(hybridPlaintext);
+
+assert.equal(hybridDecoded, message);
+console.log('✅ Node: generate → encrypt → decrypt OK (x-wing hybrid)');
+console.log(`   algorithm: ${hybridPair.algorithm}, ciphertext: ${hybridCiphertext.length} bytes`);
