@@ -1,3 +1,4 @@
+import { XWing } from '@noble/post-quantum/hybrid.js';
 import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
 import { ml_kem768 } from '@noble/post-quantum/ml-kem.js';
 
@@ -10,11 +11,25 @@ interface AlgorithmSpec {
   readonly secretKeyLength: number;
 }
 
+/**
+ * Structural KEM surface shared by `@noble` implementations (`ml_kem768`,
+ * `XWing`). The optional second argument of `encapsulate` is the
+ * derandomization seed used only by deterministic test vectors.
+ */
+export interface NobleKem {
+  keygen(seed?: Uint8Array): { publicKey: Uint8Array; secretKey: Uint8Array };
+  encapsulate(
+    publicKey: Uint8Array,
+    seed?: Uint8Array,
+  ): { cipherText: Uint8Array; sharedSecret: Uint8Array };
+  decapsulate(cipherText: Uint8Array, secretKey: Uint8Array): Uint8Array;
+}
+
 export interface KemSpec extends AlgorithmSpec {
   readonly kind: 'kem';
   readonly headerId: number;
   readonly ciphertextLength: number;
-  readonly kem: typeof ml_kem768;
+  readonly kem: NobleKem;
 }
 
 export interface SignerSpec extends AlgorithmSpec {
@@ -32,6 +47,20 @@ export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
     publicKeyLength: 1184,
     secretKeyLength: 2400,
     ciphertextLength: 1088,
+  },
+  // X-Wing (draft-connolly-cfrg-xwing-kem-10): X25519 + ML-KEM-768 hybrid.
+  // The secret key is the 32-byte seed; the public key is pk_M(1184)‖pk_X(32)
+  // and the ciphertext ct_M(1088)‖ct_X(32), both opaque spec-defined units.
+  // headerId 0x02 is reserved here; the pqcenc.v2 envelope that uses it lands
+  // separately (encrypt/decrypt reject x-wing keys until then).
+  'x-wing': {
+    kind: 'kem',
+    headerId: 2,
+    kem: XWing,
+    seedLength: 32,
+    publicKeyLength: 1216,
+    secretKeyLength: 32,
+    ciphertextLength: 1120,
   },
 };
 
