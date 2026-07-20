@@ -27,6 +27,8 @@ export interface NobleKem {
 
 export interface KemSpec extends AlgorithmSpec {
   readonly kind: 'kem';
+  /** Envelope format version byte this KEM produces (docs/serialization-format.md §2). */
+  readonly envelopeVersion: number;
   readonly headerId: number;
   readonly ciphertextLength: number;
   readonly kem: NobleKem;
@@ -41,6 +43,7 @@ export interface SignerSpec extends AlgorithmSpec {
 export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
   'ml-kem-768': {
     kind: 'kem',
+    envelopeVersion: 1,
     headerId: 1,
     kem: ml_kem768,
     seedLength: 64,
@@ -49,12 +52,13 @@ export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
     ciphertextLength: 1088,
   },
   // X-Wing (draft-connolly-cfrg-xwing-kem-10): X25519 + ML-KEM-768 hybrid.
-  // The secret key is the 32-byte seed; the public key is pk_M(1184)‖pk_X(32)
-  // and the ciphertext ct_M(1088)‖ct_X(32), both opaque spec-defined units.
-  // headerId 0x02 is reserved here; the pqcenc.v2 envelope that uses it lands
-  // separately (encrypt/decrypt reject x-wing keys until then).
+  // The secret key is the 32-byte seed (draft §5.2); the public key is
+  // pk_M(1184)‖pk_X(32) and the ciphertext ct_M(1088)‖ct_X(32) (draft §5.4),
+  // both opaque spec-defined units. x-wing keys produce/open the pqcenc.v2
+  // envelope (version byte 0x02, headerId 0x02 — docs/serialization-format.md §2.2).
   'x-wing': {
     kind: 'kem',
+    envelopeVersion: 2,
     headerId: 2,
     kem: XWing,
     seedLength: 32,
