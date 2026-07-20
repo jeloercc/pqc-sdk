@@ -33,6 +33,15 @@ export async function encrypt(
   publicKey: PublicKey<'ml-kem-768'>,
 ): Promise<Uint8Array> {
   const spec = requireKey(publicKey, 'kem', 'public', 'encrypt');
+  // x-wing keys exist since Day 1 of the hybrid sprint, but their envelope is
+  // the not-yet-implemented pqcenc.v2: fail closed rather than emit an
+  // unspecified format. Removed when the v2 envelope lands.
+  if ((publicKey.algorithm as string) !== 'ml-kem-768') {
+    throw new PqcError(
+      'UNSUPPORTED_ALGORITHM',
+      `encrypt supports ml-kem-768 envelopes only for now; the ${publicKey.algorithm} envelope format (v2) is not implemented yet`,
+    );
+  }
   const plaintext = toBytes(data);
 
   const { cipherText, sharedSecret } = spec.kem.encapsulate(publicKey.bytes);
@@ -69,6 +78,13 @@ export async function decrypt(
   secretKey: SecretKey<'ml-kem-768'>,
 ): Promise<Uint8Array> {
   const spec = requireKey(secretKey, 'kem', 'secret', 'decrypt');
+  // Mirror of the encrypt guard: no v2 envelopes exist yet to decrypt.
+  if ((secretKey.algorithm as string) !== 'ml-kem-768') {
+    throw new PqcError(
+      'UNSUPPORTED_ALGORITHM',
+      `decrypt supports ml-kem-768 envelopes only for now; the ${secretKey.algorithm} envelope format (v2) is not implemented yet`,
+    );
+  }
 
   const minLength = 2 + spec.ciphertextLength + NONCE_LENGTH + GCM_TAG_LENGTH;
   if (ciphertext.length < minLength) {
