@@ -65,64 +65,70 @@ describe('property: key serialization', () => {
   });
 });
 
-describe('property: hybrid encryption', () => {
-  it(
-    'decrypt(encrypt(x)) deep-equals x for any payload',
-    async () => {
-      const pair = await pqc.keys.generate();
-      await fc.assert(
-        fc.asyncProperty(fc.uint8Array({ maxLength: 2048 }), async (payload) => {
-          const plaintext = await pqc.decrypt(
-            await pqc.encrypt(payload, pair.publicKey),
-            pair.secretKey,
-          );
-          expect(bytesEqual(plaintext, payload)).toBe(true);
-        }),
-        kem,
-      );
-    },
-    CRYPTO_TIMEOUT,
-  );
-
-  it(
-    'any single-byte tamper fails closed — never returns plaintext',
-    async () => {
-      const pair = await pqc.keys.generate();
-      await fc.assert(
-        fc.asyncProperty(
-          fc.uint8Array({ minLength: 1, maxLength: 512 }),
-          fc.nat(),
-          fc.integer({ min: 1, max: 255 }),
-          async (payload, indexSeed, xor) => {
-            const ciphertext = await pqc.encrypt(payload, pair.publicKey);
-            const index = indexSeed % ciphertext.length;
-            const tampered = Uint8Array.from(ciphertext);
-            // xor in [1,255] guarantees the byte actually changes.
-            tampered[index] = tampered[index]! ^ xor;
-
-            // The real security invariant: an authenticated scheme must throw on
-            // ANY tamper and never return plaintext (right or wrong). The two
-            // header bytes fail fast as INVALID_CIPHERTEXT; every other byte as
-            // DECRYPTION_FAILED — both are documented fail-closed PqcError codes.
-            const error = await pqc.decrypt(tampered, pair.secretKey).then(
-              () => {
-                throw new Error(`tamper at byte ${index} did not throw`);
-              },
-              (cause: unknown) => cause,
+// Both envelope versions must satisfy the same invariants: v1 (ml-kem-768)
+// and v2 (x-wing) differ only in KEM and layout offsets, never in the
+// fail-closed contract (docs/serialization-format.md §6).
+describe.each([{ algorithm: 'ml-kem-768' }, { algorithm: 'x-wing' }] as const)(
+  'property: hybrid encryption ($algorithm)',
+  ({ algorithm }) => {
+    it(
+      'decrypt(encrypt(x)) deep-equals x for any payload',
+      async () => {
+        const pair = await pqc.keys.generate({ algorithm });
+        await fc.assert(
+          fc.asyncProperty(fc.uint8Array({ maxLength: 2048 }), async (payload) => {
+            const plaintext = await pqc.decrypt(
+              await pqc.encrypt(payload, pair.publicKey),
+              pair.secretKey,
             );
-            expect(error).toBeInstanceOf(PqcError);
-            const code = (error as PqcError).code;
-            expect(
-              index < 2 ? ['INVALID_CIPHERTEXT', 'DECRYPTION_FAILED'] : ['DECRYPTION_FAILED'],
-            ).toContain(code);
-          },
-        ),
-        kem,
-      );
-    },
-    CRYPTO_TIMEOUT,
-  );
-});
+            expect(bytesEqual(plaintext, payload)).toBe(true);
+          }),
+          kem,
+        );
+      },
+      CRYPTO_TIMEOUT,
+    );
+
+    it(
+      'any single-byte tamper fails closed — never returns plaintext',
+      async () => {
+        const pair = await pqc.keys.generate({ algorithm });
+        await fc.assert(
+          fc.asyncProperty(
+            fc.uint8Array({ minLength: 1, maxLength: 512 }),
+            fc.nat(),
+            fc.integer({ min: 1, max: 255 }),
+            async (payload, indexSeed, xor) => {
+              const ciphertext = await pqc.encrypt(payload, pair.publicKey);
+              const index = indexSeed % ciphertext.length;
+              const tampered = Uint8Array.from(ciphertext);
+              // xor in [1,255] guarantees the byte actually changes.
+              tampered[index] = tampered[index]! ^ xor;
+
+              // The real security invariant: an authenticated scheme must throw on
+              // ANY tamper and never return plaintext (right or wrong). The two
+              // header bytes fail fast as INVALID_CIPHERTEXT; every other byte as
+              // DECRYPTION_FAILED — both are documented fail-closed PqcError codes.
+              const error = await pqc.decrypt(tampered, pair.secretKey).then(
+                () => {
+                  throw new Error(`tamper at byte ${index} did not throw`);
+                },
+                (cause: unknown) => cause,
+              );
+              expect(error).toBeInstanceOf(PqcError);
+              const code = (error as PqcError).code;
+              expect(
+                index < 2 ? ['INVALID_CIPHERTEXT', 'DECRYPTION_FAILED'] : ['DECRYPTION_FAILED'],
+              ).toContain(code);
+            },
+          ),
+          kem,
+        );
+      },
+      CRYPTO_TIMEOUT,
+    );
+  },
+);
 
 describe('property: signatures', () => {
   it(
