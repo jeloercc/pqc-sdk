@@ -105,21 +105,17 @@ describe('x-wing key plumbing (Day 1 surface)', () => {
     expect((caught as PqcError).code).toBe('INVALID_KEY');
   });
 
-  it('encrypt refuses an x-wing public key until the v2 envelope exists', async () => {
+  it('encrypt/decrypt roundtrip an x-wing pair through the v2 envelope', async () => {
+    // The Day-1 UNSUPPORTED_ALGORITHM guard is gone: x-wing keys now produce
+    // the pqcenc.v2 envelope (the full mutation matrix lives in
+    // encrypt-v2.test.ts).
     const pair = await pqc.keys.generate({ algorithm: 'x-wing' });
 
-    await expect(pqc.encrypt('data', pair.publicKey as never)).rejects.toMatchObject({
-      name: 'PqcError',
-      code: 'UNSUPPORTED_ALGORITHM',
-    });
-  });
+    const ciphertext = await pqc.encrypt('data', pair.publicKey);
+    expect(ciphertext[0]).toBe(2);
+    expect(ciphertext[1]).toBe(2);
 
-  it('decrypt refuses an x-wing secret key until the v2 envelope exists', async () => {
-    const pair = await pqc.keys.generate({ algorithm: 'x-wing' });
-
-    await expect(pqc.decrypt(new Uint8Array(2000), pair.secretKey as never)).rejects.toMatchObject({
-      name: 'PqcError',
-      code: 'UNSUPPORTED_ALGORITHM',
-    });
+    const plaintext = await pqc.decrypt(ciphertext, pair.secretKey);
+    expect(new TextDecoder().decode(plaintext)).toBe('data');
   });
 });

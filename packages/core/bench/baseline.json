@@ -1,32 +1,47 @@
 {
-  "generatedAt": "2026-07-03T22:19:12.616Z",
-  "commit": "0ee857c5ddd08c6844cf407bedb42080156f16a0",
+  "generatedAt": "2026-07-20T16:22:12.978Z",
+  "commit": "18906c4b1d309a0f26ff32f9ea68368bef69f9ba",
   "runner": "ubuntu24",
   "node": "20.20.2",
   "benchmarks": {
     "ml-kem-768 > keygen": {
-      "mean": 0.8514
+      "mean": 0.7628
     },
     "ml-kem-768 > encrypt 1KiB": {
-      "mean": 1.0276
+      "mean": 0.9348
     },
     "ml-kem-768 > encrypt 100KiB": {
-      "mean": 3.5038
+      "mean": 3.6637
     },
     "ml-kem-768 > decrypt 1KiB": {
-      "mean": 1.3456
+      "mean": 1.2393
     },
     "ml-kem-768 > decrypt 100KiB": {
-      "mean": 3.7116
+      "mean": 3.883
+    },
+    "x-wing > keygen": {
+      "mean": 1.8552
+    },
+    "x-wing > encrypt 1KiB": {
+      "mean": 4.2428
+    },
+    "x-wing > encrypt 100KiB": {
+      "mean": 6.8039
+    },
+    "x-wing > decrypt 1KiB": {
+      "mean": 4.1781
+    },
+    "x-wing > decrypt 100KiB": {
+      "mean": 6.7821
     },
     "ml-dsa-65 > keygen": {
-      "mean": 2.8952
+      "mean": 2.6875
     },
     "ml-dsa-65 > sign 1KiB": {
-      "mean": 16.534
+      "mean": 14.6398
     },
     "ml-dsa-65 > verify 1KiB": {
-      "mean": 3.229
+      "mean": 3.2616
     }
   }
 }
