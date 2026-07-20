@@ -1,8 +1,8 @@
 # Performance benchmarks & regression gate
 
-`src/pqc.bench.ts` measures the five core operations (ML-KEM-768 keygen /
-encrypt / decrypt at 1 KiB and 100 KiB, ML-DSA-65 keygen / sign / verify)
-with `vitest bench`. The `bench` job in CI runs them on every PR, prints the
+`src/pqc.bench.ts` measures the core operations (ML-KEM-768 and X-Wing
+keygen / encrypt / decrypt at 1 KiB and 100 KiB, ML-DSA-65 keygen / sign /
+verify) with `vitest bench`. The `bench` job in CI runs them on every PR, prints the
 numbers in the job summary, and fails only when an operation's mean exceeds
 **2.5x** the committed baseline (`baseline.json`).
 

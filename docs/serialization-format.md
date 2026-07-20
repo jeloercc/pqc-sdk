@@ -20,12 +20,12 @@ pqcv1.<algorithm>.<use>.<base64url>
 Four segments joined by `.` (exactly 3 dots — the base64url alphabet cannot
 contain `.`):
 
-| Segment   | Values                                    | Notes                                  |
-| --------- | ----------------------------------------- | -------------------------------------- |
-| version   | `pqcv1`                                   | Literal prefix; the format's namespace |
-| algorithm | `ml-kem-768` \| `ml-dsa-65` \| `x-wing`   | FIPS 203 / FIPS 204 / X-Wing draft     |
-| use       | `public` \| `secret`                      |                                        |
-| key bytes | base64url (see §5)                        | Raw key bytes, no framing              |
+| Segment   | Values                                  | Notes                                  |
+| --------- | --------------------------------------- | -------------------------------------- |
+| version   | `pqcv1`                                 | Literal prefix; the format's namespace |
+| algorithm | `ml-kem-768` \| `ml-dsa-65` \| `x-wing` | FIPS 203 / FIPS 204 / X-Wing draft     |
+| use       | `public` \| `secret`                    |                                        |
+| key bytes | base64url (see §5)                      | Raw key bytes, no framing              |
 
 The `pqcv1` prefix names the _token_ format, not the envelope version — an
 `x-wing` key serializes as a `pqcv1` token and produces v2 envelopes.
@@ -125,19 +125,19 @@ encoding.
 What today's parsers do with malformed or unknown input — this is normative
 behavior, locked by tests:
 
-| Input                                             | `PqcError` code          |
-| ------------------------------------------------- | ------------------------ |
-| Token without 4 segments or prefix ≠ `pqcv1`      | `INVALID_SERIALIZED_KEY` |
-| Token with unknown version prefix (e.g. `pqcv2`)  | `INVALID_SERIALIZED_KEY` |
-| Token with unknown algorithm segment              | `UNSUPPORTED_ALGORITHM`  |
-| Token with unknown use segment                            | `INVALID_SERIALIZED_KEY` |
-| Token with invalid/non-canonical base64url                | `INVALID_SERIALIZED_KEY` |
-| Token with wrong decoded key length                       | `INVALID_KEY`            |
-| Ciphertext shorter than its version's minimum (§2)        | `INVALID_CIPHERTEXT`     |
-| Ciphertext with unknown version byte (∉ `{0x01, 0x02}`)   | `INVALID_CIPHERTEXT`     |
-| Ciphertext with unknown header id (∉ `{0x01, 0x02}`)      | `INVALID_CIPHERTEXT`     |
-| Version/header id not matching the decrypting key         | `INVALID_CIPHERTEXT`     |
-| Tampered ciphertext / wrong key (GCM tag failure)         | `DECRYPTION_FAILED`      |
+| Input                                                   | `PqcError` code          |
+| ------------------------------------------------------- | ------------------------ |
+| Token without 4 segments or prefix ≠ `pqcv1`            | `INVALID_SERIALIZED_KEY` |
+| Token with unknown version prefix (e.g. `pqcv2`)        | `INVALID_SERIALIZED_KEY` |
+| Token with unknown algorithm segment                    | `UNSUPPORTED_ALGORITHM`  |
+| Token with unknown use segment                          | `INVALID_SERIALIZED_KEY` |
+| Token with invalid/non-canonical base64url              | `INVALID_SERIALIZED_KEY` |
+| Token with wrong decoded key length                     | `INVALID_KEY`            |
+| Ciphertext shorter than its version's minimum (§2)      | `INVALID_CIPHERTEXT`     |
+| Ciphertext with unknown version byte (∉ `{0x01, 0x02}`) | `INVALID_CIPHERTEXT`     |
+| Ciphertext with unknown header id (∉ `{0x01, 0x02}`)    | `INVALID_CIPHERTEXT`     |
+| Version/header id not matching the decrypting key       | `INVALID_CIPHERTEXT`     |
+| Tampered ciphertext / wrong key (GCM tag failure)       | `DECRYPTION_FAILED`      |
 
 The header check is relative to the secret key in use: a v1 envelope offered
 to an `x-wing` key, or a v2 envelope offered to an `ml-kem-768` key, fails
