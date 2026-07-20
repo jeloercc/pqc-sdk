@@ -1,5 +1,10 @@
-/** Key encapsulation algorithm (hybrid encryption). */
-export type KemAlgorithm = 'ml-kem-768';
+/**
+ * Key encapsulation algorithm (hybrid encryption). `x-wing` is the PQ/T
+ * hybrid KEM (X25519 + ML-KEM-768, draft-connolly-cfrg-xwing-kem); its
+ * envelope format (`pqcenc.v2`) lands separately — see
+ * `docs/proposals/hybrid-envelope.md`.
+ */
+export type KemAlgorithm = 'ml-kem-768' | 'x-wing';
 
 /** Digital signature algorithm. */
 export type SignatureAlgorithm = 'ml-dsa-65';
