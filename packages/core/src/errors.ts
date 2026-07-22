@@ -7,7 +7,9 @@ export type PqcErrorCode =
   | 'INVALID_SERIALIZED_KEY'
   | 'INVALID_CONTEXT'
   | 'INVALID_CIPHERTEXT'
-  | 'DECRYPTION_FAILED';
+  | 'DECRYPTION_FAILED'
+  | 'INVALID_CHUNK_SIZE'
+  | 'STREAM_OVERFLOW';
 
 /**
  * Typed SDK error. Every expected failure exposes a stable `code` so it can
