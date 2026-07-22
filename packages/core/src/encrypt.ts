@@ -143,5 +143,16 @@ export async function decrypt(
   }
 }
 
-/** Available KEM algorithms, exported for introspection. */
+/**
+ * Names of the KEM algorithms `pqc.encrypt`/`pqc.decrypt` accept, for
+ * introspection — e.g. validating a key file holds an encryption key rather
+ * than a signing key, without hardcoding the list.
+ *
+ * @example
+ * ```ts
+ * import { KEM_NAMES } from '@pqc-sdk/core';
+ *
+ * KEM_NAMES.includes('x-wing'); // true
+ * ```
+ */
 export const KEM_NAMES = Object.keys(KEM_ALGORITHMS);

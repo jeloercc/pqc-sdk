@@ -6,7 +6,7 @@ import { defineCommand } from 'citty';
 
 import { friendlyRun, UsageError } from '../errors.js';
 import { assertReadableInput } from '../input.js';
-import { readKeyFile } from '../keyfiles.js';
+import { readKemKeyFile } from '../keyfiles.js';
 import { writeOutput } from '../output.js';
 import { item, ok, warn } from '../ui.js';
 
@@ -19,7 +19,7 @@ export const decrypt = defineCommand({
     input: {
       type: 'positional',
       description:
-        'Encrypted file (an ML-KEM-768 + AES-256-GCM envelope; loaded fully into memory, 1 GiB maximum)',
+        'Encrypted file (a KEM + AES-256-GCM envelope, v1 or v2; loaded fully into memory, 1 GiB maximum)',
       required: true,
     },
     key: {
@@ -45,10 +45,7 @@ export const decrypt = defineCommand({
       throw new UsageError(`${outPath} already exists. Use --force to overwrite it.`);
     }
 
-    const secretKey = await readKeyFile(args.key, {
-      algorithm: 'ml-kem-768',
-      use: 'secret',
-    });
+    const secretKey = await readKemKeyFile(args.key, 'secret');
     // A Buffer already is a Uint8Array: no defensive copy needed.
     const envelope = await readFile(args.input);
     const plaintext = await pqc.decrypt(envelope, secretKey);
