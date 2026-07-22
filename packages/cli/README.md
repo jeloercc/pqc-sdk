@@ -45,8 +45,11 @@ Worth knowing:
 - Decrypted plaintext is written readable only by you (mode 0600), and the
   CLI warns — without refusing — when a secret key file is readable by other
   users (fix with `chmod 600 <file>`).
-- Files are loaded fully into memory: inputs are capped at 1 GiB. There is no
-  streaming mode yet; split very large files or encrypt an archive of parts.
+- Files at or below 8 MiB are loaded fully into memory; larger files stream
+  automatically (bounded memory regardless of size), up to a 1 TiB
+  operational ceiling. No flag needed — the CLI picks the right path from the
+  input size for `encrypt`, and from the ciphertext's own envelope header for
+  `decrypt`.
 - Expected failures (missing file, wrong key, tampered envelope) print a
   one-line error on stderr and exit with code 1 — CI- and script-friendly.
 

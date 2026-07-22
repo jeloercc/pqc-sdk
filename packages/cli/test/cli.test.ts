@@ -477,21 +477,20 @@ describe('encrypt / decrypt', () => {
     expect(result.stderr).not.toContain('already exists');
   });
 
-  it('refuses inputs above the 1 GiB in-memory limit with a clear error', async () => {
+  it('refuses inputs above the 1 TiB operational ceiling with a clear error', async () => {
     const dir = await freshDir();
     // A sparse file: instant to create, stat.size is what the guard checks.
     await writeFile(join(dir, 'huge.bin'), '');
-    await truncate(join(dir, 'huge.bin'), 1024 * 1024 * 1024 + 1);
+    await truncate(join(dir, 'huge.bin'), 1024 * 1024 * 1024 * 1024 + 1);
 
     const enc = await runCli(['encrypt', 'huge.bin', '--key', 'nokey.pqc'], dir);
     expect(enc.code).toBe(1);
-    expect(enc.stderr).toMatch(/1 GiB limit/);
-    expect(enc.stderr).toContain('memory');
+    expect(enc.stderr).toMatch(/1 TiB operational limit/);
     expect(enc.stdout + enc.stderr).not.toMatch(/^\s+at /m);
 
     const dec = await runCli(['decrypt', 'huge.bin', '--key', 'nokey.pqc'], dir);
     expect(dec.code).toBe(1);
-    expect(dec.stderr).toMatch(/1 GiB limit/);
+    expect(dec.stderr).toMatch(/1 TiB operational limit/);
   });
 
   it('decrypt fails cleanly with the wrong secret key', async () => {
@@ -728,6 +727,131 @@ describe('encrypt / decrypt', () => {
       );
       expect(v2Wrong.code).not.toBe(0);
       expect(existsSync(join(dir, 'v2.out'))).toBe(false);
+    });
+  });
+
+  describe('streaming (files above the 8 MiB threshold)', () => {
+    // Deterministic, non-trivial content — fast to generate, and a real
+    // byte-for-byte comparison actually means something (not just zeros).
+    function largePayload(bytes: number): Buffer {
+      const buf = Buffer.alloc(bytes);
+      for (let i = 0; i < bytes; i++) {
+        buf[i] = i % 256;
+      }
+      return buf;
+    }
+
+    it.each(['ml-kem-768', 'x-wing'] as const)(
+      'streams a file above the threshold and round-trips it byte-for-byte (%s)',
+      async (algorithm) => {
+        const dir = await freshDir();
+        await runCli(['keygen', '--algorithm', algorithm, '--name', 'alice'], dir);
+        const payload = largePayload(9 * 1024 * 1024); // 9 MiB, above the 8 MiB threshold
+        await writeFile(join(dir, 'large.bin'), payload);
+
+        const enc = await runCli(['encrypt', 'large.bin', '--key', 'keys/alice.public.pqc'], dir);
+        expect(enc.code).toBe(0);
+        expect(enc.stdout).toContain('streamed');
+
+        // The streaming envelope's leading version byte (docs/serialization-format.md
+        // §9.1): 0x03 for ml-kem-768, 0x04 for x-wing — never the one-shot
+        // 0x01/0x02, proving the threshold actually routed to the streaming path.
+        const envelopeHead = await readFile(join(dir, 'large.bin.enc'));
+        expect(envelopeHead[0]).toBe(algorithm === 'ml-kem-768' ? 0x03 : 0x04);
+
+        // --out avoids colliding with the original large.bin still present
+        // in dir (decrypt's default output would otherwise be that same
+        // path, which already exists).
+        const dec = await runCli(
+          ['decrypt', 'large.bin.enc', '--key', 'keys/alice.secret.pqc', '--out', 'roundtrip.bin'],
+          dir,
+        );
+        expect(dec.code).toBe(0);
+        expect(dec.stdout).toContain('streamed');
+
+        const roundtripped = await readFile(join(dir, 'roundtrip.bin'));
+        expect(roundtripped.equals(payload)).toBe(true);
+      },
+    );
+
+    it('decrypts a small SDK-produced streaming envelope, dispatching on the version byte rather than file size', async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'alice'], dir);
+      const publicSerialized = (await readFile(join(dir, 'keys/alice.public.pqc'), 'utf8')).trim();
+      const publicKey = pqc.keys.deserialize(publicSerialized, {
+        algorithm: 'ml-kem-768',
+        use: 'public',
+      });
+
+      // A tiny plaintext, but produced via encryptStream directly — this is
+      // a real streaming envelope (version 0x03) despite being far below
+      // the CLI's 8 MiB threshold, exactly the case size-based dispatch on
+      // decrypt would get wrong.
+      // eslint-disable-next-line @typescript-eslint/require-await
+      async function* source() {
+        yield new TextEncoder().encode('tiny but streamed');
+      }
+      const parts: Uint8Array[] = [];
+      for await (const chunk of pqc.encryptStream(publicKey, source(), { chunkSize: 8 })) {
+        parts.push(chunk);
+      }
+      const total = parts.reduce((n, p) => n + p.length, 0);
+      const envelope = Buffer.concat(
+        parts.map((p) => Buffer.from(p)),
+        total,
+      );
+      expect(envelope[0]).toBe(0x03);
+      await writeFile(join(dir, 'tiny-streamed.enc'), envelope);
+
+      const result = await runCli(
+        ['decrypt', 'tiny-streamed.enc', '--key', 'keys/alice.secret.pqc'],
+        dir,
+      );
+      expect(result.code).toBe(0);
+      expect(await readFile(join(dir, 'tiny-streamed'), 'utf8')).toBe('tiny but streamed');
+    });
+
+    it('a tampered large ciphertext fails cleanly and leaves no partial output file', async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'alice'], dir);
+      const payload = largePayload(9 * 1024 * 1024);
+      await writeFile(join(dir, 'large.bin'), payload);
+      await runCli(['encrypt', 'large.bin', '--key', 'keys/alice.public.pqc'], dir);
+
+      const envelope = await readFile(join(dir, 'large.bin.enc'));
+      // Flip a byte deep inside the ciphertext (well past the first chunk),
+      // so decryption yields at least one genuine chunk before failing —
+      // the exact scenario pipeToOutput's cleanup exists for.
+      const tampered = Buffer.from(envelope);
+      const midpoint = Math.floor(tampered.length / 2);
+      tampered[midpoint] = tampered[midpoint]! ^ 0xff;
+      await writeFile(join(dir, 'tampered.enc'), tampered);
+
+      const result = await runCli(
+        ['decrypt', 'tampered.enc', '--key', 'keys/alice.secret.pqc', '--out', 'tampered.out'],
+        dir,
+      );
+      expect(result.code).toBe(1);
+      expect(result.stdout + result.stderr).not.toMatch(/^\s+at /m);
+      // The critical assertion: no partial, unauthenticated plaintext left
+      // on disk for the caller to mistake for a (short but valid) result.
+      expect(existsSync(join(dir, 'tampered.out'))).toBe(false);
+    });
+
+    it('refuses to overwrite an existing output file when streaming, same as the one-shot path', async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'alice'], dir);
+      const payload = largePayload(9 * 1024 * 1024);
+      await writeFile(join(dir, 'large.bin'), payload);
+      await writeFile(join(dir, 'large.bin.enc'), 'pre-existing, must not be clobbered');
+
+      const result = await runCli(['encrypt', 'large.bin', '--key', 'keys/alice.public.pqc'], dir);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain('large.bin.enc already exists. Use --force to overwrite it.');
+      expect(
+        (await readFile(join(dir, 'large.bin.enc'), 'utf8')) ===
+          'pre-existing, must not be clobbered',
+      ).toBe(true);
     });
   });
 });

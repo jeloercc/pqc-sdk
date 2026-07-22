@@ -44,7 +44,8 @@ async function streamingRoundtrip(algorithm) {
   try {
     // Write deterministic-size random content — this is the "multi-GB file"
     // scenario in miniature: too large to comfortably hold as one in-memory
-    // Uint8Array in the general case, so the CLI's 1 GiB guard exists.
+    // Uint8Array in the general case, which is exactly why the CLI switches
+    // to this same streaming path automatically above 8 MiB.
     await writeFile(plainPath, randomBytes(LARGE_FILE_BYTES));
 
     const streamPair = await pqc.keys.generate({ algorithm });
