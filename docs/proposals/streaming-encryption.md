@@ -1,7 +1,7 @@
 # Proposal: streaming encryption (chunked AEAD for large payloads)
 
-- **Status:** PROPOSAL — nothing in this document is implemented. The sprint
-  starts only after this plan is approved.
+- **Status:** APPROVED (2026-07-22) — see "Review decisions" at the end.
+  Sprint starting; nothing below is implemented yet as of this commit.
 - **Date:** 2026-07-22
 - **Depends on:** `@pqc-sdk/core` 0.5.0 (envelope v1/v2, both KEMs public —
   see `docs/proposals/hybrid-envelope.md`)
@@ -150,6 +150,16 @@ way. **v1 and v2 golden vectors stay byte-identical forever** — this is
 additive, ships as a minor (0.6.0), matching the v1→v2 precedent
 acknowledged in `docs/proposals/hybrid-envelope.md` §3.
 
+**Recorded consequence of this choice** (carry into
+`docs/serialization-format.md` §9 verbatim): coupling envelope-shape to KEM
+means every future KEM costs **two** version bytes, not one — a one-shot id
+and a streaming id. That's fine at KEM count 2. If the number of supported
+KEMs ever grows past a handful, a future format revision may need to
+decouple envelope-shape from KEM (e.g. a single "streaming" version byte
+with the KEM carried only in the header id, as headerId already does today
+for one-shot). Documented now as a recorded decision with a known scaling
+limit, not something a future contributor rediscovers by accident.
+
 ### Header (fixed, once per stream)
 
 | Offset | Length       | Field                                                       |
@@ -258,6 +268,24 @@ caller's iterable don't need to match the wire chunk size — the
 implementation buffers and re-chunks internally, the same way any of the
 reference constructions do.
 
+**Incremental-release caveat (must be prominent in the JSDoc and the
+streaming guide, not a footnote).** `decryptStream` yields each plaintext
+chunk as soon as _that chunk_ authenticates — it does not, and cannot,
+withhold output until the whole stream is verified, because withholding
+would defeat the point of streaming (bounded memory). Each yielded chunk is
+genuinely authenticated on its own. But that is not the same guarantee
+one-shot `pqc.decrypt` gives: there, "the call returned" already means "the
+whole plaintext is authentic." Here, **"the whole plaintext is authentic
+and complete" is signaled only by the async iterable finishing without
+throwing** — a consumer that receives chunks 0..N-1 and then the iterable
+throws on a truncated final chunk has already seen N-1 valid-but-incomplete
+chunks of plaintext. age has this exact property for the same structural
+reason (it's inherent to online/streaming AEAD, not a shortcut we took). A
+consumer writing decrypted output to a file, a socket, or anywhere
+observable **must** treat that output as provisional until the iterable
+completes cleanly, and must be prepared to handle/discard a partial write
+on error — this cannot be a detail buried in a parameter description.
+
 ### Ergonomic adapters (thin, not the core surface)
 
 - `encryptWebStream`/`decryptWebStream`: wrap the async-iterable core as a
@@ -313,7 +341,15 @@ byte from the same key algorithm check `readKemKeyFile` already does.
     must still fail. This is the case naive designs miss: every remaining
     chunk verifies individually. The decoder must track "have I
     authenticated a `flag=0x01` chunk yet?" and error on EOF if not —
-    exactly age's documented rule, and the one to write first.
+    exactly age's documented rule, and the one to write first. Assert the
+    full incremental-release behavior, not just "it eventually throws": for
+    a plaintext spanning N chunks with the final chunk removed, collecting
+    from `decryptStream` must yield exactly the first N-1 plaintext chunks
+    **and then** throw — never fewer chunks (over-eager failure), never a
+    clean completion (the truncation silently accepted). This is the
+    concrete test for the incremental-release caveat in §3: valid prefix
+    chunks are real output, and only stream completion (not receipt of any
+    chunk) means the plaintext is complete.
   - **Reorder**: swap chunk `i` and `i+1` → chunk `i`'s ciphertext, now read
     at position `i+1`, is opened against nonce index `i+1` (the decoder's
     own position counter, never attacker-supplied) instead of the index
@@ -377,13 +413,23 @@ byte from the same key algorithm check `readKemKeyFile` already does.
   validation same-day; otherwise open a tracking issue immediately, same
   pattern as issue #45, rather than leaving it implicit.
 
-## Open questions for approval
+## Review decisions (2026-07-22)
 
-1. 64 KiB default chunk size (age's default) — acceptable, or a different
-   default preferred?
-2. Version-byte choice (`0x03` ml-kem-768-stream, `0x04` x-wing-stream,
-   reusing existing header ids) vs. an alternative encoding — any objection?
-3. 8 MiB CLI one-shot/streaming cutover and 1 TiB operational ceiling —
-   right numbers, or should either move?
-4. Any objection to the chunk-size-in-header design (§2) as the one
-   deliberate deviation from copying age verbatim?
+Approved as proposed, with one required addition and one recorded
+consequence — both folded into the sections above, not left here as loose
+notes:
+
+1. **64 KiB default chunk size** — approved, age's default, right
+   latency/overhead balance.
+2. **Version bytes `0x03`/`0x04`** — approved as proposed. Consequence
+   recorded in §2: each future KEM costs two version bytes under this
+   scheme; a future format revision may need to decouple envelope-shape
+   from KEM if the KEM count grows past a handful.
+3. **8 MiB CLI cutover / 1 TiB operational ceiling** — approved, both
+   numbers stand.
+4. **Chunk-size-in-header deviation from age** — approved; binding it as
+   AAD on every chunk is what makes it safe to accept from the wire.
+5. **Required addition**: the incremental-release caveat (§3) and its
+   dedicated mutation test (§4, chunk-aligned truncation) — not optional,
+   must land in the API JSDoc and the streaming guide with the same
+   prominence as here, not as a buried parameter note.
