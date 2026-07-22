@@ -1,29 +1,36 @@
 import { describe, expect, it } from 'vitest';
 
+import type { KemAlgorithm } from './types.js';
 import { PqcError } from './errors.js';
 import { generate } from './keys.js';
 import { decryptStream, encryptStream } from './stream.js';
 
 /**
- * Day 1 of the streaming-encryption sprint (docs/proposals/streaming-encryption.md):
- * core primitive functionality for ml-kem-768 only. The full mutation-check
- * suite (truncation, reorder, duplicate, cross-stream swap, final-flag
- * games, both KEMs) is Day 2 scope — this file covers the primitive works
- * at all, plus the nonce arithmetic cross-check against age's published
- * STREAM algorithm.
+ * Core primitive functionality, both KEMs (docs/proposals/streaming-encryption.md
+ * Day 1 + Day 2). The full mutation-check suite (truncation, reorder,
+ * duplicate, cross-stream swap, final-flag games, trailing garbage) lives in
+ * stream-mutations.test.ts — this file covers the primitive works at all,
+ * plus the nonce arithmetic cross-check against age's published STREAM
+ * algorithm.
  */
 
 const utf8 = new TextEncoder();
 const utf8Decode = new TextDecoder();
 
+const KEM_CIPHERTEXT_LENGTH: Record<KemAlgorithm, number> = {
+  'ml-kem-768': 1088,
+  'x-wing': 1120,
+};
+const ALGORITHMS: readonly KemAlgorithm[] = ['ml-kem-768', 'x-wing'];
+
 // async is required to satisfy the AsyncIterable<Uint8Array> shape
 // encryptStream/decryptStream take; nothing here genuinely needs to await.
 // eslint-disable-next-line @typescript-eslint/require-await
-async function* single(data: Uint8Array): AsyncGenerator<Uint8Array> {
+export async function* single(data: Uint8Array): AsyncGenerator<Uint8Array> {
   yield data;
 }
 
-async function collect(chunks: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
+export async function collect(chunks: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
   const parts: Uint8Array[] = [];
   let total = 0;
   for await (const chunk of chunks) {
@@ -40,15 +47,20 @@ async function collect(chunks: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
 }
 
 // eslint-disable-next-line @typescript-eslint/require-await -- see `single` above.
-async function* asChunks(data: Uint8Array, sourceChunkSize: number): AsyncGenerator<Uint8Array> {
+export async function* asChunks(
+  data: Uint8Array,
+  sourceChunkSize: number,
+): AsyncGenerator<Uint8Array> {
   for (let i = 0; i < data.length; i += sourceChunkSize) {
     yield data.subarray(i, i + sourceChunkSize);
   }
 }
 
-describe('encryptStream/decryptStream: roundtrips (ml-kem-768)', () => {
+describe.each(ALGORITHMS)('encryptStream/decryptStream: roundtrips (%s)', (algorithm) => {
+  const kemCtLength = KEM_CIPHERTEXT_LENGTH[algorithm];
+
   it('round-trips a single-chunk payload with the default chunk size', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     const plaintext = utf8.encode('streamed data, fits in one chunk');
     const ciphertext = await collect(encryptStream(pair.publicKey, single(plaintext)));
     const decrypted = await collect(decryptStream(pair.secretKey, single(ciphertext)));
@@ -56,16 +68,16 @@ describe('encryptStream/decryptStream: roundtrips (ml-kem-768)', () => {
   });
 
   it('round-trips an empty payload as a single empty final chunk', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     const ciphertext = await collect(encryptStream(pair.publicKey, single(new Uint8Array(0))));
-    // header (3 bytes + 1088-byte KEM ciphertext) + 16-byte tag-only final chunk.
-    expect(ciphertext.length).toBe(3 + 1088 + 16);
+    // header (3 bytes + KEM ciphertext) + 16-byte tag-only final chunk.
+    expect(ciphertext.length).toBe(3 + kemCtLength + 16);
     const decrypted = await collect(decryptStream(pair.secretKey, single(ciphertext)));
     expect(decrypted.length).toBe(0);
   });
 
   it('round-trips a payload spanning many chunks with a small chunkSize', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     const chunkSize = 8;
     const plaintext = utf8.encode(
       'this plaintext is deliberately longer than eight bytes per chunk',
@@ -78,7 +90,7 @@ describe('encryptStream/decryptStream: roundtrips (ml-kem-768)', () => {
   });
 
   it('round-trips a payload exactly divisible by chunkSize (full-size final chunk)', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     const chunkSize = 8;
     const plaintext = utf8.encode('16-bytes'.repeat(2)); // exactly 16 bytes = 2 * chunkSize
     expect(plaintext.length).toBe(16);
@@ -86,13 +98,13 @@ describe('encryptStream/decryptStream: roundtrips (ml-kem-768)', () => {
       encryptStream(pair.publicKey, single(plaintext), { chunkSize }),
     );
     // 2 full chunks, no trailing empty chunk: 2 * (chunkSize + 16 tag).
-    expect(ciphertext.length).toBe(3 + 1088 + 2 * (chunkSize + 16));
+    expect(ciphertext.length).toBe(3 + kemCtLength + 2 * (chunkSize + 16));
     const decrypted = await collect(decryptStream(pair.secretKey, single(ciphertext)));
     expect(utf8Decode.decode(decrypted)).toBe(utf8Decode.decode(plaintext));
   });
 
   it('is insensitive to the input iterable granularity (byte-at-a-time source)', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     const chunkSize = 8;
     const plaintext = utf8.encode('granularity should not matter at all here');
     const ciphertext = await collect(
@@ -104,24 +116,33 @@ describe('encryptStream/decryptStream: roundtrips (ml-kem-768)', () => {
   });
 
   it('encryptStream default chunk size matches the documented 64 KiB', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     const plaintext = new Uint8Array(65536 + 10); // just over one default chunk
     const ciphertext = await collect(encryptStream(pair.publicKey, single(plaintext)));
     // header + one full 64 KiB chunk (65536+16) + a 10-byte final chunk (10+16).
-    expect(ciphertext.length).toBe(3 + 1088 + (65536 + 16) + (10 + 16));
+    expect(ciphertext.length).toBe(3 + kemCtLength + (65536 + 16) + (10 + 16));
+  });
+
+  it('produces the documented version byte and header id', async () => {
+    const pair = await generate({ algorithm });
+    const ciphertext = await collect(encryptStream(pair.publicKey, single(new Uint8Array(1))));
+    const expectedVersion = algorithm === 'ml-kem-768' ? 0x03 : 0x04;
+    const expectedHeaderId = algorithm === 'ml-kem-768' ? 0x01 : 0x02;
+    expect(ciphertext[0]).toBe(expectedVersion);
+    expect(ciphertext[1]).toBe(expectedHeaderId);
   });
 });
 
-describe('encryptStream: chunkSize validation', () => {
+describe.each(ALGORITHMS)('encryptStream: chunkSize validation (%s)', (algorithm) => {
   it('rejects a non-power-of-two chunkSize', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     await expect(
       collect(encryptStream(pair.publicKey, single(new Uint8Array(1)), { chunkSize: 100 })),
     ).rejects.toMatchObject({ code: 'INVALID_CHUNK_SIZE' });
   });
 
   it('accepts the smallest valid chunkSize (2^0 = 1 byte)', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     const ciphertext = await collect(
       encryptStream(pair.publicKey, single(utf8.encode('hi')), { chunkSize: 1 }),
     );
@@ -130,14 +151,14 @@ describe('encryptStream: chunkSize validation', () => {
   });
 
   it('rejects a zero chunkSize', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     await expect(
       collect(encryptStream(pair.publicKey, single(new Uint8Array(1)), { chunkSize: 0 })),
     ).rejects.toBeInstanceOf(PqcError);
   });
 
   it('rejects a chunkSize above the maximum (2^24)', async () => {
-    const pair = await generate();
+    const pair = await generate({ algorithm });
     await expect(
       collect(encryptStream(pair.publicKey, single(new Uint8Array(1)), { chunkSize: 2 ** 25 })),
     ).rejects.toBeInstanceOf(PqcError);
@@ -153,7 +174,10 @@ describe('encryptStream: chunkSize validation', () => {
  * big-endian integer — algebraically identical to "BE88(counter) ‖ flag".
  * These expected byte arrays were hand-derived from that published
  * algorithm, independent of this package's own implementation, per
- * docs/proposals/streaming-encryption.md Day 1.
+ * docs/proposals/streaming-encryption.md Day 1. ml-kem-768 only: the nonce
+ * construction is algorithm-independent (it only depends on the KEM's
+ * shared secret being used as the AES key, not on which KEM produced it),
+ * so this is not repeated per-KEM.
  */
 describe('chunk nonce arithmetic: cross-check against age (via ciphertext structure)', () => {
   it('a single-chunk stream (index 0, final) uses an all-zero-counter, flag=1 nonce', async () => {
