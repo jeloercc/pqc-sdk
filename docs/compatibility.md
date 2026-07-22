@@ -12,10 +12,35 @@ React Native on-device: 2026-07-02).
 | Hermes (RN's engine) | standalone CLI 0.12        | ✅ engine validated                                       | `crypto.getRandomValues` polyfill; transpile `class` (Metro does this in RN) |
 | React Native         | Expo SDK 54 / RN 0.81      | ✅ Validated on physical Android device (Expo Go, SDK 54) | `react-native-get-random-values` imported before the SDK; see notes below    |
 
+## X-Wing (hybrid KEM, `pqcenc.v2`)
+
+X-Wing (`pqc.keys.generate({ algorithm: 'x-wing' })`) is a separate code path
+(`@noble/post-quantum/hybrid.js`) from ML-KEM-768, so it is tracked with its
+own compatibility row per the same real-execution rule: a runtime only gets
+✅ once the actual roundtrip ran on that runtime, not by inference from the
+ML-KEM-768 result above.
+
+| Runtime              | Result                                                 | Notes                                                                                                                                  |
+| -------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Node                 | ✅ verified 2026-07-20                                 | Same example (`examples/node`), extended with an x-wing roundtrip.                                                                     |
+| Deno                 | ✅ verified 2026-07-20                                 | Import map needed one addition: `@noble/post-quantum/hybrid.js`.                                                                       |
+| Cloudflare Workers   | ✅ verified 2026-07-20 (local workerd, `wrangler dev`) | Same bundle, no extra config; ciphertext 32 bytes larger than v1.                                                                      |
+| Hermes (RN's engine) | ⏳ not yet run                                         | Needs the standalone Hermes CLI re-run with an x-wing case, as was done for ML-KEM-768 on 2026-06-12. Not executed this sprint.        |
+| React Native         | ⏳ not yet run                                         | Needs an on-device roundtrip through `examples/react-native-expo`, as was done for ML-KEM-768 on 2026-07-02. Not executed this sprint. |
+
+Measured ciphertext sizes for the message `'roundtrip on <runtime>'` (23–31
+bytes depending on runtime), confirming the pqcenc.v2 1150-byte overhead
+(docs/serialization-format.md §2.2): Node 1173 B, Deno 1167 B, Workers 1181 B
+— each exactly 1150 + the plaintext length actually sent.
+
 ## Node (`examples/node`)
 
 No limitations. Direct ESM, no flags. The CJS build also works
 (`require('@pqc-sdk/core')`), verified in the previous step's smoke tests.
+Extended 2026-07-20 with an x-wing roundtrip (same example, no new flags):
+ml-kem-768 ciphertext 1141 B, x-wing ciphertext 1173 B for the same 23-byte
+message — the 32-byte difference is exactly the v1→v2 overhead delta
+(1150 − 1118).
 
 ## Deno (`examples/deno`)
 
@@ -29,6 +54,12 @@ Works, with two **temporary** caveats (they disappear once published to npm):
 
 No `node_modules` or `nodeModulesDir` was needed: Deno's `npm:` resolution
 handles the transitive dependencies (@noble/hashes) on its own.
+
+**x-wing (2026-07-20)**: the import map needed one more entry —
+`"@noble/post-quantum/hybrid.js": "npm:@noble/post-quantum@^0.6.1/hybrid.js"`
+— alongside the existing `ml-kem.js`/`ml-dsa.js` mappings; without it Deno
+refuses the import with "not a dependency and not in import map". Once added,
+the roundtrip ran with no other changes.
 
 ## Cloudflare Workers (`examples/cloudflare-workers`)
 
@@ -44,6 +75,12 @@ handles the transitive dependencies (@noble/hashes) on its own.
   individual operation stays within budget, but measure with
   `wrangler dev --remote` before going to production on the free plan. On paid
   plans (30 s limit) there is no issue.
+- **x-wing (2026-07-20)**: same worker extended to also run an x-wing
+  roundtrip in the same request, verified against a real `wrangler dev`
+  local workerd instance (not just `--dry-run`): `{"ok":true,
+"algorithm":"ml-kem-768","ciphertextBytes":1149,...,"hybrid":{"ok":true,
+"algorithm":"x-wing","ciphertextBytes":1181,...}}`. No bundle or
+  `nodejs_compat` changes needed — `hybrid.js` uses the same standard APIs.
 
 ## Standalone Hermes (`examples/hermes-standalone`)
 
@@ -75,6 +112,12 @@ Slower than V8 but usable; keep ML-DSA signing off the UI thread.
 real RN app with `react-native-get-random-values` as the entropy source — was
 closed by the on-device validation recorded below (July 2026).
 
+**x-wing**: not re-run on Hermes this sprint (2026-07-20) — the standalone
+CLI binary was not available in the environment that implemented the
+`pqcenc.v2` envelope. Stays ⏳ in the table above until an actual Hermes
+execution (interpreted or precompiled bytecode) exercises an x-wing key
+pair, per the honest-compatibility rule.
+
 ## React Native app (`examples/react-native-expo`)
 
 A minimal Expo (TypeScript) app that imports `react-native-get-random-values`
@@ -100,6 +143,12 @@ signature), verify 77 ms. `TextDecoder` is available in this runtime.
 
 See [examples/react-native-expo/README.md](../examples/react-native-expo/README.md)
 for how to run it on an actual simulator or device.
+
+**x-wing**: not re-run on a physical device this sprint (2026-07-20) — no
+device was available in the environment that implemented the `pqcenc.v2`
+envelope. Stays ⏳ in the table above until an on-device roundtrip with an
+x-wing key pair is recorded here, the same way the ML-KEM-768 row was closed
+on 2026-07-02.
 
 ## General limitations (inherited from @noble/post-quantum)
 

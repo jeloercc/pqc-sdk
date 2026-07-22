@@ -6,14 +6,14 @@ import { defineCommand } from 'citty';
 
 import { friendlyRun, UsageError } from '../errors.js';
 import { assertReadableInput } from '../input.js';
-import { readKeyFile } from '../keyfiles.js';
+import { readKemKeyFile } from '../keyfiles.js';
 import { writeOutput } from '../output.js';
 import { item, ok } from '../ui.js';
 
 export const encrypt = defineCommand({
   meta: {
     name: 'encrypt',
-    description: 'Encrypt a file for the holder of an ML-KEM-768 key pair',
+    description: 'Encrypt a file for the holder of a KEM key pair (ml-kem-768 or x-wing)',
   },
   args: {
     input: {
@@ -43,10 +43,7 @@ export const encrypt = defineCommand({
       throw new UsageError(`${outPath} already exists. Use --force to overwrite it.`);
     }
 
-    const publicKey = await readKeyFile(args.key, {
-      algorithm: 'ml-kem-768',
-      use: 'public',
-    });
+    const publicKey = await readKemKeyFile(args.key, 'public');
     // A Buffer already is a Uint8Array: no defensive copy (the file can be
     // large, and encrypt never mutates its input).
     const plaintext = await readFile(args.input);
@@ -54,7 +51,7 @@ export const encrypt = defineCommand({
     await writeOutput(outPath, envelope, { force: args.force });
 
     ok(`Encrypted ${args.input} (${plaintext.length} bytes):`);
-    item(`output: ${outPath} (${envelope.length} bytes, ML-KEM-768 + AES-256-GCM)`);
+    item(`output: ${outPath} (${envelope.length} bytes, ${publicKey.algorithm} + AES-256-GCM)`);
     item('only the matching secret key can decrypt it');
   }),
 });
