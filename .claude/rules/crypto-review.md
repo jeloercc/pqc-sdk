@@ -9,6 +9,11 @@
   (header, KEM ciphertext, nonce, sealed payload, signature bytes, serialized
   key segments) and assert fail-closed behavior with the documented
   `PqcError` code — never a raw upstream `@noble` error leaking through.
+- **Combiner discipline.** Hybrid constructions use an established,
+  fully-specified combiner (e.g. X-Wing) verbatim; never add extra KDF
+  layers on top of a spec-defined combiner, and never design secret-mixing.
+  Spec citations must be verified against the actual draft text before
+  committing them.
 - **Honest compatibility claims.** A runtime gets ✅ in
   `docs/compatibility.md` only after the real roundtrip has executed on that
   actual runtime (physical device, real worker, real engine). Harness builds,

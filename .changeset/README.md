@@ -1,11 +1,11 @@
 # Changesets
 
-Cada PR que cambie `@pqc-sdk/core` o `@pqc-sdk/cli` debe incluir un changeset:
+Every PR that changes `@pqc-sdk/core` or `@pqc-sdk/cli` must include a changeset:
 
 ```bash
 pnpm changeset
 ```
 
-Al mergear a `main`, el workflow de release abre/actualiza un PR "Version
-Packages" con los bumps y changelogs. Mergear ese PR publica a npm con
+On merge to `main`, the release workflow opens/updates a "Version Packages"
+PR with the bumps and changelogs. Merging that PR publishes to npm with
 provenance.
