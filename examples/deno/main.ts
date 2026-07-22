@@ -10,5 +10,17 @@ const decoded = new TextDecoder().decode(plaintext);
 if (decoded !== message) {
   throw new Error(`roundtrip failed: ${decoded}`);
 }
-console.log('✅ Deno: generate → encrypt → decrypt OK');
+console.log('✅ Deno: generate → encrypt → decrypt OK (ml-kem-768)');
 console.log(`   algorithm: ${pair.algorithm}, ciphertext: ${ciphertext.length} bytes`);
+
+// Hybrid KEM (X25519 + ML-KEM-768, pqcenc.v2): same API, an x-wing key pair.
+const hybridPair = await pqc.keys.generate({ algorithm: 'x-wing' });
+const hybridCiphertext = await pqc.encrypt(message, hybridPair.publicKey);
+const hybridPlaintext = await pqc.decrypt(hybridCiphertext, hybridPair.secretKey);
+const hybridDecoded = new TextDecoder().decode(hybridPlaintext);
+
+if (hybridDecoded !== message) {
+  throw new Error(`hybrid roundtrip failed: ${hybridDecoded}`);
+}
+console.log('✅ Deno: generate → encrypt → decrypt OK (x-wing hybrid)');
+console.log(`   algorithm: ${hybridPair.algorithm}, ciphertext: ${hybridCiphertext.length} bytes`);
