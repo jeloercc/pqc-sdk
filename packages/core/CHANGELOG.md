@@ -1,5 +1,13 @@
 # @pqc-sdk/core
 
+## 0.5.0
+
+### Minor Changes
+
+- ce2fa4c: X-Wing is now a fully supported algorithm across the public API and CLI: `SUPPORTED_ALGORITHMS` includes `'x-wing'`, and `KEM_NAMES` is exported for introspection. `pqc keygen --algorithm x-wing` generates a hybrid key pair, and `pqc encrypt`/`pqc decrypt` accept either KEM key (`ml-kem-768` or `x-wing`) and write/read the matching envelope version automatically — `readKeyFile`'s expectation loosened from "exactly ml-kem-768" to "any KEM key," reporting the algorithm actually found on a mismatch. `pqc audit` migration hints now mention x-wing for long-term data. `pqc.keys.generate()` with no arguments is unchanged (`ml-kem-768`); the default flips to `x-wing` at v1.0 as previously announced.
+- 7340a0d: New `x-wing` KEM algorithm (X25519 + ML-KEM-768 hybrid per draft-connolly-cfrg-xwing-kem-10): `pqc.keys.generate({ algorithm: 'x-wing' })` generates a pair (1216-byte public key, 32-byte seed secret key) that serializes with the existing `pqcv1` token format, validated against the draft's Appendix C test vectors. The hybrid envelope format (`pqcenc.v2`) is not implemented yet — `encrypt`/`decrypt` fail closed with `UNSUPPORTED_ALGORITHM` on x-wing keys until it lands. The no-argument `keys.generate()` default is unchanged (`ml-kem-768`).
+- 79d4565: Hybrid envelope v2 (`pqcenc.v2`): `pqc.encrypt` with an `x-wing` public key now produces a v2 envelope (version byte `0x02`, X-Wing ciphertext `ct_M ‖ ct_X`, AES-256-GCM keyed by the draft's SHA3-256 combiner output used verbatim — see `docs/serialization-format.md` §2.2), and `pqc.decrypt` dispatches on the version byte, accepting both v1 and v2. The Day-1 `UNSUPPORTED_ALGORITHM` guard on x-wing keys is removed; `encrypt`/`decrypt` signatures widen to any KEM key. This is the additive layout change acknowledged in `docs/proposals/hybrid-envelope.md` §3: every v1 artifact remains valid and byte-identical (v1 golden vectors untouched), so no major bump. Caveat for mixed-version fleets: peers on ≤0.4.x cannot decrypt v2 envelopes — upgrade readers before writers.
+
 ## 0.4.1
 
 ### Patch Changes
