@@ -1,6 +1,6 @@
 {
   "name": "@pqc-sdk/cli",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "CLI for the post-quantum cryptography SDK",
   "type": "module",
   "bin": {
