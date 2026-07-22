@@ -13,7 +13,7 @@ describe('@pqc-sdk/core', () => {
   });
 
   it('lists the implemented algorithms', () => {
-    expect(SUPPORTED_ALGORITHMS).toEqual(['ml-kem-768', 'ml-dsa-65']);
+    expect(SUPPORTED_ALGORITHMS).toEqual(['ml-kem-768', 'ml-dsa-65', 'x-wing']);
   });
 
   it('exposes the full public API', () => {

@@ -3,10 +3,12 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  KEM_NAMES,
   SUPPORTED_ALGORITHMS,
   pqc,
   type Algorithm,
   type ExpectedKey,
+  type KemAlgorithm,
   type KeyUse,
   type PqcKey,
   type SupportedAlgorithm,
@@ -107,6 +109,53 @@ export async function readKeyFile<A extends Algorithm, U extends KeyUse>(
       `${path} is not a valid ${expected.algorithm} ${expected.use} key: ${reason}`,
     );
   }
+}
+
+/**
+ * Reads a key file written by `pqc keygen` (or the SDK) expected to be a KEM
+ * key of the given use, for `pqc encrypt`/`pqc decrypt`. Unlike
+ * {@link readKeyFile}, it does not pin a single algorithm: any KEM
+ * (`ml-kem-768` or `x-wing`) is accepted, and `pqc.encrypt`/`pqc.decrypt`
+ * themselves pick the matching envelope version from the key
+ * (docs/serialization-format.md §2). Throws {@link UsageError}, naming the
+ * algorithm actually found, when the file holds a signing key or the wrong
+ * use.
+ *
+ * @example
+ * ```ts
+ * import { readKemKeyFile } from './keyfiles.js';
+ *
+ * const publicKey = await readKemKeyFile('keys/alice.public.pqc', 'public');
+ * ```
+ */
+export async function readKemKeyFile<U extends KeyUse>(
+  path: string,
+  use: U,
+): Promise<PqcKey<KemAlgorithm, U>> {
+  if (!existsSync(path)) {
+    throw new UsageError(`Key file not found: ${path}`);
+  }
+  if (use === 'secret') {
+    await warnIfSecretKeyTooOpen(path);
+  }
+  const contents = await readFile(path, 'utf8');
+  let key: PqcKey;
+  try {
+    key = pqc.keys.deserialize(contents.trim());
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    throw new UsageError(`${path} is not a valid PQC key: ${reason}`);
+  }
+  if (key.use !== use) {
+    throw new UsageError(`${path} is a ${key.use} key; a ${use} key is required here.`);
+  }
+  if (!(KEM_NAMES as readonly string[]).includes(key.algorithm)) {
+    throw new UsageError(
+      `${path} is a ${key.algorithm} key, which cannot be used for encryption. ` +
+        `Use a KEM key (${KEM_NAMES.join(' or ')}).`,
+    );
+  }
+  return key as PqcKey<KemAlgorithm, U>;
 }
 
 /**

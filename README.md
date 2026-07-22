@@ -6,14 +6,19 @@
 [![license](https://img.shields.io/npm/l/%40pqc-sdk%2Fcore)](./LICENSE)
 
 Post-quantum cryptography for JS/TS with safe defaults and zero configuration:
-**ML-KEM-768** (FIPS 203) + AES-256-GCM for hybrid encryption and **ML-DSA-65**
-(FIPS 204) for signatures, validated against the official NIST ACVP test
-vectors. The goal: add post-quantum encryption to your app in 30 minutes.
+**ML-KEM-768** (FIPS 203) + AES-256-GCM for encryption, an optional
+**X-Wing** hybrid mode (X25519 + ML-KEM-768, opt-in) for defense-in-depth on
+long-term data, and **ML-DSA-65** (FIPS 204) for signatures — all validated
+against the official NIST ACVP / draft test vectors. The goal: add
+post-quantum encryption to your app in 30 minutes.
 
-> Here "hybrid encryption" means the classic KEM-DEM scheme — ML-KEM-768
-> encapsulating an AES-256-GCM key — **not** a classical+post-quantum hybrid.
-> A combined X25519 + ML-KEM-768 mode is on the roadmap; see
-> [hybrid encryption explained](https://jeloercc.github.io/pqc-sdk/guide/hybrid-encryption).
+> `pqc.keys.generate()` still returns ML-KEM-768 by default. Pass
+> `{ algorithm: 'x-wing' }` to get the classical+post-quantum hybrid KEM
+> instead — recommended for data that must stay confidential for years, per
+> the same industry consensus behind TLS's `X25519MLKEM768` and Signal's
+> PQXDH. See
+> [hybrid encryption explained](https://jeloercc.github.io/pqc-sdk/guide/hybrid-encryption)
+> for when to choose which.
 
 ## Quickstart
 
