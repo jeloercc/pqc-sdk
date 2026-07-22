@@ -15,8 +15,8 @@ sets `MAX_INPUT_BYTES = 1 GiB` and `input.ts:25-36` (`assertReadableInput`)
 refuses anything larger with:
 
 > `<path> is <N> GiB, above the 1 GiB limit: the CLI loads the whole file
-> into memory (no streaming yet). Split the file or encrypt an archive of
-> its parts.`
+into memory (no streaming yet). Split the file or encrypt an archive of
+its parts.`
 
 Multi-GB files (backups, disk images, media) need multi-GB RAM under the
 current design, or the CLI simply refuses them. This proposal adds a chunked
@@ -30,8 +30,8 @@ split the plaintext, AEAD-seal each piece with the same key and a random or
 reused nonce, concatenate. That's trivially breakable — chunks can be
 dropped (truncation), swapped (reordering), or spliced from a different
 message (chunk-swap), and the AEAD tags on the surviving chunks still verify
-individually, because nothing binds a chunk to its *position in this
-specific stream*. Every credible construction solves exactly this by folding
+individually, because nothing binds a chunk to its _position in this
+specific stream_. Every credible construction solves exactly this by folding
 the chunk's position and finality into what the AEAD authenticates — as a
 KDF-derived nonce, an explicit AAD field, or both. We adopt one of these
 verbatim, for the same reason the X-Wing combiner was adopted verbatim
@@ -62,7 +62,7 @@ a direct, widely-deployed, audited STREAM instantiation:
   (starting at 0) ‖ 1-byte flag** (`0x00` = more chunks follow, `0x01` =
   this is the final chunk).
 - No explicit chunk-count or length field in the format. A reader knows a
-  chunk is final only by the flag bit *and* must error if input ends without
+  chunk is final only by the flag bit _and_ must error if input ends without
   ever having authenticated a `0x01`-flagged chunk — that second half is
   what actually stops truncation (see §5).
 
@@ -105,12 +105,12 @@ than sequential streaming encryption.
 
 ### Comparison
 
-| | Nonce/binding | Chunk size | Per-chunk overhead | Format self-describes params |
-|---|---|---|---|---|
-| STREAM (paper) | index + final bit in nonce, formally proven | scheme-defined | AEAD tag only | n/a (it's the model, not a wire format) |
-| age | 11B counter + 1B flag in nonce | fixed 64 KiB | 16B (Poly1305 tag) | No — fixed by spec, no header params |
-| Tink AES-GCM-HKDF | noncePrefix ‖ 4B index ‖ flag; AAD empty | configurable | 16B (GCM tag) | Yes — header carries salt + noncePrefix |
-| libsodium secretstream | internal state counter + encrypted tag byte | app-chosen | 17B (tag + 1B tag byte) | No — session parameters, not in a byte format |
+|                        | Nonce/binding                               | Chunk size     | Per-chunk overhead      | Format self-describes params                  |
+| ---------------------- | ------------------------------------------- | -------------- | ----------------------- | --------------------------------------------- |
+| STREAM (paper)         | index + final bit in nonce, formally proven | scheme-defined | AEAD tag only           | n/a (it's the model, not a wire format)       |
+| age                    | 11B counter + 1B flag in nonce              | fixed 64 KiB   | 16B (Poly1305 tag)      | No — fixed by spec, no header params          |
+| Tink AES-GCM-HKDF      | noncePrefix ‖ 4B index ‖ flag; AAD empty    | configurable   | 16B (GCM tag)           | Yes — header carries salt + noncePrefix       |
+| libsodium secretstream | internal state counter + encrypted tag byte | app-chosen     | 17B (tag + 1B tag byte) | No — session parameters, not in a byte format |
 
 **Chosen approach:** age's exact nonce/framing pattern (11-byte BE counter +
 1-byte final flag, fixed/max-length non-final chunks, error-on-EOF-without-final),
@@ -152,12 +152,12 @@ acknowledged in `docs/proposals/hybrid-envelope.md` §3.
 
 ### Header (fixed, once per stream)
 
-| Offset | Length | Field |
-|---|---|---|
-| 0 | 1 | Version byte: `0x03` (ml-kem-768) or `0x04` (x-wing) |
-| 1 | 1 | Algorithm header id: `0x01`/`0x02`, same values as one-shot |
-| 2 | 1 | Chunk-size exponent `e`: chunk size = 2^e plaintext bytes |
-| 3 | 1088 or 1120 | KEM ciphertext (same encoding as the one-shot envelope) |
+| Offset | Length       | Field                                                       |
+| ------ | ------------ | ----------------------------------------------------------- |
+| 0      | 1            | Version byte: `0x03` (ml-kem-768) or `0x04` (x-wing)        |
+| 1      | 1            | Algorithm header id: `0x01`/`0x02`, same values as one-shot |
+| 2      | 1            | Chunk-size exponent `e`: chunk size = 2^e plaintext bytes   |
+| 3      | 1088 or 1120 | KEM ciphertext (same encoding as the one-shot envelope)     |
 
 `e` is bounds-checked on decode to a documented safe range — proposed
 `10..=24` (1 KiB..16 MiB plaintext per chunk); the CLI/SDK default is
@@ -205,7 +205,7 @@ counter has a `2^88` chunk-index space, and — unlike age or Tink — the
 AES-256-GCM key is **never reused across streams** (fresh KEM `encapsulate()`
 per stream), so there is no "total bytes under one key" ceiling to manage
 the way long-lived-master-key designs need one. NIST SP 800-38D's
-`2^39 - 256`-bit (~64 GiB) limit is a *per-(key, nonce) invocation* bound on
+`2^39 - 256`-bit (~64 GiB) limit is a _per-(key, nonce) invocation_ bound on
 plaintext length — irrelevant here since each chunk is at most 16 MiB. We
 still propose the CLI enforce a generous, overridable **operational**
 ceiling (default 1 TiB) as a sanity check against operator mistakes (e.g.
@@ -230,7 +230,7 @@ host capabilities genuinely differ:
 - Hermes/React Native's Streams API support is not established fact here —
   nothing in this repo has verified `ReadableStream`/`TransformStream` on
   Hermes, and issue #45 shows we're still catching up on verifying even
-  *existing* algorithms on that engine. Building the only public API on an
+  _existing_ algorithms on that engine. Building the only public API on an
   unverified host feature would be a new compatibility gap on day one.
 
 Async iteration (`for await`, async generators) is plain ECMAScript, not a
@@ -264,7 +264,7 @@ reference constructions do.
   `TransformStream`, for Node/Deno/Workers pipeline ergonomics
   (`readable.pipeThrough(...)`). A few lines over the core primitive, no
   independent crypto logic.
-- Node convenience: no new adapter code needed — `Readable` already *is*
+- Node convenience: no new adapter code needed — `Readable` already _is_
   `AsyncIterable<Buffer>` (`for await` works directly on
   `fs.createReadStream(...)`), and `Readable.toWeb`/`Writable.fromWeb` are
   built into Node 20+ for bridging to the Web Streams adapters above. No new
