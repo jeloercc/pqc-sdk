@@ -22,7 +22,9 @@ interface Finding {
 const MAX_FILE_BYTES = 1024 * 1024; // 1 MiB
 
 const ML_DSA = 'ML-DSA-65 (pqc.sign / pqc.verify)';
-const ML_KEM = 'ML-KEM-768 + AES-256-GCM (pqc.encrypt / pqc.decrypt)';
+const ML_KEM =
+  'ML-KEM-768 + AES-256-GCM (pqc.encrypt / pqc.decrypt), or the x-wing hybrid ' +
+  "(X25519 + ML-KEM-768, keys.generate({ algorithm: 'x-wing' })) for long-term data";
 
 const RISKY_PACKAGES: Record<string, { what: string; migrateTo: string }> = {
   jsonwebtoken: { what: 'JWTs signed with RSA/ECDSA (RS256/ES256)', migrateTo: ML_DSA },
