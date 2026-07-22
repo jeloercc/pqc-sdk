@@ -196,6 +196,22 @@ describe('pqc keygen', () => {
     expect(result.stdout + result.stderr).toMatch(/unsupported/i);
   });
 
+  it('generates an x-wing pair (1216-byte public, 32-byte secret seed)', async () => {
+    const dir = await freshDir();
+    const result = await runCli(['keygen', '--algorithm', 'x-wing'], dir);
+
+    expect(result.code).toBe(0);
+    const publicKey = pqc.keys.deserialize(
+      (await readFile(join(dir, 'keys/x-wing.public.pqc'), 'utf8')).trim(),
+    );
+    const secretKey = pqc.keys.deserialize(
+      (await readFile(join(dir, 'keys/x-wing.secret.pqc'), 'utf8')).trim(),
+    );
+    expect(publicKey.algorithm).toBe('x-wing');
+    expect(publicKey.bytes.length).toBe(1216);
+    expect(secretKey.bytes.length).toBe(32);
+  });
+
   it('honors --name as the base file name (overriding the algorithm default)', async () => {
     const dir = await freshDir();
     const result = await runCli(['keygen', '--name', 'payments'], dir);
@@ -580,5 +596,138 @@ describe('encrypt / decrypt', () => {
     const result = await runCli(['decrypt', 'b.enc', '--key', 'keys/alice.secret.pqc'], dir);
     expect(result.code).toBe(0);
     expect(await readFile(join(dir, 'b'), 'utf8')).toBe('from the SDK');
+  });
+
+  it('rejects a signing (ml-dsa-65) key file with a clear KEM-key error', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--algorithm', 'ml-dsa-65', '--name', 'signer'], dir);
+    await writeFile(join(dir, 'note.txt'), 'x');
+
+    const result = await runCli(['encrypt', 'note.txt', '--key', 'keys/signer.public.pqc'], dir);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr + result.stdout).toMatch(/ml-dsa-65/i);
+    expect(result.stdout + result.stderr).not.toMatch(/^\s+at /m);
+  });
+
+  describe('x-wing (pqcenc.v2)', () => {
+    it('round-trips a file through keygen --algorithm x-wing, encrypt, and decrypt', async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--algorithm', 'x-wing', '--name', 'alice'], dir);
+      const payload = Buffer.from(Array.from({ length: 512 }, (_, i) => i % 256));
+      await writeFile(join(dir, 'will.pdf'), payload);
+
+      const enc = await runCli(['encrypt', 'will.pdf', '--key', 'keys/alice.public.pqc'], dir);
+      expect(enc.code).toBe(0);
+      // The friendly summary line names the algorithm actually used.
+      expect(enc.stdout).toContain('x-wing');
+
+      const dec = await runCli(
+        ['decrypt', 'will.pdf.enc', '--key', 'keys/alice.secret.pqc', '--out', 'restored.pdf'],
+        dir,
+      );
+      expect(dec.code).toBe(0);
+      expect((await readFile(join(dir, 'restored.pdf'))).equals(payload)).toBe(true);
+    });
+
+    it('encrypt output interoperates with the SDK (and vice versa)', async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--algorithm', 'x-wing', '--name', 'alice'], dir);
+      const secretKey = pqc.keys.deserialize(
+        (await readFile(join(dir, 'keys/alice.secret.pqc'), 'utf8')).trim(),
+        { algorithm: 'x-wing', use: 'secret' },
+      );
+      const publicKey = pqc.keys.deserialize(
+        (await readFile(join(dir, 'keys/alice.public.pqc'), 'utf8')).trim(),
+        { algorithm: 'x-wing', use: 'public' },
+      );
+
+      // CLI encrypt -> SDK decrypt
+      await writeFile(join(dir, 'a.txt'), 'from the CLI, hybrid');
+      await runCli(['encrypt', 'a.txt', '--key', 'keys/alice.public.pqc'], dir);
+      const cliEnvelope = await readFile(join(dir, 'a.txt.enc'));
+      expect(cliEnvelope[0]).toBe(0x02); // pqcenc.v2 header
+      const sdkPlain = await pqc.decrypt(new Uint8Array(cliEnvelope), secretKey);
+      expect(Buffer.from(sdkPlain).toString()).toBe('from the CLI, hybrid');
+
+      // SDK encrypt -> CLI decrypt
+      const sdkEnvelope = await pqc.encrypt('from the SDK, hybrid', publicKey);
+      await writeFile(join(dir, 'b.enc'), sdkEnvelope);
+      const result = await runCli(['decrypt', 'b.enc', '--key', 'keys/alice.secret.pqc'], dir);
+      expect(result.code).toBe(0);
+      expect(await readFile(join(dir, 'b'), 'utf8')).toBe('from the SDK, hybrid');
+    });
+
+    it('decrypt fails closed on a tampered v2 envelope, through the real binary', async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--algorithm', 'x-wing', '--name', 'alice'], dir);
+      await writeFile(join(dir, 'note.txt'), 'integrity matters, hybrid');
+      await runCli(['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc'], dir);
+      const envelope = await readFile(join(dir, 'note.txt.enc'));
+
+      // Sealed payload region: flip the last byte (inside the GCM tag).
+      const sealedTampered = Buffer.from(envelope);
+      sealedTampered[sealedTampered.length - 1]! ^= 0x01;
+      await writeFile(join(dir, 'sealed.enc'), sealedTampered);
+      const sealed = await runCli(
+        ['decrypt', 'sealed.enc', '--key', 'keys/alice.secret.pqc', '--out', 'sealed.out'],
+        dir,
+      );
+      expect(sealed.code).toBe(1);
+      expect(sealed.stderr).toMatch(/tampered ciphertext or wrong secret key/i);
+      expect(existsSync(join(dir, 'sealed.out'))).toBe(false);
+
+      // Header region: an unknown version byte is rejected before any crypto.
+      const headerTampered = Buffer.from(envelope);
+      headerTampered[0]! ^= 0xff;
+      await writeFile(join(dir, 'header.enc'), headerTampered);
+      const header = await runCli(
+        ['decrypt', 'header.enc', '--key', 'keys/alice.secret.pqc', '--out', 'header.out'],
+        dir,
+      );
+      expect(header.code).toBe(1);
+      expect(header.stderr).toMatch(/unknown header/i);
+      expect(existsSync(join(dir, 'header.out'))).toBe(false);
+
+      // X-Wing ciphertext region (ct_M): implicit rejection ends in the same
+      // clean failure as v1's KEM-ciphertext tamper.
+      const ctTampered = Buffer.from(envelope);
+      ctTampered[2]! ^= 0x01;
+      await writeFile(join(dir, 'ct.enc'), ctTampered);
+      const ct = await runCli(
+        ['decrypt', 'ct.enc', '--key', 'keys/alice.secret.pqc', '--out', 'ct.out'],
+        dir,
+      );
+      expect(ct.code).toBe(1);
+      expect(existsSync(join(dir, 'ct.out'))).toBe(false);
+    });
+
+    it('cross-version key confusion fails closed through the real binary', async () => {
+      const dir = await freshDir();
+      await runCli(['keygen', '--name', 'kem-alice'], dir);
+      await runCli(['keygen', '--algorithm', 'x-wing', '--name', 'xwing-alice'], dir);
+      await writeFile(join(dir, 'note.txt'), 'x');
+
+      // v1 envelope decrypted with an x-wing key.
+      await runCli(['encrypt', 'note.txt', '--key', 'keys/kem-alice.public.pqc'], dir);
+      const v1Wrong = await runCli(
+        ['decrypt', 'note.txt.enc', '--key', 'keys/xwing-alice.secret.pqc', '--out', 'v1.out'],
+        dir,
+      );
+      expect(v1Wrong.code).not.toBe(0);
+      expect(existsSync(join(dir, 'v1.out'))).toBe(false);
+
+      // v2 envelope decrypted with an ml-kem-768 key.
+      await runCli(
+        ['encrypt', 'note.txt', '--key', 'keys/xwing-alice.public.pqc', '--out', 'note2.enc'],
+        dir,
+      );
+      const v2Wrong = await runCli(
+        ['decrypt', 'note2.enc', '--key', 'keys/kem-alice.secret.pqc', '--out', 'v2.out'],
+        dir,
+      );
+      expect(v2Wrong.code).not.toBe(0);
+      expect(existsSync(join(dir, 'v2.out'))).toBe(false);
+    });
   });
 });
