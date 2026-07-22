@@ -4,6 +4,7 @@ import type { KemAlgorithm } from './types.js';
 import { PqcError } from './errors.js';
 import { generate } from './keys.js';
 import { decryptStream, encryptStream } from './stream.js';
+import { asChunks, collect, single } from './stream-test-helpers.js';
 
 /**
  * Core primitive functionality, both KEMs (docs/proposals/streaming-encryption.md
@@ -22,39 +23,6 @@ const KEM_CIPHERTEXT_LENGTH: Record<KemAlgorithm, number> = {
   'x-wing': 1120,
 };
 const ALGORITHMS: readonly KemAlgorithm[] = ['ml-kem-768', 'x-wing'];
-
-// async is required to satisfy the AsyncIterable<Uint8Array> shape
-// encryptStream/decryptStream take; nothing here genuinely needs to await.
-// eslint-disable-next-line @typescript-eslint/require-await
-export async function* single(data: Uint8Array): AsyncGenerator<Uint8Array> {
-  yield data;
-}
-
-export async function collect(chunks: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
-  const parts: Uint8Array[] = [];
-  let total = 0;
-  for await (const chunk of chunks) {
-    parts.push(chunk);
-    total += chunk.length;
-  }
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
-}
-
-// eslint-disable-next-line @typescript-eslint/require-await -- see `single` above.
-export async function* asChunks(
-  data: Uint8Array,
-  sourceChunkSize: number,
-): AsyncGenerator<Uint8Array> {
-  for (let i = 0; i < data.length; i += sourceChunkSize) {
-    yield data.subarray(i, i + sourceChunkSize);
-  }
-}
 
 describe.each(ALGORITHMS)('encryptStream/decryptStream: roundtrips (%s)', (algorithm) => {
   const kemCtLength = KEM_CIPHERTEXT_LENGTH[algorithm];

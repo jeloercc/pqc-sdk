@@ -169,21 +169,19 @@ async function* rechunk(
  * per plaintext chunk. Concatenating everything yielded reproduces the full
  * wire format §9 describes.
  *
- * Not yet part of the public `pqc` surface (`docs/proposals/streaming-encryption.md`
- * Day 3 exports it) — this example imports the module directly, as the
- * internal test suite does until then.
+ * `chunkSize` (advanced, rarely needed) defaults to 64 KiB — see
+ * {@link StreamOptions}.
  *
  * @example
  * ```ts
- * import { generate } from './keys.js';
- * import { encryptStream } from './stream.js';
+ * import { pqc } from '@pqc-sdk/core';
  *
- * const pair = await generate();
+ * const pair = await pqc.keys.generate();
  * async function* source() {
  *   yield new TextEncoder().encode('streamed data');
  * }
  * const parts: Uint8Array[] = [];
- * for await (const chunk of encryptStream(pair.publicKey, source())) {
+ * for await (const chunk of pqc.encryptStream(pair.publicKey, source())) {
  *   parts.push(chunk);
  * }
  * ```
@@ -267,38 +265,65 @@ function decryptionFailed(): PqcError {
  * Decrypts a stream produced by {@link encryptStream}, discriminating the
  * envelope on its leading version byte the same way {@link decrypt} does
  * (`0x03` = ml-kem-768 streaming, `0x04` = x-wing streaming; unrelated to
- * and rejected the same way as the one-shot `0x01`/`0x02` bytes). Yields
- * plaintext chunk by chunk as each chunk authenticates — see the
- * incremental-release property in docs/serialization-format.md §9.3: a
- * truncated or tampered stream can yield genuine prefix chunks before the
- * iterable throws `PqcError` with code `DECRYPTION_FAILED`. Only the
- * iterable completing without throwing means the full plaintext is
- * authentic — do not treat any individual yielded chunk as proof the
- * stream is complete.
+ * and rejected the same way as the one-shot `0x01`/`0x02` bytes).
  *
- * Not yet part of the public `pqc` surface (`docs/proposals/streaming-encryption.md`
- * Day 3 exports it) — this example imports the module directly, as the
- * internal test suite does until then.
+ * **IMPORTANT — incremental release, read before writing decrypted output
+ * anywhere observable.** This function yields each plaintext chunk as soon
+ * as *that specific chunk* authenticates. Every yielded chunk is genuinely
+ * authentic on its own — but that is **not** the same guarantee one-shot
+ * {@link decrypt} gives, where the call returning already means the whole
+ * plaintext is authentic. Here, a truncated or tampered stream can — and,
+ * for a stream truncated after the point of tampering, will — yield one or
+ * more genuine prefix chunks before the iterable throws `PqcError`
+ * (`DECRYPTION_FAILED`). **The only signal that the full plaintext is
+ * authentic and complete is the iterable finishing without throwing** —
+ * never any individual yielded chunk, and never "N chunks came out
+ * without error yet." A consumer writing this output to a file, a socket,
+ * or anywhere else observable must treat that output as provisional until
+ * the loop below completes cleanly, and must discard or roll back
+ * whatever was written if it throws instead. This is structural to
+ * streaming/online AEAD (age has the same property), not a shortcut this
+ * implementation took — see docs/serialization-format.md §9.3 for the
+ * full decode algorithm this follows.
  *
  * @example
  * ```ts
- * import { generate } from './keys.js';
- * import { encryptStream, decryptStream } from './stream.js';
+ * import { pqc } from '@pqc-sdk/core';
  *
- * const pair = await generate();
+ * const pair = await pqc.keys.generate();
  * async function* source() {
  *   yield new TextEncoder().encode('streamed data');
  * }
  * const ciphertextChunks: Uint8Array[] = [];
- * for await (const chunk of encryptStream(pair.publicKey, source())) {
+ * for await (const chunk of pqc.encryptStream(pair.publicKey, source())) {
  *   ciphertextChunks.push(chunk);
  * }
  * async function* replay() {
  *   yield* ciphertextChunks;
  * }
- * const parts: Uint8Array[] = [];
- * for await (const chunk of decryptStream(pair.secretKey, replay())) {
- *   parts.push(chunk); // provisional until the loop finishes without throwing
+ *
+ * // Correct handling of the incremental-release property: buffer chunks
+ * // as they arrive, but only treat them as real output once the loop
+ * // finishes without throwing. On error, the provisional buffer is
+ * // discarded — never returned, never written to a permanent sink.
+ * const provisional: Uint8Array[] = [];
+ * let plaintext: Uint8Array;
+ * try {
+ *   for await (const chunk of pqc.decryptStream(pair.secretKey, replay())) {
+ *     provisional.push(chunk); // authentic on its own, but NOT proof of completeness
+ *   }
+ *   // Reached only on clean completion — now, and only now, the full
+ *   // plaintext is confirmed authentic.
+ *   plaintext = new Uint8Array(provisional.reduce((n, c) => n + c.length, 0));
+ *   let offset = 0;
+ *   for (const chunk of provisional) {
+ *     plaintext.set(chunk, offset);
+ *     offset += chunk.length;
+ *   }
+ * } catch (error) {
+ *   // provisional is discarded here, not used — the stream never
+ *   // completed, so nothing in it is trustworthy as "the" plaintext.
+ *   throw error;
  * }
  * ```
  */
