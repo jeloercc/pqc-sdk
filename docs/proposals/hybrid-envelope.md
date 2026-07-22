@@ -1,7 +1,10 @@
 # Proposal: hybrid envelope v2 (X-Wing — X25519 + ML-KEM-768)
 
-- **Status:** PROPOSAL — nothing in this document is implemented. The sprint
-  starts only after this plan is approved.
+- **Status:** IMPLEMENTED (2026-07-22) — shipped in `@pqc-sdk/core` /
+  `@pqc-sdk/cli` 0.5.0 across three PRs: Day 1 key generation (#41), Day 2
+  `pqcenc.v2` envelope (#43), Day 3 public API/CLI opt-in (#44). The
+  default-flip-to-v1.0 decision from §4 is unchanged: `x-wing` remains
+  opt-in via `keys.generate({ algorithm: 'x-wing' })` in 0.5.0.
 - **Date:** 2026-07-19
 - **Depends on:** `@pqc-sdk/core` 0.4.1 (envelope v1, `pqcv1` key tokens,
   golden-vector suite from PR #33)
