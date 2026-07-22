@@ -22,6 +22,14 @@
     not replayed from a previous run.
 - Run the gate locally before pushing and before claiming any work is done.
 
+## Benchmarks
+
+- When a PR changes the benchmark set, the `bench` CI job fails on set
+  mismatch by design — this is the intended tripwire, not a bug. Resolve it
+  by: push the branch, run the `bench-baseline` workflow_dispatch on that
+  branch, then commit the runner's generated `baseline.json` into the same
+  PR.
+
 ## CI discipline
 
 - No merge without green PR CI. "Green locally" is not a substitute.
