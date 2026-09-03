@@ -10,8 +10,30 @@ the **X-Wing** hybrid KEM (X25519 + ML-KEM-768) + AES-256-GCM by default,
 pure **ML-KEM-768** (FIPS 203) one option away when FIPS scope or size
 dominates, **streaming encryption** for files too large to hold in memory, and
 **ML-DSA-65** (FIPS 204) for signatures — all validated against the official
-NIST ACVP / draft test vectors. The goal: add post-quantum
-encryption to your app in 30 minutes.
+NIST ACVP / draft test vectors.
+
+**The API surface is designed to take about 30 minutes to adopt** — that is a
+claim about this library's ergonomics, not about migrating an organisation to
+post-quantum cryptography. The genuinely hard parts of a PQC migration are key
+management, format versioning, key rotation, and interoperability with peers
+and other languages, and no SDK removes them. What this one tries to do is
+keep the cryptographic decisions few and safe, and be explicit about the
+format so the rest is tractable: see
+[why PQC now](https://jeloercc.github.io/pqc-sdk/guide/why-pqc) for the threat
+that motivates the work, and
+[the serialization format](./docs/serialization-format.md) for the byte layout
+you would need to interoperate with.
+
+> **Security status, up front.** This SDK has **not** had an independent
+> third-party cryptographic audit, and does not claim one; the reviews in
+> `docs/` are internal and AI-assisted. As with any JavaScript
+> implementation there are **no constant-time guarantees**, and there is **no
+> memory zeroization** of secrets, plaintext or key material — JS offers no
+> reliable primitive for it. `@noble/post-quantum` has no independent audit
+> either (self-audit 04/2026). Read the full threat model in
+> [SECURITY.md](./SECURITY.md) before adopting this for anything that matters,
+> and [How this is verified](#how-this-is-verified) for what _is_ checked and
+> how.
 
 > **Breaking in 0.8.0:** `pqc.keys.generate()` with no arguments now returns
 > an **X-Wing** hybrid pair (X25519 + ML-KEM-768), not pure ML-KEM-768 — a
@@ -44,7 +66,12 @@ Read this first if you are evaluating whether to trust this SDK.
   intended tripwire.
 - **A mutation matrix** tampers every region of a streaming envelope
   independently — truncation, reorder, duplication, cross-stream splice,
-  final-flag games — each asserting the documented error code.
+  final-flag games — each asserting the documented error code. The streaming
+  envelope binds every chunk to its index and marks the final chunk, adopting
+  [age](https://github.com/C2SP/C2SP/blob/main/age.md)'s STREAM construction
+  verbatim: see
+  [how each chunk is bound](https://jeloercc.github.io/pqc-sdk/guide/streaming-encryption#how-each-chunk-is-bound-to-its-position-and-to-the-stream)
+  and [`docs/serialization-format.md` §9.3](./docs/serialization-format.md).
 
 We never implement cryptographic primitives: ML-KEM/ML-DSA come from
 [`@noble/post-quantum`](https://github.com/paulmillr/noble-post-quantum) and
