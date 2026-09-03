@@ -8,12 +8,55 @@ the genuine entropy polyfill,
 (native OS randomness via `SecRandomCopyBytes` / `SecureRandom`), imported
 **before** the SDK in [`App.tsx`](./App.tsx).
 
-The single screen runs, on mount:
+The single screen runs, on mount, everything the ⏳ rows in
+[docs/compatibility.md](../../docs/compatibility.md) need from one device run
+(issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45)):
 
 1. ML-KEM-768: generate → encrypt → decrypt → byte-compare the plaintext.
-2. ML-DSA-65: generate → sign → verify.
+2. X-Wing: generate → encrypt → decrypt → byte-compare (the `pqcenc.v2`
+   hybrid envelope).
+3. ML-DSA-65: generate → sign → verify.
+4. Streaming, both KEMs: `encryptStream`/`decryptStream` over a 4 KiB
+   synthetic payload in 1 KiB chunks — four chunks, so the chunk counter,
+   the final-chunk flag and chunk-to-chunk chaining are all exercised.
+   Deliberately small: this proves chunking works on Hermes, it is not a
+   throughput benchmark.
+5. Streaming fail-closed: a bit is flipped in the last chunk's
+   authentication tag and the decrypt must reject it with `PqcError`
+   `DECRYPTION_FAILED`. A tampered stream that decrypted cleanly would be a
+   failure, so this step passing is as load-bearing as the roundtrips.
 
-Each step renders PASS/FAIL with its timing in milliseconds.
+Each step renders PASS/FAIL with its timing in milliseconds, and the screen
+ends with a **Runtime** section reporting what the engine actually provides
+(`Symbol.asyncIterator`, `TextDecoder`, `TransformStream`) — so a device run
+records the engine's capabilities, not just pass/fail.
+
+## Hermes and async iteration
+
+Hermes implements **no part of ES2018 async iteration**. This is not a stale
+toolchain artifact: React Native 0.81.5's own bundled compiler
+(`sdks/hermesc`, `hermes-2025-07-07-RNv0.81.0`) rejects `async function*` and
+`for await...of` outright. Metro's Babel preset downlevels both, which is why
+the streaming API works on device at all.
+
+Downlevelling leaves one gap, and [`asyncIteratorPolyfill.ts`](./asyncIteratorPolyfill.ts)
+closes it. Babel's transpiled async generators expose their iterator method
+under the **string** key `"@@asyncIterator"`, since `Symbol.asyncIterator`
+does not exist to key it under. Babel's own `for await` helper looks there, so
+Babel-compiled code is self-consistent — but `@pqc-sdk/core`'s `decryptStream`
+performs an explicit `object[Symbol.asyncIterator]()` lookup, which evaluates
+`object[undefined]` and throws `TypeError: undefined is not a function`.
+Aliasing `Symbol.asyncIterator` to that same string resolves it. The alias
+must be installed before `@pqc-sdk/core` is evaluated, hence its position as
+the first import in `App.tsx`, alongside the entropy polyfill's identical
+ordering requirement.
+
+**The Web Streams adapters (`encryptWebStream`/`decryptWebStream`) are not
+usable here**: Hermes provides no `TransformStream` or `ReadableStream`, and
+React Native does not polyfill them. RN apps should use the async-iterable
+core (`encryptStream`/`decryptStream`) directly, which is what this example
+does. The screen reports `TransformStream` availability so a device run
+confirms this rather than assuming it.
 
 ## Run on a simulator/emulator or device
 
@@ -25,37 +68,33 @@ pnpm ios      # or: pnpm android
 
 ## What was actually verified in this repo's environment, and what wasn't
 
-This environment has no Xcode app (`xcrun simctl` unavailable, command line
-tools only) and no Java/Android SDK, so **no simulator or emulator could be
-launched here**. What was verified instead:
+This environment has no Xcode app and no Java/Android SDK, so **no simulator
+or emulator could be launched here**. What was verified instead:
 
 - **TypeScript**: `pnpm lint` (`tsc --noEmit`) passes against the real
   `react-native` and `@pqc-sdk/core` types.
-- **Metro bundling**: `npx expo export --platform ios` bundles the app —
-  595 modules, including `@pqc-sdk/core`, `@noble/post-quantum`,
-  `@noble/ciphers`, and `react-native-get-random-values` — into Hermes
-  bytecode with no resolution or transform errors. This is a stronger signal
-  than the standalone example: it goes through the actual Metro/Babel
-  pipeline RN ships, not esbuild.
-- **Standalone Hermes execution of the real bundle was attempted and failed**,
-  for reasons that confirm a real device/simulator can't be substituted:
-  - The precompiled bytecode Metro emits for RN 0.86 is bytecode version 98;
-    the latest published standalone Hermes CLI (v0.13.0) only reads up to
-    version 96 (`Error deserializing bytecode: Wrong bytecode version`).
-  - Re-exporting as plain JS (`--no-bytecode`) and interpreting it instead
-    fails to even parse: the `react-native` package itself (not our app code)
-    uses private class fields (`#x`), a syntax the standalone CLI's older
-    parser rejects. The Day-0 Hermes-engine test never hit this because it
-    only bundled the SDK, not the `react-native` package.
-  - This is also why `react-native-get-random-values` can't be exercised
-    standalone: its `index.js` does `require('react-native')` at module scope
-    just to read `NativeModules`, so loading it at all pulls in the same
-    `react-native` package that fails to parse above.
+- **Metro bundling**: `npx expo export --platform android` bundles the app —
+  609 modules, including `@pqc-sdk/core`, `@noble/post-quantum`,
+  `@noble/ciphers` and `react-native-get-random-values` — into Hermes
+  bytecode (2.14 MB `.hbc`) with no resolution or transform errors. That the
+  bytecode compiles at all is meaningful here: it means Metro's downlevelled
+  async generators are accepted by RN's own `hermesc`.
+- **Real Hermes execution of the SDK's streaming path**: the standalone
+  Hermes CLI ran ML-KEM-768 and X-Wing one-shot roundtrips, both KEMs'
+  streaming roundtrips at this example's exact 4 KiB / 1 KiB parameters, and
+  the tamper case — all passing, using this directory's actual
+  `asyncIteratorPolyfill.ts`. The SDK bundle was transformed with
+  `@react-native/babel-preset` first, so the code under test is what Metro
+  produces. Without the polyfill the streaming steps fail with
+  `TypeError: undefined is not a function`, which is how the gap was found.
 
-**Conclusion: harness ready, on-device/simulator run pending.** The harness
-(this app) is built, type-checks, and bundles cleanly through the real Metro
-pipeline with the genuine polyfill wired in the correct order. What remains is
-executing it on an actual iOS/Android simulator or device, which needs Xcode
-or the Android SDK — neither is available in this environment. See
-[docs/compatibility.md](../../docs/compatibility.md) for the documented
-status (kept as "engine ✅ / app ⏳", not flipped to ✅).
+Note the standalone CLI cannot run the _app_ bundle (bytecode version skew,
+and `react-native`'s own private-class-field syntax), which is why the SDK
+path was exercised directly instead. Entropy there comes from the
+`Math.random` shim, so it validates the engine, never the randomness.
+
+**Conclusion: harness ready and the engine questions answered, on-device run
+pending.** What remains is executing this app on a real device, which needs
+Xcode or the Android SDK — neither is available in this environment.
+[docs/compatibility.md](../../docs/compatibility.md) stays ⏳ until that run
+happens, per the honest-compatibility rule.
