@@ -6,10 +6,15 @@ import { pqc } from '@pqc-sdk/core';
 import { defineCommand } from 'citty';
 
 import { friendlyRun, UsageError } from '../errors.js';
-import { assertReadableInput, STREAMING_THRESHOLD_BYTES } from '../input.js';
+import {
+  assertReadableInput,
+  MAX_SIZE_DESCRIPTION,
+  sizeGuardOptions,
+  STREAMING_THRESHOLD_BYTES,
+} from '../input.js';
 import { readKemKeyFile } from '../keyfiles.js';
 import { pipeToOutput, writeOutput } from '../output.js';
-import { item, ok } from '../ui.js';
+import { item, ok, warn } from '../ui.js';
 
 export const encrypt = defineCommand({
   meta: {
@@ -20,7 +25,7 @@ export const encrypt = defineCommand({
     input: {
       type: 'positional',
       description:
-        'File to encrypt (any size: at or below 8 MiB loaded fully into memory, larger streamed; 1 TiB operational ceiling)',
+        'File to encrypt (any size: at or below 8 MiB loaded fully into memory, larger streamed; 1 TiB operational guard, raise with --max-size)',
       required: true,
     },
     key: {
@@ -37,9 +42,13 @@ export const encrypt = defineCommand({
       description: 'Overwrite the output file if it exists',
       default: false,
     },
+    'max-size': {
+      type: 'string',
+      description: MAX_SIZE_DESCRIPTION,
+    },
   },
   run: friendlyRun(async ({ args }) => {
-    const size = await assertReadableInput(args.input);
+    const size = await assertReadableInput(args.input, sizeGuardOptions(args['max-size'], warn));
     const outPath = args.out ?? `${args.input}.enc`;
     if (!args.force && existsSync(outPath)) {
       throw new UsageError(`${outPath} already exists. Use --force to overwrite it.`);

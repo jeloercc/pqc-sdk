@@ -50,6 +50,19 @@ Worth knowing:
   operational ceiling. No flag needed — the CLI picks the right path from the
   input size for `encrypt`, and from the ciphertext's own envelope header for
   `decrypt`.
+- That 1 TiB ceiling is an **operational guard against accidental inputs**
+  (pointing the CLI at a mounted block device, say) — not a cryptographic
+  limit. The streaming envelope has no practical size bound of its own. Raise
+  or lower it with `--max-size` on `encrypt`/`decrypt`:
+
+  ```bash
+  pqc encrypt archive.tar --key keys/alice.public.pqc --max-size 4TiB
+  ```
+
+  Accepts a byte count or a binary-unit size (`2TiB`, `500GiB`, `64MiB`).
+  When `--max-size` actually admits a file the 1 TiB default would have
+  refused, the CLI says so explicitly rather than proceeding quietly.
+
 - Expected failures (missing file, wrong key, tampered envelope) print a
   one-line error on stderr and exit with code 1 — CI- and script-friendly.
 

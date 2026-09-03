@@ -6,7 +6,12 @@ import { pqc } from '@pqc-sdk/core';
 import { defineCommand } from 'citty';
 
 import { friendlyRun, UsageError } from '../errors.js';
-import { assertReadableInput, peekEnvelopeVersion } from '../input.js';
+import {
+  assertReadableInput,
+  MAX_SIZE_DESCRIPTION,
+  peekEnvelopeVersion,
+  sizeGuardOptions,
+} from '../input.js';
 import { readKemKeyFile } from '../keyfiles.js';
 import { pipeToOutput, writeOutput } from '../output.js';
 import { item, ok, warn } from '../ui.js';
@@ -22,7 +27,7 @@ export const decrypt = defineCommand({
     input: {
       type: 'positional',
       description:
-        'Encrypted file (a KEM + AES-256-GCM envelope, one-shot or streamed; any size, 1 TiB operational ceiling)',
+        'Encrypted file (a KEM + AES-256-GCM envelope, one-shot or streamed; any size, 1 TiB operational guard, raise with --max-size)',
       required: true,
     },
     key: {
@@ -39,9 +44,13 @@ export const decrypt = defineCommand({
       description: 'Overwrite the output file if it exists',
       default: false,
     },
+    'max-size': {
+      type: 'string',
+      description: MAX_SIZE_DESCRIPTION,
+    },
   },
   run: friendlyRun(async ({ args }) => {
-    await assertReadableInput(args.input);
+    await assertReadableInput(args.input, sizeGuardOptions(args['max-size'], warn));
     const outPath =
       args.out ?? (args.input.endsWith('.enc') ? args.input.slice(0, -4) : `${args.input}.dec`);
     if (!args.force && existsSync(outPath)) {
