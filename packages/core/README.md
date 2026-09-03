@@ -73,9 +73,19 @@ Full documentation at **[jeloercc.github.io/pqc-sdk](https://jeloercc.github.io/
 ## Security
 
 - We never implement primitives: ML-KEM/ML-DSA come from
-  `@noble/post-quantum` and AES-GCM from `@noble/ciphers`.
+  `@noble/post-quantum` and AES-GCM from `@noble/ciphers`. The risk that is
+  ours to carry is the layer around them — envelope format, key
+  serialization, nonce derivation, fail-closed parsing — and
+  [**How this is verified**](https://github.com/jeloercc/pqc-sdk#how-this-is-verified)
+  lists the suite covering each: NIST ACVP vectors, golden serialization
+  vectors, parser fuzzing, `fast-check` property tests and the streaming
+  mutation matrix.
+- **No memory zeroization**: shared secrets, decrypted plaintext and
+  secret-key bytes are not wiped after use. JavaScript offers no reliable
+  primitive for it and `@noble` does not zeroize either.
 - `@noble/post-quantum` has no independent audit yet (self-audit 04/2026).
-  As with all JS, there are no strict constant-time guarantees.
+  As with all JS, there are no strict constant-time guarantees. The reviews in
+  `docs/` are internal and AI-assisted — not an independent third-party audit.
 - Security reports: see [SECURITY.md](https://github.com/jeloercc/pqc-sdk/blob/main/SECURITY.md) —
   please do not open public issues.
 

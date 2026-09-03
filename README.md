@@ -54,10 +54,10 @@ npx @pqc-sdk/cli init
 
 ## Packages
 
-| Package                                                        | What it does                                                                              |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK: hybrid encryption, signatures, key handling. Node 20+, Deno, Workers, RN.        |
-| [`@pqc-sdk/cli`](https://www.npmjs.com/package/@pqc-sdk/cli)   | `pqc init` / `keygen` / `audit`: scaffolding, keys and heuristic legacy-crypto detection. |
+| Package                                                        | What it does                                                                                                                                          |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK: hybrid encryption, signatures, key handling. Node 20+, Deno, Workers, RN.                                                                    |
+| [`@pqc-sdk/cli`](https://www.npmjs.com/package/@pqc-sdk/cli)   | `pqc init` / `keygen` / `encrypt` / `decrypt` / `audit`: scaffolding, keys, file encryption, and a heuristic (non-exhaustive) scan for legacy crypto. |
 
 ## Monorepo structure
 
@@ -72,11 +72,43 @@ docs/            repo source documentation (compatibility)
 Turborepo + pnpm workspaces. See [CONTRIBUTING.md](./CONTRIBUTING.md) to run
 the repo locally.
 
-## Security
+## How this is verified
 
 We never implement cryptographic primitives: ML-KEM/ML-DSA come from
 [`@noble/post-quantum`](https://github.com/paulmillr/noble-post-quantum) and
 AES-GCM from [`@noble/ciphers`](https://github.com/paulmillr/noble-ciphers).
+That means the interesting risk is **not** in the primitives — it is in the
+layers this SDK does own: the envelope format, key serialization, nonce
+derivation, and fail-closed behaviour on malformed input. Those are what the
+following test suites exist to cover, and each one is a file you can read:
+
+| Layer                         | How it is verified                                                                                                                                                                                                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primitive correctness         | Official **NIST ACVP vectors** for ML-KEM-768 and ML-DSA-65, plus the X-Wing draft's Appendix C vectors — [`nist-vectors.test.ts`](./packages/core/src/nist-vectors.test.ts), [`xwing-vectors.test.ts`](./packages/core/src/xwing-vectors.test.ts)                |
+| Wire format stability         | **Golden serialization vectors** for every envelope version (v1, v2, streaming), regenerated only behind an acknowledged breaking change — [`src/vectors/`](./packages/core/src/vectors/), [`golden-vectors.test.ts`](./packages/core/src/golden-vectors.test.ts) |
+| Parser hostility              | **Fuzzing** of `keys.deserialize` against arbitrary and hand-picked hostile input, asserting it always fails closed — [`deserialize-fuzz.test.ts`](./packages/core/src/deserialize-fuzz.test.ts)                                                                  |
+| Roundtrip + tamper invariants | **Property-based tests** (`fast-check`): decrypt(encrypt(x)) === x for arbitrary payloads, and any single-byte tamper fails closed — [`properties.test.ts`](./packages/core/src/properties.test.ts)                                                               |
+| Streaming envelope            | **Mutation matrix** tampering every region independently — truncation, reorder, duplication, cross-stream splice, final-flag games — each asserting the documented `PqcError` code — [`stream-mutations.test.ts`](./packages/core/src/stream-mutations.test.ts)   |
+| Format specification          | The normative byte layout, so the tests above check an intent rather than the current output — [`docs/serialization-format.md`](./docs/serialization-format.md)                                                                                                   |
+| Review                        | Pre-launch findings report ([`docs/AUDIT-2026-06.md`](./docs/AUDIT-2026-06.md)) and a source-level security review ([`docs/SECURITY-REVIEW-2026-06.md`](./docs/SECURITY-REVIEW-2026-06.md))                                                                       |
+| Runtime claims                | Node, Deno, Cloudflare Workers, Hermes and a physical React Native device — each ✅ only after the roundtrip actually ran there — [`docs/compatibility.md`](./docs/compatibility.md)                                                                              |
+
+Coverage floor is 90%; the suite currently runs ~297 tests across both
+packages. Run it yourself with `pnpm turbo run lint test build --force`.
+
+**What these reviews are not.** `docs/AUDIT-2026-06.md` and
+`docs/SECURITY-REVIEW-2026-06.md` are internal, AI-assisted reviews. They are
+**not** an independent third-party cryptographic audit, and the SDK does not
+claim to be audited. `@noble/post-quantum` itself has no independent audit yet
+either (self-audit 04/2026).
+
+**Known limitation worth reading before you adopt this: there is no memory
+zeroization.** Shared secrets, decrypted plaintext and secret-key bytes are
+not wiped after use — JavaScript offers no reliable primitive for it and
+`@noble` does not zeroize either, so it is an ecosystem limitation this SDK
+cannot fully close. The full threat model, including the absence of
+constant-time guarantees, is in [SECURITY.md](./SECURITY.md).
+
 To report a vulnerability, see [SECURITY.md](./SECURITY.md) — please do not
 open public issues.
 

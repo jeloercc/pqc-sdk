@@ -138,7 +138,10 @@ export const audit = defineCommand({
   meta: {
     name: 'audit',
     description:
-      'Heuristically detect pre-quantum crypto (best-effort regex scan) and suggest the PQC equivalent',
+      'Heuristically flag likely pre-quantum crypto and suggest a PQC equivalent. ' +
+      'A best-effort regex scan of dependencies and source — non-exhaustive, ' +
+      'produces false positives and false negatives, and is a starting point for ' +
+      'a migration review, not a substitute for one.',
   },
   run: friendlyRun(async () => {
     const cwd = process.cwd();
@@ -146,7 +149,12 @@ export const audit = defineCommand({
     const findings = [...(await auditPackageJson(cwd)), ...sourceFindings];
 
     note(
-      'Heuristic, best-effort regex scan — expect occasional false positives and false negatives.',
+      'Heuristic regex scan of dependencies and source. It is non-exhaustive: it ' +
+        'matches known package names and call patterns, so it misses crypto reached ' +
+        'through wrappers, dynamic imports, transitive dependencies, compiled output ' +
+        'or any name it does not know, and it flags matches it cannot prove are ' +
+        'reachable. Treat the result as a starting point for a migration review, ' +
+        'never as evidence that a codebase is free of pre-quantum crypto.',
     );
     if (skipped.length > 0) {
       note(
@@ -155,7 +163,11 @@ export const audit = defineCommand({
     }
 
     if (findings.length === 0) {
-      ok('No pre-quantum crypto detected.');
+      ok('No pre-quantum crypto detected by these heuristics.');
+      note(
+        'This is not a clean bill of health: it means the patterns above did not ' +
+          'match, not that none exists.',
+      );
       return;
     }
 
@@ -166,8 +178,12 @@ export const audit = defineCommand({
     console.log();
     console.log(
       pc.yellow(
-        `${findings.length} usages to migrate. Algorithm guide: FIPS 203 (ML-KEM) encryption, FIPS 204 (ML-DSA) signatures.`,
+        `${findings.length} candidate usage(s) to review. Algorithm guide: FIPS 203 (ML-KEM) encryption, FIPS 204 (ML-DSA) signatures.`,
       ),
+    );
+    note(
+      'Candidates, not a migration plan: confirm each one is genuinely reachable ' +
+        'and genuinely pre-quantum before acting on it.',
     );
     process.exitCode = 1;
   }),
