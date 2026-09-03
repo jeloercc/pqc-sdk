@@ -1,4 +1,10 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable, Writable } from 'node:stream';
 
 import { pqc } from '@pqc-sdk/core';
 
@@ -22,3 +28,48 @@ const hybridDecoded = new TextDecoder().decode(hybridPlaintext);
 assert.equal(hybridDecoded, message);
 console.log('✅ Node: generate → encrypt → decrypt OK (x-wing hybrid)');
 console.log(`   algorithm: ${hybridPair.algorithm}, ciphertext: ${hybridCiphertext.length} bytes`);
+
+// Streaming (pqcenc.v2 chunked envelope, docs/proposals/streaming-encryption.md):
+// a real large file, piped through fs streams and the Web Streams adapters —
+// never held fully in memory, unlike pqc.encrypt above.
+const LARGE_FILE_BYTES = 8 * 1024 * 1024; // 8 MiB: large enough to span many
+// chunks at the 64 KiB default, small enough to keep the example fast.
+
+async function streamingRoundtrip(algorithm) {
+  const dir = await mkdtemp(join(tmpdir(), 'pqc-streaming-'));
+  const plainPath = join(dir, 'large-file.bin');
+  const encPath = join(dir, 'large-file.bin.enc');
+  const decPath = join(dir, 'large-file.bin.dec');
+
+  try {
+    // Write deterministic-size random content — this is the "multi-GB file"
+    // scenario in miniature: too large to comfortably hold as one in-memory
+    // Uint8Array in the general case, which is exactly why the CLI switches
+    // to this same streaming path automatically above 8 MiB.
+    await writeFile(plainPath, randomBytes(LARGE_FILE_BYTES));
+
+    const streamPair = await pqc.keys.generate({ algorithm });
+
+    await Readable.toWeb(createReadStream(plainPath))
+      .pipeThrough(pqc.encryptWebStream(streamPair.publicKey))
+      .pipeTo(Writable.toWeb(createWriteStream(encPath)));
+
+    await Readable.toWeb(createReadStream(encPath))
+      .pipeThrough(pqc.decryptWebStream(streamPair.secretKey))
+      .pipeTo(Writable.toWeb(createWriteStream(decPath)));
+
+    const [original, roundtripped] = await Promise.all([readFile(plainPath), readFile(decPath)]);
+    assert.deepEqual(roundtripped, original);
+
+    const { size: encSize } = await stat(encPath);
+    console.log(`✅ Node: streaming encryptWebStream → decryptWebStream OK (${algorithm})`);
+    console.log(
+      `   plaintext: ${LARGE_FILE_BYTES} bytes, ciphertext: ${encSize} bytes, byte-for-byte match: true`,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+await streamingRoundtrip('ml-kem-768');
+await streamingRoundtrip('x-wing');

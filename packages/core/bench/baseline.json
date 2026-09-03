@@ -1,47 +1,59 @@
 {
-  "generatedAt": "2026-07-20T16:22:12.978Z",
-  "commit": "18906c4b1d309a0f26ff32f9ea68368bef69f9ba",
+  "generatedAt": "2026-09-03T16:50:22.758Z",
+  "commit": "3ff2652cad359e87749357100f0292055d75b058",
   "runner": "ubuntu24",
   "node": "20.20.2",
   "benchmarks": {
     "ml-kem-768 > keygen": {
-      "mean": 0.7628
+      "mean": 0.6522
     },
     "ml-kem-768 > encrypt 1KiB": {
-      "mean": 0.9348
+      "mean": 0.7966
     },
     "ml-kem-768 > encrypt 100KiB": {
-      "mean": 3.6637
+      "mean": 2.6431
     },
     "ml-kem-768 > decrypt 1KiB": {
-      "mean": 1.2393
+      "mean": 1.0402
     },
     "ml-kem-768 > decrypt 100KiB": {
-      "mean": 3.883
+      "mean": 2.957
     },
     "x-wing > keygen": {
-      "mean": 1.8552
+      "mean": 1.5594
     },
     "x-wing > encrypt 1KiB": {
-      "mean": 4.2428
+      "mean": 3.3093
     },
     "x-wing > encrypt 100KiB": {
-      "mean": 6.8039
+      "mean": 5.1452
     },
     "x-wing > decrypt 1KiB": {
-      "mean": 4.1781
+      "mean": 3.3823
     },
     "x-wing > decrypt 100KiB": {
-      "mean": 6.7821
+      "mean": 5.2232
     },
     "ml-dsa-65 > keygen": {
-      "mean": 2.6875
+      "mean": 2.1879
     },
     "ml-dsa-65 > sign 1KiB": {
-      "mean": 14.6398
+      "mean": 12.0505
     },
     "ml-dsa-65 > verify 1KiB": {
-      "mean": 3.2616
+      "mean": 2.5359
+    },
+    "ml-kem-768 streaming > encryptStream 1MiB (default 64KiB chunks)": {
+      "mean": 20.7847
+    },
+    "ml-kem-768 streaming > decryptStream 1MiB (default 64KiB chunks)": {
+      "mean": 21.388
+    },
+    "x-wing streaming > encryptStream 1MiB (default 64KiB chunks)": {
+      "mean": 23.1575
+    },
+    "x-wing streaming > decryptStream 1MiB (default 64KiB chunks)": {
+      "mean": 23.579
     }
   }
 }
