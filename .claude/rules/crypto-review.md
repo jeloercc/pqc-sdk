@@ -20,6 +20,22 @@
   clean bundling, or engine-only shims are ⏳ and the doc must say exactly
   what is still missing. Never overstate implemented algorithms or validated
   targets (audit findings M2 and the RN ⏳ row exist because of this rule).
+- **Verify runtime feature assumptions on the actual engine.** Before an
+  example, a doc, or a compatibility claim depends on a language or host
+  feature being present — `Symbol.asyncIterator`, async generators,
+  `for await...of`, Web Streams (`TransformStream`/`ReadableStream`),
+  `TextDecoder`, `crypto.getRandomValues` — run it on that engine and record
+  the result. "It is part of the language, not a host API" is not evidence;
+  neither is a clean type-check or a clean bundle. Hermes is the standing
+  example in both directions: it implements no part of ES2018 async
+  iteration (RN's own `hermesc` rejects `async function*` outright, so Metro
+  must downlevel it, and Babel's transpiled generators key their iterator on
+  the string `"@@asyncIterator"` rather than the missing symbol — breaking
+  any explicit `obj[Symbol.asyncIterator]()` lookup), and it provides no Web
+  Streams at all. Both were found by executing the engine, and neither is
+  visible from types or bundling. Where a gap is permanent rather than
+  pending, say so in `docs/compatibility.md` as a known limitation with the
+  supported alternative — distinct from a ⏳, which means "not yet run".
 - **No secrets in output.** Never print, log, or embed key material, shared
   secrets, or plaintext in error messages, test names, docs, commits, or CI
   logs. Errors carry only lengths, algorithm names, and key use. This applies
