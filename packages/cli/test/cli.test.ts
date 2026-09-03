@@ -81,7 +81,7 @@ describe('pqc init', () => {
     const config = JSON.parse(await readFile(join(dir, 'pqc.config.json'), 'utf8')) as {
       defaultAlgorithm: string;
     };
-    expect(config.defaultAlgorithm).toBe('ml-kem-768');
+    expect(config.defaultAlgorithm).toBe('x-wing');
 
     const publicKey = pqc.keys.deserialize(
       (await readFile(join(dir, 'keys/dev.public.pqc'), 'utf8')).trim(),
@@ -89,7 +89,7 @@ describe('pqc init', () => {
     const secretKey = pqc.keys.deserialize(
       (await readFile(join(dir, 'keys/dev.secret.pqc'), 'utf8')).trim(),
     );
-    expect(publicKey.algorithm).toBe('ml-kem-768');
+    expect(publicKey.algorithm).toBe('x-wing');
     expect(publicKey.use).toBe('public');
     expect(secretKey.use).toBe('secret');
 
@@ -165,16 +165,28 @@ describe('pqc init', () => {
 });
 
 describe('pqc keygen', () => {
-  it('generates ML-KEM-768 in ./keys by default', async () => {
+  it('generates the x-wing hybrid in ./keys by default', async () => {
     const dir = await freshDir();
     const result = await runCli(['keygen'], dir);
+
+    expect(result.code).toBe(0);
+    const key = pqc.keys.deserialize(
+      (await readFile(join(dir, 'keys/x-wing.public.pqc'), 'utf8')).trim(),
+    );
+    expect(key.algorithm).toBe('x-wing');
+    await readFile(join(dir, 'keys/x-wing.secret.pqc'), 'utf8');
+  });
+
+  it('still generates pure ML-KEM-768 on request, with its own file names', async () => {
+    // The CLI half of the 0.8.0 migration path (docs/MIGRATION-0.8.md).
+    const dir = await freshDir();
+    const result = await runCli(['keygen', '--algorithm', 'ml-kem-768'], dir);
 
     expect(result.code).toBe(0);
     const key = pqc.keys.deserialize(
       (await readFile(join(dir, 'keys/ml-kem-768.public.pqc'), 'utf8')).trim(),
     );
     expect(key.algorithm).toBe('ml-kem-768');
-    await readFile(join(dir, 'keys/ml-kem-768.secret.pqc'), 'utf8');
   });
 
   it('honors --algorithm and --out', async () => {
@@ -220,7 +232,7 @@ describe('pqc keygen', () => {
     const key = pqc.keys.deserialize(
       (await readFile(join(dir, 'keys/payments.public.pqc'), 'utf8')).trim(),
     );
-    expect(key.algorithm).toBe('ml-kem-768');
+    expect(key.algorithm).toBe('x-wing');
     await readFile(join(dir, 'keys/payments.secret.pqc'), 'utf8');
   });
 
@@ -237,15 +249,15 @@ describe('pqc keygen', () => {
   it('does not overwrite existing keys without --force', async () => {
     const dir = await freshDir();
     await runCli(['keygen'], dir);
-    const original = await readFile(join(dir, 'keys/ml-kem-768.public.pqc'), 'utf8');
+    const original = await readFile(join(dir, 'keys/x-wing.public.pqc'), 'utf8');
 
     const second = await runCli(['keygen'], dir);
     expect(second.code).not.toBe(0);
-    expect(await readFile(join(dir, 'keys/ml-kem-768.public.pqc'), 'utf8')).toBe(original);
+    expect(await readFile(join(dir, 'keys/x-wing.public.pqc'), 'utf8')).toBe(original);
 
     const forced = await runCli(['keygen', '--force'], dir);
     expect(forced.code).toBe(0);
-    expect(await readFile(join(dir, 'keys/ml-kem-768.public.pqc'), 'utf8')).not.toBe(original);
+    expect(await readFile(join(dir, 'keys/x-wing.public.pqc'), 'utf8')).not.toBe(original);
   });
 
   it('protects secret keys with .gitignore and does not duplicate patterns', async () => {
@@ -695,11 +707,11 @@ describe('encrypt / decrypt', () => {
     const secretSerialized = (await readFile(join(dir, 'keys/alice.secret.pqc'), 'utf8')).trim();
     const publicSerialized = (await readFile(join(dir, 'keys/alice.public.pqc'), 'utf8')).trim();
     const secretKey = pqc.keys.deserialize(secretSerialized, {
-      algorithm: 'ml-kem-768',
+      algorithm: 'x-wing',
       use: 'secret',
     });
     const publicKey = pqc.keys.deserialize(publicSerialized, {
-      algorithm: 'ml-kem-768',
+      algorithm: 'x-wing',
       use: 'public',
     });
 
@@ -900,12 +912,12 @@ describe('encrypt / decrypt', () => {
       await runCli(['keygen', '--name', 'alice'], dir);
       const publicSerialized = (await readFile(join(dir, 'keys/alice.public.pqc'), 'utf8')).trim();
       const publicKey = pqc.keys.deserialize(publicSerialized, {
-        algorithm: 'ml-kem-768',
+        algorithm: 'x-wing',
         use: 'public',
       });
 
       // A tiny plaintext, but produced via encryptStream directly — this is
-      // a real streaming envelope (version 0x03) despite being far below
+      // a real streaming envelope (version 0x04 for x-wing) despite being far below
       // the CLI's 8 MiB threshold, exactly the case size-based dispatch on
       // decrypt would get wrong.
       // eslint-disable-next-line @typescript-eslint/require-await
@@ -921,7 +933,7 @@ describe('encrypt / decrypt', () => {
         parts.map((p) => Buffer.from(p)),
         total,
       );
-      expect(envelope[0]).toBe(0x03);
+      expect(envelope[0]).toBe(0x04);
       await writeFile(join(dir, 'tiny-streamed.enc'), envelope);
 
       const result = await runCli(

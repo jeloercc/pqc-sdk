@@ -24,14 +24,25 @@ function expectPqcCode(fn: () => unknown, code: PqcErrorCode): void {
 }
 
 describe('pqc.keys.generate', () => {
-  it('generates an ML-KEM-768 pair by default', async () => {
+  it('generates an X-Wing hybrid pair by default', async () => {
     const pair = await pqc.keys.generate();
 
-    expect(pair.algorithm).toBe('ml-kem-768');
-    expect(pair.publicKey.algorithm).toBe('ml-kem-768');
+    expect(pair.algorithm).toBe('x-wing');
+    expect(pair.publicKey.algorithm).toBe('x-wing');
     expect(pair.publicKey.use).toBe('public');
-    expect(pair.publicKey.bytes).toHaveLength(1184);
+    expect(pair.publicKey.bytes).toHaveLength(1216);
     expect(pair.secretKey.use).toBe('secret');
+    expect(pair.secretKey.bytes).toHaveLength(32);
+  });
+
+  it('still generates pure ML-KEM-768 when asked for it explicitly', async () => {
+    // The documented migration path off the 0.8.0 default flip
+    // (docs/MIGRATION-0.8.md): pure ML-KEM-768 stays first-class, so this
+    // must keep working with exactly the pre-0.8 shape.
+    const pair = await pqc.keys.generate({ algorithm: 'ml-kem-768' });
+
+    expect(pair.algorithm).toBe('ml-kem-768');
+    expect(pair.publicKey.bytes).toHaveLength(1184);
     expect(pair.secretKey.bytes).toHaveLength(2400);
   });
 
@@ -60,7 +71,7 @@ describe('pqc.keys.generate', () => {
 
 describe('pqc.keys serialization', () => {
   it('serializes to base64url with algorithm and use metadata', async () => {
-    const pair = await pqc.keys.generate();
+    const pair = await pqc.keys.generate({ algorithm: 'ml-kem-768' });
     const serialized = pqc.keys.serialize(pair.publicKey);
 
     expect(serialized).toMatch(/^pqcv1\.ml-kem-768\.public\.[A-Za-z0-9_-]+$/);
@@ -101,7 +112,7 @@ describe('pqc.keys serialization', () => {
 
 describe('pqc.keys.deserialize with an expected algorithm and use', () => {
   it('returns the narrowed key when the assertion matches', async () => {
-    const pair = await pqc.keys.generate();
+    const pair = await pqc.keys.generate({ algorithm: 'ml-kem-768' });
     const token = pqc.keys.serialize(pair.publicKey);
 
     const publicKey = pqc.keys.deserialize(token, { algorithm: 'ml-kem-768', use: 'public' });
@@ -130,7 +141,9 @@ describe('pqc.keys.deserialize with an expected algorithm and use', () => {
   });
 
   it('throws WRONG_KEY_USE when the use does not match', async () => {
-    const token = pqc.keys.serialize((await pqc.keys.generate()).secretKey);
+    const token = pqc.keys.serialize(
+      (await pqc.keys.generate({ algorithm: 'ml-kem-768' })).secretKey,
+    );
 
     expectPqcCode(
       () => pqc.keys.deserialize(token, { algorithm: 'ml-kem-768', use: 'public' }),
