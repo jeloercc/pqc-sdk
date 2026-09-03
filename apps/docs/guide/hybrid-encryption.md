@@ -88,13 +88,15 @@ two key-establishment algorithms and combining their secrets, so the result
 stays secure as long as _either_ one holds. The SDK offers this as a second,
 opt-in KEM:
 
-- **`ml-kem-768`** (default): ML-KEM-768 (FIPS 203) alone as the KEM. Envelope
-  `pqcenc.v1`.
-- **`x-wing`** (opt-in): X25519 + ML-KEM-768, combined per
+- **`x-wing`** (the default since 0.8.0): X25519 + ML-KEM-768, combined per
   [draft-connolly-cfrg-xwing-kem](https://datatracker.ietf.org/doc/draft-connolly-cfrg-xwing-kem/),
   an established construction with a
   [formal security analysis](https://eprint.iacr.org/2024/039) — not a
   homegrown combiner. Envelope `pqcenc.v2`.
+- **`ml-kem-768`**: ML-KEM-768 (FIPS 203) alone as the KEM. Envelope
+  `pqcenc.v1`. Choose it deliberately when FIPS certification scope matters
+  (X-Wing is a CFRG draft, not covered by FIPS 203) or when size and speed
+  dominate.
 
 Both are selected purely by which key you pass — same `pqc.encrypt`/
 `pqc.decrypt` signature, no mode flag:
@@ -102,24 +104,25 @@ Both are selected purely by which key you pass — same `pqc.encrypt`/
 ```ts twoslash
 import { pqc } from '@pqc-sdk/core';
 
-const kemOnly = await pqc.keys.generate(); // ml-kem-768 → pqcenc.v1
-const hybrid = await pqc.keys.generate({ algorithm: 'x-wing' }); // → pqcenc.v2
+const hybrid = await pqc.keys.generate(); // x-wing (default) → pqcenc.v2
+const kemOnly = await pqc.keys.generate({ algorithm: 'ml-kem-768' }); // → pqcenc.v1
 
-await pqc.encrypt('data', kemOnly.publicKey); // v1 envelope
 await pqc.encrypt('data', hybrid.publicKey); // v2 envelope
+await pqc.encrypt('data', kemOnly.publicKey); // v1 envelope
 // pqc.decrypt reads the leading version byte and picks the matching path —
 // no need to track which algorithm produced a given ciphertext.
 ```
 
 ## Choosing an algorithm
 
-|                                               | `ml-kem-768` (default) | `x-wing` (opt-in)                 |
-| --------------------------------------------- | ---------------------- | --------------------------------- |
-| Security if ML-KEM-768 alone were ever broken | Confidentiality lost   | Still confidential (X25519 holds) |
-| Overhead per message                          | 1118 bytes + plaintext | 1150 bytes + plaintext (+32 B)    |
-| Public key                                    | 1184 bytes             | 1216 bytes                        |
-| Secret key                                    | 2400 bytes             | 32 bytes (a seed)                 |
-| Relative speed (this SDK's bench)             | baseline               | ~3–6× slower per operation        |
+|                                               | `x-wing` (default)                | `ml-kem-768`           |
+| --------------------------------------------- | --------------------------------- | ---------------------- |
+| Security if ML-KEM-768 alone were ever broken | Still confidential (X25519 holds) | Confidentiality lost   |
+| Overhead per message                          | 1150 bytes + plaintext (+32 B)    | 1118 bytes + plaintext |
+| Public key                                    | 1216 bytes                        | 1184 bytes             |
+| Secret key                                    | 32 bytes (a seed)                 | 2400 bytes             |
+| Relative speed (this SDK's bench)             | ~3–6× slower per operation        | baseline               |
+| FIPS 203 certification scope                  | No (CFRG draft)                   | Yes                    |
 
 **Use `x-wing`** for data that must stay confidential for years — archives,
 backups, anything with a long secrecy requirement — where the extra 32 bytes
