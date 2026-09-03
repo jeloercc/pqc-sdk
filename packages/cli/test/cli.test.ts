@@ -275,6 +275,42 @@ describe('pqc audit', () => {
     expect(result.stdout).toMatch(/no pre-quantum crypto/i);
   });
 
+  it('states its limits: non-exhaustive, and a clean run is not a clean bill of health', async () => {
+    const dir = await freshDir();
+    await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'clean' }));
+    await writeFile(join(dir, 'index.js'), 'console.log("no crypto");\n');
+
+    const result = await runCli(['audit'], dir);
+
+    expect(result.stdout).toMatch(/non-exhaustive/i);
+    expect(result.stdout).toMatch(/starting point for a migration review/i);
+    // The dangerous reading of a clean run is "we have no pre-quantum crypto".
+    // The output must actively deny that, not merely omit the claim.
+    expect(result.stdout).toMatch(/not a clean bill of health/i);
+  });
+
+  it('frames findings as candidates to review, not a finished migration list', async () => {
+    const dir = await freshDir();
+    await writeFile(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'legacy', dependencies: { jsonwebtoken: '^9.0.0' } }),
+    );
+
+    const result = await runCli(['audit'], dir);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stdout).toMatch(/candidate usage/i);
+    expect(result.stdout).toMatch(/confirm each one is genuinely reachable/i);
+  });
+
+  it('carries the heuristic caveat in its help text', async () => {
+    const dir = await freshDir();
+    const result = await runCli(['audit', '--help'], dir);
+
+    expect(result.stdout).toMatch(/non-exhaustive/i);
+    expect(result.stdout).toMatch(/not a substitute/i);
+  });
+
   it('detects pre-quantum dependencies and code with their PQC equivalent', async () => {
     const dir = await freshDir();
     await writeFile(

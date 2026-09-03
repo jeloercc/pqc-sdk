@@ -66,11 +66,18 @@ Worth knowing:
 - Expected failures (missing file, wrong key, tampered envelope) print a
   one-line error on stderr and exit with code 1 — CI- and script-friendly.
 
-`audit` is a best-effort regex scan of your dependencies and source: expect the
-occasional false positive or false negative, and treat it as a starting point,
-not a proof. Files larger than 1 MiB are skipped and reported. It exits with
-code 1 when it finds crypto to migrate — usable as a CI gate. Output uses colors
-only when there is a TTY: readable in logs and pipes.
+`audit` is a **heuristic, non-exhaustive** regex scan of your dependencies and
+source — a starting point for a migration review, **not a substitute for one**,
+and not evidence that a codebase is free of pre-quantum crypto. It matches
+known package names and call patterns, so it will miss crypto reached through
+wrappers, dynamic imports, transitive dependencies, compiled output, or any
+name it does not know; and it flags matches it cannot prove are reachable.
+Expect both false positives and false negatives, and confirm every finding by
+hand before acting on it. Files larger than 1 MiB are skipped and reported.
+It exits with code 1 when it finds candidates — usable as a CI gate, with the
+same caveat: a passing exit means these heuristics matched nothing, not that
+the codebase is clean. Output uses colors only when there is a TTY: readable
+in logs and pipes.
 
 ## License
 
