@@ -6,20 +6,23 @@
 [![license](https://img.shields.io/npm/l/%40pqc-sdk%2Fcore)](./LICENSE)
 
 Post-quantum cryptography for JS/TS with safe defaults and zero configuration:
-**ML-KEM-768** (FIPS 203) + AES-256-GCM for encryption, an optional
-**X-Wing** hybrid mode (X25519 + ML-KEM-768, opt-in) for defense-in-depth on
-long-term data, **streaming encryption** for files too large to hold in
-memory, and **ML-DSA-65** (FIPS 204) for signatures — all validated against
-the official NIST ACVP / draft test vectors. The goal: add post-quantum
+the **X-Wing** hybrid KEM (X25519 + ML-KEM-768) + AES-256-GCM by default,
+pure **ML-KEM-768** (FIPS 203) one option away when FIPS scope or size
+dominates, **streaming encryption** for files too large to hold in memory, and
+**ML-DSA-65** (FIPS 204) for signatures — all validated against the official
+NIST ACVP / draft test vectors. The goal: add post-quantum
 encryption to your app in 30 minutes.
 
-> `pqc.keys.generate()` still returns ML-KEM-768 by default. Pass
-> `{ algorithm: 'x-wing' }` to get the classical+post-quantum hybrid KEM
-> instead — recommended for data that must stay confidential for years, per
-> the same industry consensus behind TLS's `X25519MLKEM768` and Signal's
-> PQXDH. See
-> [hybrid encryption explained](https://jeloercc.github.io/pqc-sdk/guide/hybrid-encryption)
-> for when to choose which.
+> **Breaking in 0.8.0:** `pqc.keys.generate()` with no arguments now returns
+> an **X-Wing** hybrid pair (X25519 + ML-KEM-768), not pure ML-KEM-768 — a
+> break in either half still leaves the other standing, which is the same
+> reasoning behind TLS's `X25519MLKEM768`, Signal's PQXDH, and the BSI and
+> ANSSI recommendations. **JavaScript consumers get no compile-time signal**,
+> so read
+> [migrating to 0.8.0](https://github.com/jeloercc/pqc-sdk/blob/main/docs/MIGRATION-0.8.md)
+> before upgrading. Pure ML-KEM-768 stays first-class and one line away —
+> `pqc.keys.generate({ algorithm: 'ml-kem-768' })` — and is the right choice
+> when FIPS certification scope or size/speed dominate.
 
 ## Quickstart
 

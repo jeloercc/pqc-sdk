@@ -157,7 +157,7 @@ describe('chunk nonce arithmetic: cross-check against age (via ciphertext struct
     // and confirming ciphertext bytes match, proving the implementation
     // used exactly that nonce.
     const { gcm } = await import('@noble/ciphers/aes.js');
-    const pair = await generate();
+    const pair = await generate({ algorithm: 'ml-kem-768' });
     const plaintext = utf8.encode('short');
     const ciphertext = await collect(encryptStream(pair.publicKey, single(plaintext)));
 
@@ -180,7 +180,7 @@ describe('chunk nonce arithmetic: cross-check against age (via ciphertext struct
   it('chunk index 1 (BE88(1) = 10 zero bytes then 0x01) matches a hand-built nonce', async () => {
     const { gcm } = await import('@noble/ciphers/aes.js');
     const { ml_kem768 } = await import('@noble/post-quantum/ml-kem.js');
-    const pair = await generate();
+    const pair = await generate({ algorithm: 'ml-kem-768' });
     const chunkSize = 4;
     // Exactly 2 chunks: index 0 (non-final, full 4 bytes) and index 1 (final).
     const plaintext = utf8.encode('abcdEF'); // 6 bytes: chunk0="abcd", chunk1="EF"

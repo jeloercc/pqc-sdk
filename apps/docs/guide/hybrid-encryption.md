@@ -129,14 +129,18 @@ protocols: TLS 1.3's `X25519MLKEM768`, Signal's PQXDH, and Apple's PQ3 all
 combine a classical KEM with a post-quantum one rather than betting on either
 alone.
 
-**`ml-kem-768` remains the SDK default** (`pqc.keys.generate()` with no
-arguments) through 1.x for two reasons: changing the no-arg return type would
-be a breaking change for TypeScript consumers, and a peer still on ≤0.4.x
-cannot decrypt a `pqcenc.v2` envelope or parse an `x-wing` key token — a mixed
-deployment needs its readers upgraded before its writers switch. The default
-flips to `x-wing` at v1.0 (the next breaking-change milestone), with a
-documented migration path (`{ algorithm: 'ml-kem-768' }` to keep today's
-behavior).
+**`x-wing` is the SDK default since 0.8.0** (`pqc.keys.generate()` with no
+arguments). The flip was originally deferred to v1.0, on the grounds that
+changing the no-arg return type breaks TypeScript consumers; at 0.x that break
+is cheap and expected, and shipping the weaker default for longer was the worse
+trade. See [migrating to 0.8.0](https://github.com/jeloercc/pqc-sdk/blob/main/docs/MIGRATION-0.8.md).
+
+`ml-kem-768` stays a first-class choice, one line away
+(`pqc.keys.generate({ algorithm: 'ml-kem-768' })`), and is the right call when
+FIPS certification scope matters — X-Wing is a CFRG draft, not covered by
+FIPS 203 — or when size and speed dominate. One deployment caveat survives the
+flip: a peer on ≤0.4.x cannot decrypt a `pqcenc.v2` envelope or parse an
+`x-wing` key token, so a mixed fleet upgrades its readers before its writers.
 
 ## In code
 
