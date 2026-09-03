@@ -4,7 +4,7 @@ layout: home
 hero:
   name: PQC SDK
   text: Post-quantum cryptography for JS/TS
-  tagline: X-Wing hybrid (X25519 + ML-KEM-768) by default, ML-KEM-768 and ML-DSA-65 (FIPS 203/204) when you need them. From zero to PQC encryption in 30 minutes.
+  tagline: X-Wing hybrid (X25519 + ML-KEM-768) by default, ML-KEM-768 and ML-DSA-65 (FIPS 203/204) when you need them. An API you can adopt in 30 minutes — key management and interop are still yours to design.
   actions:
     - theme: brand
       text: 5-minute quickstart
