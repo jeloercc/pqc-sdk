@@ -41,6 +41,7 @@ export default defineConfig({
         items: [
           { text: 'Hybrid KEM+AES encryption, explained', link: '/guide/hybrid-encryption' },
           { text: 'Encrypting files', link: '/guide/encrypt-files' },
+          { text: 'Streaming large files', link: '/guide/streaming-encryption' },
           { text: 'Signing JWTs with ML-DSA', link: '/guide/sign-jwt' },
         ],
       },

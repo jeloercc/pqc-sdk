@@ -8,9 +8,10 @@
 Post-quantum cryptography for JS/TS with safe defaults and zero configuration:
 **ML-KEM-768** (FIPS 203) + AES-256-GCM for encryption, an optional
 **X-Wing** hybrid mode (X25519 + ML-KEM-768, opt-in) for defense-in-depth on
-long-term data, and **ML-DSA-65** (FIPS 204) for signatures — all validated
-against the official NIST ACVP / draft test vectors. The goal: add
-post-quantum encryption to your app in 30 minutes.
+long-term data, **streaming encryption** for files too large to hold in
+memory, and **ML-DSA-65** (FIPS 204) for signatures — all validated against
+the official NIST ACVP / draft test vectors. The goal: add post-quantum
+encryption to your app in 30 minutes.
 
 > `pqc.keys.generate()` still returns ML-KEM-768 by default. Pass
 > `{ algorithm: 'x-wing' }` to get the classical+post-quantum hybrid KEM
@@ -47,6 +48,7 @@ npx @pqc-sdk/cli init
 **Full documentation at [jeloercc.github.io/pqc-sdk](https://jeloercc.github.io/pqc-sdk/)**:
 [5-minute quickstart](https://jeloercc.github.io/pqc-sdk/guide/quickstart),
 [hybrid encryption explained](https://jeloercc.github.io/pqc-sdk/guide/hybrid-encryption),
+[streaming large files](https://jeloercc.github.io/pqc-sdk/guide/streaming-encryption),
 [runtime compatibility](https://jeloercc.github.io/pqc-sdk/compatibility) and
 [API reference](https://jeloercc.github.io/pqc-sdk/api/).
 

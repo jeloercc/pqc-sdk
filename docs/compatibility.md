@@ -33,6 +33,30 @@ bytes depending on runtime), confirming the pqcenc.v2 1150-byte overhead
 (docs/serialization-format.md §2.2): Node 1173 B, Deno 1167 B, Workers 1181 B
 — each exactly 1150 + the plaintext length actually sent.
 
+## Streaming (chunked envelope, `docs/serialization-format.md` §9)
+
+`pqc.encryptStream`/`decryptStream` (and the Web Streams adapters
+`encryptWebStream`/`decryptWebStream`) are async-iterable-based specifically
+so the core primitive needs nothing from the host runtime beyond the
+language itself — but "needs nothing" is not the same as "verified," so
+this gets its own row set per the same real-execution rule as X-Wing above.
+The Web Streams adapters additionally depend on the host's `TransformStream`/
+`ReadableStream`/`WritableStream` implementation, which is why runtimes are
+tracked separately from the core-primitive claim.
+
+| Runtime              | Result                                                 | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node                 | ✅ verified 2026-07-22                                 | `examples/node`: a real 8 MiB file, `fs.createReadStream`/`createWriteStream` bridged via `Readable.toWeb`/`Writable.toWeb`, piped through both adapters end to end, byte-for-byte match confirmed. Both KEMs.                                                                                                                                                                                                                                                                                                                         |
+| Deno                 | ✅ verified 2026-07-22                                 | `examples/deno`: same 8 MiB roundtrip using `Deno.FsFile`'s native `.readable`/`.writable` (no bridging layer needed — already WHATWG streams). Both KEMs.                                                                                                                                                                                                                                                                                                                                                                             |
+| Cloudflare Workers   | ✅ verified 2026-07-22 (local workerd, `wrangler dev`) | `examples/cloudflare-workers`: no filesystem in workerd, so a 4 MiB in-memory synthetic payload (smaller than Node/Deno's, to stay inside the CPU-time budget) piped through both adapters in a single request; response includes `byteForByteMatch: true` for both KEMs.                                                                                                                                                                                                                                                              |
+| Hermes (RN's engine) | ⏳ not yet run                                         | Same gap as x-wing's row above and for the same reason (no standalone Hermes CLI binary in the implementing environment this sprint) — see issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45), which already tracks closing this exact kind of gap for streaming's core primitive. The async-iterable core needs nothing Hermes-specific in principle (plain async generators are part of the language, not a host API), but that is exactly the kind of claim the honest-compatibility rule says stays ⏳ until actually run. |
+| React Native         | ⏳ not yet run                                         | Same as above — needs an on-device roundtrip through `examples/react-native-expo`, tracked by issue #45. The Web Streams adapters have an additional open question RN raises that ml-kem-768/x-wing's one-shot API doesn't: whether Hermes/RN's `TransformStream`/`ReadableStream` support (if any) is complete enough for the adapters, or whether RN apps on this SDK should use the async-iterable core directly. Not answered here — requires an actual device test, not inference.                                                |
+
+**x-wing streaming** required zero additional code (`packages/core/src/stream.ts`
+was algorithm-generic from Day 1 of the streaming sprint), so it shares
+these same rows rather than getting its own separate table, unlike x-wing's
+one-shot rows above.
+
 ## Node (`examples/node`)
 
 No limitations. Direct ESM, no flags. The CJS build also works
@@ -118,6 +142,13 @@ CLI binary was not available in the environment that implemented the
 execution (interpreted or precompiled bytecode) exercises an x-wing key
 pair, per the honest-compatibility rule.
 
+**streaming**: same gap, same reason, not re-run this sprint (2026-07-22) —
+tracked by issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45)
+alongside x-wing's Hermes row. Stays ⏳ until an actual Hermes execution
+exercises `encryptStream`/`decryptStream` (and ideally the Web Streams
+adapters, to also confirm Hermes's `TransformStream` support one way or
+the other).
+
 ## React Native app (`examples/react-native-expo`)
 
 A minimal Expo (TypeScript) app that imports `react-native-get-random-values`
@@ -149,6 +180,12 @@ device was available in the environment that implemented the `pqcenc.v2`
 envelope. Stays ⏳ in the table above until an on-device roundtrip with an
 x-wing key pair is recorded here, the same way the ML-KEM-768 row was closed
 on 2026-07-02.
+
+**streaming**: same gap, same reason, not re-run this sprint (2026-07-22) —
+tracked by issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45)
+alongside x-wing's device row. Stays ⏳ until an on-device roundtrip through
+`encryptStream`/`decryptStream` (or the Web Streams adapters) is recorded
+here.
 
 ## General limitations (inherited from @noble/post-quantum)
 

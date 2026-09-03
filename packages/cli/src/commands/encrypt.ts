@@ -1,13 +1,14 @@
-import { existsSync } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 
 import { pqc } from '@pqc-sdk/core';
 import { defineCommand } from 'citty';
 
 import { friendlyRun, UsageError } from '../errors.js';
-import { assertReadableInput } from '../input.js';
+import { assertReadableInput, STREAMING_THRESHOLD_BYTES } from '../input.js';
 import { readKemKeyFile } from '../keyfiles.js';
-import { writeOutput } from '../output.js';
+import { pipeToOutput, writeOutput } from '../output.js';
 import { item, ok } from '../ui.js';
 
 export const encrypt = defineCommand({
@@ -18,7 +19,8 @@ export const encrypt = defineCommand({
   args: {
     input: {
       type: 'positional',
-      description: 'File to encrypt (loaded fully into memory; 1 GiB maximum)',
+      description:
+        'File to encrypt (any size: at or below 8 MiB loaded fully into memory, larger streamed; 1 TiB operational ceiling)',
       required: true,
     },
     key: {
@@ -37,21 +39,36 @@ export const encrypt = defineCommand({
     },
   },
   run: friendlyRun(async ({ args }) => {
-    await assertReadableInput(args.input);
+    const size = await assertReadableInput(args.input);
     const outPath = args.out ?? `${args.input}.enc`;
     if (!args.force && existsSync(outPath)) {
       throw new UsageError(`${outPath} already exists. Use --force to overwrite it.`);
     }
 
     const publicKey = await readKemKeyFile(args.key, 'public');
-    // A Buffer already is a Uint8Array: no defensive copy (the file can be
-    // large, and encrypt never mutates its input).
-    const plaintext = await readFile(args.input);
-    const envelope = await pqc.encrypt(plaintext, publicKey);
-    await writeOutput(outPath, envelope, { force: args.force });
 
-    ok(`Encrypted ${args.input} (${plaintext.length} bytes):`);
-    item(`output: ${outPath} (${envelope.length} bytes, ${publicKey.algorithm} + AES-256-GCM)`);
+    if (size <= STREAMING_THRESHOLD_BYTES) {
+      // A Buffer already is a Uint8Array: no defensive copy (encrypt never
+      // mutates its input).
+      const plaintext = await readFile(args.input);
+      const envelope = await pqc.encrypt(plaintext, publicKey);
+      await writeOutput(outPath, envelope, { force: args.force });
+
+      ok(`Encrypted ${args.input} (${plaintext.length} bytes):`);
+      item(`output: ${outPath} (${envelope.length} bytes, ${publicKey.algorithm} + AES-256-GCM)`);
+      item('only the matching secret key can decrypt it');
+      return;
+    }
+
+    // Above the threshold: stream instead of holding the whole file in
+    // memory (docs/proposals/streaming-encryption.md §3).
+    const readable = Readable.toWeb(createReadStream(args.input)) as ReadableStream<Uint8Array>;
+    await pipeToOutput(readable.pipeThrough(pqc.encryptWebStream(publicKey)), outPath, {
+      force: args.force,
+    });
+
+    ok(`Encrypted ${args.input} (${size} bytes, streamed):`);
+    item(`output: ${outPath} (${publicKey.algorithm} + AES-256-GCM, chunked envelope)`);
     item('only the matching secret key can decrypt it');
   }),
 });
