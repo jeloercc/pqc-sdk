@@ -91,8 +91,13 @@ the roundtrip ran with no other changes.
 - **Does not require `nodejs_compat`**: the SDK only uses standard APIs
   (`crypto.getRandomValues`, `TextEncoder`/`TextDecoder`, `Uint8Array`).
   Verified with `compatibility_date = 2025-01-01` on local workerd.
-- **Bundle**: 78 KiB / 20 KiB gzip total upload (SDK + @noble/\*), measured
-  with `wrangler deploy --dry-run`. Far below the free plan's 1 MiB limit.
+- **Bundle**: 161 KiB / 43 KiB gzip total upload (SDK + @noble/\*), measured
+  with `wrangler deploy --dry-run` on 2026-09-03. Still far below the free
+  plan's 1 MiB limit. This replaces an earlier 78 KiB / 20 KiB figure measured
+  on 2026-07-20: the bundle roughly doubled when x-wing (X25519) and the
+  streaming envelope landed, and the example itself now exercises both KEMs
+  plus a streaming roundtrip. Re-measure rather than quote this number if
+  bundle size is a constraint for you.
 - **CPU**: the full request (keygen + encapsulate + AES + decapsulate) took
   ~51 ms wall-clock in local dev. The Workers free plan limits CPU to 10 ms
   per request: doing **keygen + encrypt + decrypt in a single request** can
