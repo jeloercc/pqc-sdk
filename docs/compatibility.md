@@ -44,13 +44,13 @@ The Web Streams adapters additionally depend on the host's `TransformStream`/
 `ReadableStream`/`WritableStream` implementation, which is why runtimes are
 tracked separately from the core-primitive claim.
 
-| Runtime              | Result                                                 | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Node                 | ✅ verified 2026-07-22                                 | `examples/node`: a real 8 MiB file, `fs.createReadStream`/`createWriteStream` bridged via `Readable.toWeb`/`Writable.toWeb`, piped through both adapters end to end, byte-for-byte match confirmed. Both KEMs.                                                                                                                                                                                                                                                                                                                         |
-| Deno                 | ✅ verified 2026-07-22                                 | `examples/deno`: same 8 MiB roundtrip using `Deno.FsFile`'s native `.readable`/`.writable` (no bridging layer needed — already WHATWG streams). Both KEMs.                                                                                                                                                                                                                                                                                                                                                                             |
-| Cloudflare Workers   | ✅ verified 2026-07-22 (local workerd, `wrangler dev`) | `examples/cloudflare-workers`: no filesystem in workerd, so a 4 MiB in-memory synthetic payload (smaller than Node/Deno's, to stay inside the CPU-time budget) piped through both adapters in a single request; response includes `byteForByteMatch: true` for both KEMs.                                                                                                                                                                                                                                                              |
-| Hermes (RN's engine) | ⏳ not yet run                                         | Same gap as x-wing's row above and for the same reason (no standalone Hermes CLI binary in the implementing environment this sprint) — see issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45), which already tracks closing this exact kind of gap for streaming's core primitive. The async-iterable core needs nothing Hermes-specific in principle (plain async generators are part of the language, not a host API), but that is exactly the kind of claim the honest-compatibility rule says stays ⏳ until actually run. |
-| React Native         | ⏳ not yet run                                         | Same as above — needs an on-device roundtrip through `examples/react-native-expo`, tracked by issue #45. The Web Streams adapters have an additional open question RN raises that ml-kem-768/x-wing's one-shot API doesn't: whether Hermes/RN's `TransformStream`/`ReadableStream` support (if any) is complete enough for the adapters, or whether RN apps on this SDK should use the async-iterable core directly. Not answered here — requires an actual device test, not inference.                                                |
+| Runtime              | Result                                                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node                 | ✅ verified 2026-07-22                                    | `examples/node`: a real 8 MiB file, `fs.createReadStream`/`createWriteStream` bridged via `Readable.toWeb`/`Writable.toWeb`, piped through both adapters end to end, byte-for-byte match confirmed. Both KEMs.                                                                                                                                                                                                                                                                                                                         |
+| Deno                 | ✅ verified 2026-07-22                                    | `examples/deno`: same 8 MiB roundtrip using `Deno.FsFile`'s native `.readable`/`.writable` (no bridging layer needed — already WHATWG streams). Both KEMs.                                                                                                                                                                                                                                                                                                                                                                             |
+| Cloudflare Workers   | ✅ verified 2026-07-22 (local workerd, `wrangler dev`)    | `examples/cloudflare-workers`: no filesystem in workerd, so a 4 MiB in-memory synthetic payload (smaller than Node/Deno's, to stay inside the CPU-time budget) piped through both adapters in a single request; response includes `byteForByteMatch: true` for both KEMs.                                                                                                                                                                                                                                                              |
+| Hermes (RN's engine) | ⏳ not yet run                                            | Same gap as x-wing's row above and for the same reason (no standalone Hermes CLI binary in the implementing environment this sprint) — see issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45), which already tracks closing this exact kind of gap for streaming's core primitive. The async-iterable core needs nothing Hermes-specific in principle (plain async generators are part of the language, not a host API), but that is exactly the kind of claim the honest-compatibility rule says stays ⏳ until actually run. |
+| React Native         | ⏳ not yet run (core primitive) · ❌ Web Streams adapters | Needs an on-device roundtrip through `examples/react-native-expo` for `encryptStream`/`decryptStream`, tracked by issue #45. The **Web Streams adapters are not a pending item on this runtime — they are unavailable**: Hermes provides no `TransformStream`/`ReadableStream` and React Native does not polyfill them. RN apps use the async-iterable core directly. See the known-limitation note below.                                                                                                                             |
 
 **x-wing streaming** required zero additional code (`packages/core/src/stream.ts`
 was algorithm-generic from Day 1 of the streaming sprint), so it shares
@@ -184,8 +184,33 @@ on 2026-07-02.
 **streaming**: same gap, same reason, not re-run this sprint (2026-07-22) —
 tracked by issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45)
 alongside x-wing's device row. Stays ⏳ until an on-device roundtrip through
-`encryptStream`/`decryptStream` (or the Web Streams adapters) is recorded
-here.
+`encryptStream`/`decryptStream` is recorded here.
+
+**Known limitation — the Web Streams adapters do not work on React Native,
+and this is permanent, not pending.** Hermes provides no `TransformStream`,
+`ReadableStream` or `WritableStream`, and React Native ships no polyfill for
+them, so `pqc.encryptWebStream`/`pqc.decryptWebStream` cannot run on this
+runtime at all. **Use the async-iterable core — `pqc.encryptStream` /
+`pqc.decryptStream` — directly on React Native**; it is the primary API and
+needs nothing from the host beyond the language, which is exactly why the SDK
+was built that way (`docs/proposals/streaming-encryption.md` §3). This is a
+statement about the platform, not a to-do: no device run will change it, and
+it is deliberately recorded separately from the ⏳ above, which does still
+mean "not yet run" and is closed by the device roundtrip.
+
+Two further Hermes facts the same investigation established, since anything
+depending on them needs to know: Hermes implements **no part of ES2018 async
+iteration** — React Native 0.81.5's own bundled compiler (`sdks/hermesc`,
+`hermes-2025-07-07-RNv0.81.0`) rejects `async function*` and `for await...of`
+outright, so Metro's Babel preset downlevels them, which is what makes
+`encryptStream`/`decryptStream` usable on device in the first place. And
+because `Symbol.asyncIterator` does not exist there, Babel keys its
+transpiled generators on the string `"@@asyncIterator"` instead, which breaks
+the SDK's explicit `object[Symbol.asyncIterator]()` lookups until aliased —
+see
+[`examples/react-native-expo/asyncIteratorPolyfill.ts`](../examples/react-native-expo/asyncIteratorPolyfill.ts),
+which the example installs before `@pqc-sdk/core`. Verified by executing the
+SDK on the Hermes VM, not inferred.
 
 ## General limitations (inherited from @noble/post-quantum)
 
