@@ -1,7 +1,14 @@
 # Proposal: streaming encryption (chunked AEAD for large payloads)
 
-- **Status:** APPROVED (2026-07-22) — see "Review decisions" at the end.
-  Sprint starting; nothing below is implemented yet as of this commit.
+- **Status:** IMPLEMENTED (2026-09-03) — shipped in `@pqc-sdk/core` /
+  `@pqc-sdk/cli` 0.6.0 across four PRs: the proposal itself (#49), Day 1
+  core primitive and `docs/serialization-format.md` §9 (#50, changeset
+  #51), Day 2 mutation-check suite and x-wing (#52), and Days 3-4 public
+  API, Web Streams adapters, CLI streaming, docs and bench (#53). The §5
+  review decisions all hold as approved. One deviation from §2 is
+  outstanding and tracked: the CLI's 1 TiB operational ceiling shipped as
+  a hard limit rather than an overridable one (issue #54). Hermes and
+  React Native remain ⏳ in `docs/compatibility.md`, tracked by issue #45.
 - **Date:** 2026-07-22
 - **Depends on:** `@pqc-sdk/core` 0.5.0 (envelope v1/v2, both KEMs public —
   see `docs/proposals/hybrid-envelope.md`)
