@@ -68,7 +68,10 @@ describe('ml-kem-768', () => {
   bench(
     'keygen',
     async () => {
-      await pqc.keys.generate();
+      // Pinned: since 0.8.0 the no-argument default is x-wing, so calling
+      // generate() here would silently benchmark the hybrid instead of the
+      // pure KEM this describe block is named for.
+      await pqc.keys.generate({ algorithm: 'ml-kem-768' });
     },
     OPTS,
   );

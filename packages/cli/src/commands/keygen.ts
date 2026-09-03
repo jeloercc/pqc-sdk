@@ -18,9 +18,10 @@ export const keygen = defineCommand({
     algorithm: {
       type: 'string',
       description:
-        'Algorithm of the pair (ml-kem-768, x-wing for the X25519 + ML-KEM-768 hybrid ' +
-        'recommended for long-term data, or ml-dsa-65 for signing)',
-      default: 'ml-kem-768',
+        'Algorithm of the pair (x-wing, the X25519 + ML-KEM-768 hybrid, is the default; ' +
+        'ml-kem-768 for the pure post-quantum KEM when FIPS certification scope or ' +
+        'size/speed matter; ml-dsa-65 for signing)',
+      default: 'x-wing',
     },
     name: {
       type: 'string',
