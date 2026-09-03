@@ -1,7 +1,7 @@
 {
   "name": "@pqc-sdk/core",
   "version": "0.8.0",
-  "description": "Post-quantum cryptography SDK for JS/TS (ML-KEM, ML-DSA)",
+  "description": "Post-quantum cryptography SDK for JS/TS: X-Wing hybrid KEM by default, plus ML-KEM-768 and ML-DSA-65 (FIPS 203/204)",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
