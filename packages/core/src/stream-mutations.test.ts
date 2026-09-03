@@ -4,7 +4,7 @@ import type { KemAlgorithm, SecretKey } from './types.js';
 import { PqcError } from './errors.js';
 import { generate } from './keys.js';
 import { decryptStream, encryptStream } from './stream.js';
-import { asChunks, collect, single } from './stream.test.js';
+import { asChunks, collect, single } from './stream-test-helpers.js';
 
 /**
  * Day 2 of the streaming-encryption sprint
@@ -117,6 +117,11 @@ describe.each(ALGORITHMS)('streaming mutation suite (%s)', (algorithm) => {
     });
 
     it('never silently completes: draining a truncated stream always ends in an error, not a clean return', async () => {
+      // Every iteration does a real KEM decapsulate (X-Wing's is
+      // meaningfully slower than ML-KEM-768 alone, pure JS, no WASM) —
+      // an intentionally exhaustive sweep, given generous headroom below
+      // rather than trimmed down, since it caught the design's actual
+      // decode algorithm being correct empirically, not just in theory.
       const plaintext = utf8.encode('abcdefghijklmnopqr');
       const s = await buildStream(algorithm, plaintext, chunkSize);
       for (let cutAt = s.headerLength; cutAt < s.ciphertext.length; cutAt += 3) {
@@ -125,7 +130,7 @@ describe.each(ALGORITHMS)('streaming mutation suite (%s)', (algorithm) => {
           PqcError,
         );
       }
-    });
+    }, 20000);
   });
 
   describe('reorder', () => {
