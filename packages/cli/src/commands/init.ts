@@ -10,14 +10,14 @@ import { heading, item, ok, warn } from '../ui.js';
 const CONFIG_FILE = 'pqc.config.json';
 
 const CONFIG = {
-  defaultAlgorithm: 'ml-kem-768',
+  defaultAlgorithm: 'x-wing',
   keysDir: 'keys',
 } as const;
 
 const EXAMPLE = `import { pqc } from '@pqc-sdk/core';
 
 // Full roundtrip: generate keys, encrypt and decrypt.
-const pair = await pqc.keys.generate(); // ML-KEM-768 by default
+const pair = await pqc.keys.generate(); // X-Wing hybrid (X25519 + ML-KEM-768) by default
 const ciphertext = await pqc.encrypt('hello post-quantum', pair.publicKey);
 const plaintext = await pqc.decrypt(ciphertext, pair.secretKey);
 console.log(new TextDecoder().decode(plaintext)); // "hello post-quantum"

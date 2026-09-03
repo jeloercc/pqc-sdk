@@ -9,29 +9,46 @@ const SERIAL_PREFIX = 'pqcv1';
 
 /** Options for {@link generate}. */
 export interface GenerateOptions<A extends Algorithm = Algorithm> {
-  /** Algorithm of the pair. Default: `'ml-kem-768'` (encryption). */
+  /**
+   * Algorithm of the pair. Default: `'x-wing'` (the X25519 + ML-KEM-768
+   * hybrid KEM). Pass `'ml-kem-768'` for the pure post-quantum KEM, or
+   * `'ml-dsa-65'` for signing.
+   */
   readonly algorithm?: A;
 }
 
 /**
- * Generates a post-quantum key pair. With no options it generates ML-KEM-768,
- * ready for `pqc.encrypt`.
+ * Generates a post-quantum key pair. With no options it generates an
+ * **X-Wing** hybrid pair (X25519 + ML-KEM-768), ready for `pqc.encrypt`.
+ *
+ * The no-argument default is hybrid because a break in either component
+ * still leaves the other standing — the same reasoning behind TLS 1.3's
+ * `X25519MLKEM768`, Signal's PQXDH, and the BSI and ANSSI recommendations.
+ * ML-KEM-768 is young, and a cryptanalytic result against it would leave a
+ * pure-PQ ciphertext with nothing to fall back on.
+ *
+ * **`'ml-kem-768'` remains fully supported and is the right choice in two
+ * cases**: when FIPS certification scope matters (X-Wing is not covered by
+ * FIPS 203, so a compliance regime requiring a certified KEM needs the pure
+ * one), and when size or speed dominate (32 bytes less per envelope, and
+ * roughly 2–4× faster per operation — see `docs/MIGRATION-0.8.md`).
  *
  * @example
  * ```ts
  * import { pqc } from '@pqc-sdk/core';
  *
- * const encryption = await pqc.keys.generate();
+ * const encryption = await pqc.keys.generate(); // x-wing hybrid
+ * const pureMlKem = await pqc.keys.generate({ algorithm: 'ml-kem-768' });
  * const signing = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
  * ```
  */
-export async function generate(): Promise<KeyPair<'ml-kem-768'>>;
+export async function generate(): Promise<KeyPair<'x-wing'>>;
 export async function generate<A extends Algorithm>(
   options: GenerateOptions<A> & { algorithm: A },
 ): Promise<KeyPair<A>>;
 export async function generate(options?: GenerateOptions): Promise<KeyPair>;
 export async function generate(options?: GenerateOptions): Promise<KeyPair> {
-  const algorithm = options?.algorithm ?? 'ml-kem-768';
+  const algorithm = options?.algorithm ?? 'x-wing';
   const spec = getAlgorithm(algorithm);
   return Promise.resolve(generateKeyPairFromSeed(algorithm, randomBytes(spec.seedLength)));
 }

@@ -138,7 +138,9 @@ describe('pqcenc.v2: mutation matrix — every region fails closed independently
 
 describe('pqcenc.v2: cross-version key confusion fails closed', () => {
   it('a v1 ciphertext offered to an x-wing key → INVALID_CIPHERTEXT', async () => {
-    const kem = await pqc.keys.generate();
+    // Pinned: this case is specifically about a *v1* envelope, so the key must
+    // be ml-kem-768 regardless of what the no-arg default is.
+    const kem = await pqc.keys.generate({ algorithm: 'ml-kem-768' });
     const xwing = await xwingPair();
     const v1Ciphertext = await pqc.encrypt('v1 message', kem.publicKey);
 
@@ -146,7 +148,7 @@ describe('pqcenc.v2: cross-version key confusion fails closed', () => {
   });
 
   it('a v2 ciphertext offered to an ml-kem-768 key → INVALID_CIPHERTEXT', async () => {
-    const kem = await pqc.keys.generate();
+    const kem = await pqc.keys.generate({ algorithm: 'ml-kem-768' });
     const xwing = await xwingPair();
     const v2Ciphertext = await pqc.encrypt('v2 message', xwing.publicKey);
 
