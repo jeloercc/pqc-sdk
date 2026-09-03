@@ -21,8 +21,8 @@ features:
     title: Runs everywhere
     details: Node 20+, Cloudflare Workers, Deno and React Native. No WASM, no native addons, ~20 KB gzip.
   - icon: ✅
-    title: Validated against NIST
-    details: Test suite with the official ACVP vectors for FIPS 203 and FIPS 204.
+    title: Verified, and specific about how
+    details: Official NIST ACVP vectors, golden wire-format vectors, parser fuzzing, property tests and a streaming mutation matrix — each one a file you can read.
 ---
 
 "Hybrid ML-KEM-768 + AES-256-GCM" above means the KEM-DEM construction — a
