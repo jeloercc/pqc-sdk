@@ -493,6 +493,91 @@ describe('encrypt / decrypt', () => {
     expect(dec.stderr).toMatch(/1 TiB operational limit/);
   });
 
+  it('the operational ceiling error says it is not a cryptographic limit and names the override', async () => {
+    const dir = await freshDir();
+    await writeFile(join(dir, 'huge.bin'), '');
+    await truncate(join(dir, 'huge.bin'), 1024 * 1024 * 1024 * 1024 + 1);
+
+    const enc = await runCli(['encrypt', 'huge.bin', '--key', 'nokey.pqc'], dir);
+    expect(enc.code).toBe(1);
+    expect(enc.stderr).toContain('not a cryptographic limit');
+    expect(enc.stderr).toContain('--max-size');
+  });
+
+  it('--max-size raises the operational ceiling and says loudly that the guard was bypassed', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    // Sparse and just past the 1 TiB default: the guard reads stat.size, so
+    // this exercises the override without writing a real terabyte. Encryption
+    // itself is never reached — readKemKeyFile runs after the size check, and
+    // a missing key ends the run before any streaming starts.
+    await writeFile(join(dir, 'huge.bin'), '');
+    await truncate(join(dir, 'huge.bin'), 1024 * 1024 * 1024 * 1024 + 1);
+
+    const enc = await runCli(
+      ['encrypt', 'huge.bin', '--key', 'nokey.pqc', '--max-size', '2TiB'],
+      dir,
+    );
+    // The size guard passed (its refusal message is gone) and the bypass was
+    // announced; the run then fails later, on the missing key file.
+    expect(enc.stdout).toContain('Operational size guard bypassed');
+    expect(enc.stdout).toContain('not against a cryptographic limit');
+    expect(enc.stderr).not.toMatch(/operational limit/);
+
+    const dec = await runCli(
+      ['decrypt', 'huge.bin', '--key', 'nokey.pqc', '--max-size', '2TiB'],
+      dir,
+    );
+    expect(dec.stdout).toContain('Operational size guard bypassed');
+    expect(dec.stderr).not.toMatch(/operational limit/);
+  });
+
+  it('--max-size stays silent when it does not actually bypass the default guard', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    await writeFile(join(dir, 'note.txt'), 'small file, well under any ceiling');
+
+    const enc = await runCli(
+      ['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc', '--max-size', '2TiB'],
+      dir,
+    );
+    expect(enc.code).toBe(0);
+    expect(enc.stdout).not.toContain('Operational size guard bypassed');
+  });
+
+  it('--max-size can lower the ceiling, and rejects a malformed value', async () => {
+    const dir = await freshDir();
+    await runCli(['keygen', '--name', 'alice'], dir);
+    await writeFile(join(dir, 'note.txt'), 'x'.repeat(4096));
+
+    const lowered = await runCli(
+      ['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc', '--max-size', '1KiB'],
+      dir,
+    );
+    expect(lowered.code).toBe(1);
+    expect(lowered.stderr).toContain('above the 1 KiB operational limit');
+    // Lowered below the default, so the message must not advise raising it
+    // with the flag the operator just used to lower it.
+    expect(lowered.stderr).toContain('Raise --max-size further');
+
+    const bad = await runCli(
+      ['encrypt', 'note.txt', '--key', 'keys/alice.public.pqc', '--max-size', 'banana'],
+      dir,
+    );
+    expect(bad.code).toBe(1);
+    expect(bad.stderr).toContain('Invalid --max-size value');
+    expect(bad.stdout + bad.stderr).not.toMatch(/^\s+at /m);
+  });
+
+  it('documents --max-size as an operational guard in both help screens', async () => {
+    const dir = await freshDir();
+    for (const command of ['encrypt', 'decrypt']) {
+      const help = await runCli([command, '--help'], dir);
+      expect(help.stdout).toContain('--max-size');
+      expect(help.stdout).toContain('not a cryptographic limit');
+    }
+  });
+
   it('decrypt fails cleanly with the wrong secret key', async () => {
     const dir = await freshDir();
     await runCli(['keygen', '--name', 'alice'], dir);
