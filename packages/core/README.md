@@ -30,14 +30,14 @@ console.log(new TextDecoder().decode(plaintext), valid); // "secret" true
 
 ## Compatibility
 
-| Runtime            | Support | Notes                                     |
-| ------------------ | ------- | ----------------------------------------- |
-| Node 20+           | ✅      | ESM and CJS                               |
-| Cloudflare Workers | ✅      | No `nodejs_compat`; ~20 KB gzip in bundle |
-| Deno 2+            | ✅      | `npm:@pqc-sdk/core`                       |
-| Bun                | ✅      |                                           |
-| React Native       | ✅      | Requires `react-native-get-random-values` |
-| Browsers           | ✅      | Any ES2022 target with WebCrypto          |
+| Runtime            | Support        | Notes                                                                                                                                                                                            |
+| ------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Node 20+           | ✅             | ESM and CJS                                                                                                                                                                                      |
+| Cloudflare Workers | ✅             | No `nodejs_compat`; 43 KiB gzip total worker upload, measured 2026-09-03                                                                                                                         |
+| Deno 2+            | ✅             | `npm:@pqc-sdk/core`                                                                                                                                                                              |
+| Bun                | ⏳ not yet run | Expected to work (it targets Node compatibility), but no roundtrip has been executed there, so it is not claimed                                                                                 |
+| React Native       | ✅             | Requires `react-native-get-random-values`. Streaming additionally needs a `Symbol.asyncIterator` alias; the Web Streams adapters do **not** work on Hermes — use `encryptStream`/`decryptStream` |
+| Browsers           | ⏳ not yet run | Expected to work on any ES2022 target with WebCrypto, but no browser roundtrip has been executed, so it is not claimed                                                                           |
 
 No WASM or native addons: pure TypeScript on top of
 [@noble/post-quantum](https://github.com/paulmillr/noble-post-quantum).

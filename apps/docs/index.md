@@ -4,7 +4,7 @@ layout: home
 hero:
   name: PQC SDK
   text: Post-quantum cryptography for JS/TS
-  tagline: ML-KEM-768 and ML-DSA-65 (FIPS 203/204) with safe defaults. From zero to PQC encryption in 30 minutes.
+  tagline: X-Wing hybrid (X25519 + ML-KEM-768) by default, ML-KEM-768 and ML-DSA-65 (FIPS 203/204) when you need them. From zero to PQC encryption in 30 minutes.
   actions:
     - theme: brand
       text: 5-minute quickstart
@@ -16,10 +16,10 @@ hero:
 features:
   - icon: 🔐
     title: Zero-config
-    details: pqc.encrypt and you're done. Hybrid ML-KEM-768 + AES-256-GCM with no cryptographic decisions to make.
+    details: pqc.encrypt and you're done. Safe defaults chosen for you — the one decision worth making, hybrid vs pure ML-KEM, is documented rather than hidden.
   - icon: 🌍
     title: Runs everywhere
-    details: Node 20+, Cloudflare Workers, Deno and React Native. No WASM, no native addons, ~20 KB gzip.
+    details: Node 20+, Cloudflare Workers, Deno and React Native — each verified by running the roundtrip there. No WASM, no native addons; ~26-28 KB gzip bundled, depending on what you import.
   - icon: ✅
     title: Verified, and specific about how
     details: Official NIST ACVP vectors, golden wire-format vectors, parser fuzzing, property tests and a streaming mutation matrix — each one a file you can read.
