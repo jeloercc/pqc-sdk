@@ -2,7 +2,8 @@
 
 Results from the `examples/` projects (generate → encrypt → decrypt roundtrip
 with ML-KEM-768 + AES-256-GCM), verified on 2026-06-11 (Hermes: 2026-06-12,
-React Native on-device: 2026-07-02).
+React Native on-device: 2026-07-02, extended to X-Wing, streaming and the
+Hermes engine on 2026-09-03).
 
 | Runtime              | Tested version             | Result                                                    | Required flags/config                                                        |
 | -------------------- | -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -20,13 +21,13 @@ own compatibility row per the same real-execution rule: a runtime only gets
 ✅ once the actual roundtrip ran on that runtime, not by inference from the
 ML-KEM-768 result above.
 
-| Runtime              | Result                                                 | Notes                                                                                                                                  |
-| -------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Node                 | ✅ verified 2026-07-20                                 | Same example (`examples/node`), extended with an x-wing roundtrip.                                                                     |
-| Deno                 | ✅ verified 2026-07-20                                 | Import map needed one addition: `@noble/post-quantum/hybrid.js`.                                                                       |
-| Cloudflare Workers   | ✅ verified 2026-07-20 (local workerd, `wrangler dev`) | Same bundle, no extra config; ciphertext 32 bytes larger than v1.                                                                      |
-| Hermes (RN's engine) | ⏳ not yet run                                         | Needs the standalone Hermes CLI re-run with an x-wing case, as was done for ML-KEM-768 on 2026-06-12. Not executed this sprint.        |
-| React Native         | ⏳ not yet run                                         | Needs an on-device roundtrip through `examples/react-native-expo`, as was done for ML-KEM-768 on 2026-07-02. Not executed this sprint. |
+| Runtime              | Result                                                    | Notes                                                                                                                                                                                                                                                  |
+| -------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Node                 | ✅ verified 2026-07-20                                    | Same example (`examples/node`), extended with an x-wing roundtrip.                                                                                                                                                                                     |
+| Deno                 | ✅ verified 2026-07-20                                    | Import map needed one addition: `@noble/post-quantum/hybrid.js`.                                                                                                                                                                                       |
+| Cloudflare Workers   | ✅ verified 2026-07-20 (local workerd, `wrangler dev`)    | Same bundle, no extra config; ciphertext 32 bytes larger than v1.                                                                                                                                                                                      |
+| Hermes (RN's engine) | ✅ engine validated 2026-09-03                            | Standalone Hermes CLI (v0.13.0 release, binary reports 0.12.0), same harness as the ML-KEM-768 run on 2026-06-12: x-wing generate → encrypt → decrypt roundtrip PASS. Engine validation only — entropy is the `Math.random` shim, never cryptographic. |
+| React Native         | ✅ verified 2026-09-03 (physical Android, Expo Go SDK 54) | `examples/react-native-expo` on device with genuine native entropy: generate 32 ms (public 1216 B, secret 32 B seed), encrypt+decrypt 124 ms (envelope 1202 B), plaintext byte-match PASS.                                                             |
 
 Measured ciphertext sizes for the message `'roundtrip on <runtime>'` (23–31
 bytes depending on runtime), confirming the pqcenc.v2 1150-byte overhead
@@ -44,13 +45,13 @@ The Web Streams adapters additionally depend on the host's `TransformStream`/
 `ReadableStream`/`WritableStream` implementation, which is why runtimes are
 tracked separately from the core-primitive claim.
 
-| Runtime              | Result                                                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Node                 | ✅ verified 2026-07-22                                    | `examples/node`: a real 8 MiB file, `fs.createReadStream`/`createWriteStream` bridged via `Readable.toWeb`/`Writable.toWeb`, piped through both adapters end to end, byte-for-byte match confirmed. Both KEMs.                                                                                                                                                                                                                                                                                                                         |
-| Deno                 | ✅ verified 2026-07-22                                    | `examples/deno`: same 8 MiB roundtrip using `Deno.FsFile`'s native `.readable`/`.writable` (no bridging layer needed — already WHATWG streams). Both KEMs.                                                                                                                                                                                                                                                                                                                                                                             |
-| Cloudflare Workers   | ✅ verified 2026-07-22 (local workerd, `wrangler dev`)    | `examples/cloudflare-workers`: no filesystem in workerd, so a 4 MiB in-memory synthetic payload (smaller than Node/Deno's, to stay inside the CPU-time budget) piped through both adapters in a single request; response includes `byteForByteMatch: true` for both KEMs.                                                                                                                                                                                                                                                              |
-| Hermes (RN's engine) | ⏳ not yet run                                            | Same gap as x-wing's row above and for the same reason (no standalone Hermes CLI binary in the implementing environment this sprint) — see issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45), which already tracks closing this exact kind of gap for streaming's core primitive. The async-iterable core needs nothing Hermes-specific in principle (plain async generators are part of the language, not a host API), but that is exactly the kind of claim the honest-compatibility rule says stays ⏳ until actually run. |
-| React Native         | ⏳ not yet run (core primitive) · ❌ Web Streams adapters | Needs an on-device roundtrip through `examples/react-native-expo` for `encryptStream`/`decryptStream`, tracked by issue #45. The **Web Streams adapters are not a pending item on this runtime — they are unavailable**: Hermes provides no `TransformStream`/`ReadableStream` and React Native does not polyfill them. RN apps use the async-iterable core directly. See the known-limitation note below.                                                                                                                             |
+| Runtime              | Result                                                                              | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node                 | ✅ verified 2026-07-22                                                              | `examples/node`: a real 8 MiB file, `fs.createReadStream`/`createWriteStream` bridged via `Readable.toWeb`/`Writable.toWeb`, piped through both adapters end to end, byte-for-byte match confirmed. Both KEMs.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Deno                 | ✅ verified 2026-07-22                                                              | `examples/deno`: same 8 MiB roundtrip using `Deno.FsFile`'s native `.readable`/`.writable` (no bridging layer needed — already WHATWG streams). Both KEMs.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Cloudflare Workers   | ✅ verified 2026-07-22 (local workerd, `wrangler dev`)                              | `examples/cloudflare-workers`: no filesystem in workerd, so a 4 MiB in-memory synthetic payload (smaller than Node/Deno's, to stay inside the CPU-time budget) piped through both adapters in a single request; response includes `byteForByteMatch: true` for both KEMs.                                                                                                                                                                                                                                                                                                                                       |
+| Hermes (RN's engine) | ✅ engine validated 2026-09-03 (core primitive) · ❌ Web Streams adapters           | Standalone Hermes CLI, with the SDK transformed through `@react-native/babel-preset` first so the code under test is what Metro produces: both KEMs' streaming roundtrips PASS at 4096 B in 1 KiB chunks, and a tampered chunk rejected with `DECRYPTION_FAILED`. This is also where the async-iteration gap was found — see the note below; without `Symbol.asyncIterator` aliased, `decryptStream` throws `TypeError: undefined is not a function`. `TransformStream`/`ReadableStream` are absent on this engine, so the adapters are ❌, not ⏳. Engine validation only — entropy is the `Math.random` shim. |
+| React Native         | ✅ verified 2026-09-03 (core primitive, physical Android) · ❌ Web Streams adapters | `examples/react-native-expo` on device: 4096 B in 4 chunks → 5251 B (ml-kem-768, 63 ms) and → 5283 B (x-wing, 137 ms), plaintext byte-match PASS for both, and a tampered final chunk rejected with `PqcError` `DECRYPTION_FAILED` (60 ms). The ✅ covers `encryptStream`/`decryptStream` only. The **Web Streams adapters remain unavailable and this run does not change that**: Hermes provides no `TransformStream`/`ReadableStream` and React Native does not polyfill them. RN apps use the async-iterable core directly. See the known-limitation note below.                                            |
 
 **x-wing streaming** required zero additional code (`packages/core/src/stream.ts`
 was algorithm-generic from Day 1 of the streaming sprint), so it shares
@@ -136,27 +137,34 @@ Slower than V8 but usable; keep ML-DSA signing off the UI thread.
 real RN app with `react-native-get-random-values` as the entropy source — was
 closed by the on-device validation recorded below (July 2026).
 
-**x-wing**: not re-run on Hermes this sprint (2026-07-20) — the standalone
-CLI binary was not available in the environment that implemented the
-`pqcenc.v2` envelope. Stays ⏳ in the table above until an actual Hermes
-execution (interpreted or precompiled bytecode) exercises an x-wing key
-pair, per the honest-compatibility rule.
+**x-wing and streaming (2026-09-03).** Both were run on the standalone
+Hermes CLI, closing the gap left open in July when no CLI binary was
+available. The SDK was transformed with `@react-native/babel-preset` before
+execution, so the code under test is what Metro actually produces rather
+than an esbuild approximation. Results: x-wing generate → encrypt → decrypt
+PASS; `encryptStream`/`decryptStream` PASS for both KEMs at 4096 B in 1 KiB
+chunks; a tampered final chunk rejected with `PqcError` `DECRYPTION_FAILED`.
+Entropy remains the `Math.random` shim, so this validates the engine and
+never the randomness — the real-entropy claim rests on the device run below.
 
-**streaming**: same gap, same reason, not re-run this sprint (2026-07-22) —
-tracked by issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45)
-alongside x-wing's Hermes row. Stays ⏳ until an actual Hermes execution
-exercises `encryptStream`/`decryptStream` (and ideally the Web Streams
-adapters, to also confirm Hermes's `TransformStream` support one way or
-the other).
+This run is also what surfaced the async-iteration gap described under
+"Hermes and async iteration" in
+[examples/react-native-expo/README.md](../examples/react-native-expo/README.md):
+Hermes implements no part of ES2018 async iteration, and without
+`Symbol.asyncIterator` aliased to Babel's `"@@asyncIterator"` key,
+`decryptStream` throws `TypeError: undefined is not a function`. It also
+settled the `TransformStream` question — the answer is that Hermes has none,
+which is why the adapters are ❌ rather than ⏳.
 
 ## React Native app (`examples/react-native-expo`)
 
 A minimal Expo (TypeScript) app that imports `react-native-get-random-values`
-**before** `@pqc-sdk/core` and runs ML-KEM-768 generate → encrypt → decrypt and
-ML-DSA-65 sign → verify on a single screen, rendering PASS/FAIL with timings.
-This is the genuine entropy polyfill (native OS randomness via
-`SecRandomCopyBytes` / `SecureRandom`), not the `Math.random` shim used to
-validate the Hermes engine standalone.
+**before** `@pqc-sdk/core` and runs nine steps on a single screen, rendering
+PASS/FAIL with timings: ML-KEM-768 and X-Wing generate → encrypt → decrypt,
+ML-DSA-65 sign → verify, streaming roundtrips for both KEMs, and a streaming
+tamper case that must fail closed. This is the genuine entropy polyfill
+(native OS randomness via `SecRandomCopyBytes` / `SecureRandom`), not the
+`Math.random` shim used to validate the Hermes engine standalone.
 
 **Target: Expo SDK 54** (matches the Expo Go version actually installed on
 the test device, v54.0.8, which only supports SDK 54). Play Store rollout of
@@ -165,7 +173,9 @@ installable on the test hardware, not the latest SDK. Newer SDK support —
 not a PQC SDK limitation — will be revisited once a newer Expo Go build
 reaches the device.
 
-**On-device validation (July 2026).** The roundtrip ran on a physical Android
+**Earlier on-device validation (July 2026), superseded by the run below but
+kept as the record of when the ML-KEM-768 row was first closed.** The
+roundtrip ran on a physical Android
 device via Expo Go (SDK 54), with genuine native entropy from
 `react-native-get-random-values` confirmed at runtime on screen. Results:
 ML-KEM-768 generate 48 ms, encrypt 27 ms (1170-byte ciphertext), decrypt
@@ -175,16 +185,37 @@ signature), verify 77 ms. `TextDecoder` is available in this runtime.
 See [examples/react-native-expo/README.md](../examples/react-native-expo/README.md)
 for how to run it on an actual simulator or device.
 
-**x-wing**: not re-run on a physical device this sprint (2026-07-20) — no
-device was available in the environment that implemented the `pqcenc.v2`
-envelope. Stays ⏳ in the table above until an on-device roundtrip with an
-x-wing key pair is recorded here, the same way the ML-KEM-768 row was closed
-on 2026-07-02.
+**On-device validation, full surface (2026-09-03).** All nine steps of
+`examples/react-native-expo` PASS on a **physical Android device via Expo Go
+(SDK 54)**, with genuine native entropy from `react-native-get-random-values`
+confirmed on screen — not a simulator, not the `Math.random` shim. This
+closes the x-wing and streaming device rows together with the re-run of the
+ML-KEM-768 and ML-DSA-65 paths, and closes issue
+[#45](https://github.com/jeloercc/pqc-sdk/issues/45).
 
-**streaming**: same gap, same reason, not re-run this sprint (2026-07-22) —
-tracked by issue [#45](https://github.com/jeloercc/pqc-sdk/issues/45)
-alongside x-wing's device row. Stays ⏳ until an on-device roundtrip through
-`encryptStream`/`decryptStream` is recorded here.
+| Step                           | Result | Time   | Detail                                       |
+| ------------------------------ | ------ | ------ | -------------------------------------------- |
+| ML-KEM-768 generate            | PASS   | 52 ms  | public 1184 B, secret 2400 B                 |
+| ML-KEM-768 encrypt + decrypt   | PASS   | 54 ms  | envelope 1170 B, plaintext matches           |
+| X-Wing generate                | PASS   | 32 ms  | public 1216 B, secret 32 B seed              |
+| X-Wing encrypt + decrypt       | PASS   | 124 ms | envelope 1202 B, plaintext matches           |
+| ML-DSA-65 generate + sign      | PASS   | 468 ms | signature 3309 B                             |
+| ML-DSA-65 verify               | PASS   | 78 ms  |                                              |
+| Streaming ML-KEM-768 roundtrip | PASS   | 63 ms  | 4096 B in 4 chunks → 5251 B, bytes match     |
+| Streaming X-Wing roundtrip     | PASS   | 137 ms | 4096 B in 4 chunks → 5283 B, bytes match     |
+| Streaming tampered chunk       | PASS   | 60 ms  | rejected with `PqcError` `DECRYPTION_FAILED` |
+
+The tamper step passing is the load-bearing one for the streaming envelope:
+a flipped bit in the final chunk's authentication tag must fail closed on
+the device exactly as it does under CI, and it did.
+
+The streaming steps ran with `asyncIteratorPolyfill.ts` installed, as the
+example always installs it. Which branch it took on this device — Hermes
+supplying `Symbol.asyncIterator` natively (the alias no-ops) or the alias
+being used — is not recorded here, because the on-screen Runtime line was
+not captured in this run's report. Given RN 0.81.5's own `hermesc` rejects
+async generators, the alias is the expected path, but that is an inference
+and is deliberately not written down as a result.
 
 **Known limitation — the Web Streams adapters do not work on React Native,
 and this is permanent, not pending.** Hermes provides no `TransformStream`,
@@ -195,8 +226,8 @@ runtime at all. **Use the async-iterable core — `pqc.encryptStream` /
 needs nothing from the host beyond the language, which is exactly why the SDK
 was built that way (`docs/proposals/streaming-encryption.md` §3). This is a
 statement about the platform, not a to-do: no device run will change it, and
-it is deliberately recorded separately from the ⏳ above, which does still
-mean "not yet run" and is closed by the device roundtrip.
+it is deliberately recorded separately from the core-primitive ✅ above,
+which the 2026-09-03 device run closed.
 
 Two further Hermes facts the same investigation established, since anything
 depending on them needs to know: Hermes implements **no part of ES2018 async
