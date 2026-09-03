@@ -79,6 +79,9 @@ try {
 
 ## Large files
 
-`encrypt` operates in memory: for files of hundreds of MB consider encrypting
-in chunks (each chunk is an independent `encrypt` with its own encapsulation)
-or wait for the SDK's streaming API. The per-message overhead is 1118 bytes.
+`encrypt`/`decrypt` operate fully in memory — fine for typical files, but not
+for anything too large to comfortably hold as one `Uint8Array`. For that, use
+`encryptStream`/`decryptStream` (or the Web Streams adapters) instead: see
+[Streaming large files](/guide/streaming-encryption). The CLI already does
+this automatically — `pqc encrypt`/`pqc decrypt` switch to streaming above
+8 MiB with no flag needed.

@@ -1,10 +1,13 @@
 import { encrypt, decrypt } from './encrypt.js';
 import { deserialize, generate, serialize } from './keys.js';
 import { sign, verify } from './sign.js';
+import { decryptWebStream, encryptWebStream } from './stream-web.js';
+import { decryptStream, encryptStream } from './stream.js';
 
 export { PqcError, type PqcErrorCode } from './errors.js';
 export { KEM_NAMES } from './encrypt.js';
 export type { ExpectedKey, GenerateOptions } from './keys.js';
+export type { StreamOptions } from './stream.js';
 export type {
   Algorithm,
   KemAlgorithm,
@@ -16,7 +19,19 @@ export type {
   SignatureAlgorithm,
   SignatureOptions,
 } from './types.js';
-export { encrypt, decrypt, sign, verify, generate, serialize, deserialize };
+export {
+  encrypt,
+  decrypt,
+  sign,
+  verify,
+  generate,
+  serialize,
+  deserialize,
+  encryptStream,
+  decryptStream,
+  encryptWebStream,
+  decryptWebStream,
+};
 
 // Injected at build time from package.json (`define` in tsup.config.ts and vitest.config.ts).
 declare const __PQC_CORE_VERSION__: string;
@@ -78,11 +93,21 @@ export type SupportedAlgorithm = (typeof SUPPORTED_ALGORITHMS)[number];
  * const signature = await pqc.sign('document', signer.secretKey);
  * await pqc.verify('document', signature, signer.publicKey); // true
  * ```
+ *
+ * For payloads too large to hold in memory at once, see
+ * {@link encryptStream}/{@link decryptStream} (or the Web Streams
+ * adapters, {@link encryptWebStream}/{@link decryptWebStream}) — read
+ * {@link decryptStream}'s documentation first, it has an incremental-release
+ * property one-shot `decrypt` does not.
  */
 export const pqc = {
   keys: { generate, serialize, deserialize },
   encrypt,
   decrypt,
+  encryptStream,
+  decryptStream,
+  encryptWebStream,
+  decryptWebStream,
   sign,
   verify,
 } as const;
