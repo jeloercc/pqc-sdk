@@ -1,7 +1,7 @@
 import { gcm } from '@noble/ciphers/aes.js';
 import { randomBytes } from '@noble/post-quantum/utils.js';
 
-import { KEM_ALGORITHMS, requireKey } from './algorithms.js';
+import { KEM_ALGORITHMS, encapsulateTo, requireKey } from './algorithms.js';
 import { PqcError } from './errors.js';
 import type { KemAlgorithm, PublicKey, SecretKey } from './types.js';
 
@@ -49,7 +49,7 @@ export async function encrypt(
   // recipient public key (draft-connolly-cfrg-xwing-kem-10 §5.3). Adding
   // another KDF on top would be exactly the home-grown secret-mixing the
   // never-invent rule forbids; the combiner is the derivation.
-  const { cipherText, sharedSecret } = spec.kem.encapsulate(publicKey.bytes);
+  const { cipherText, sharedSecret } = encapsulateTo(spec, publicKey.bytes, publicKey.algorithm);
   const nonce = randomBytes(NONCE_LENGTH);
 
   // Bind the 2-byte header (envelopeVersion, headerId) as AES-GCM additional

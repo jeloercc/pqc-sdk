@@ -1,6 +1,6 @@
 import { gcm } from '@noble/ciphers/aes.js';
 
-import { requireKey } from './algorithms.js';
+import { encapsulateTo, requireKey } from './algorithms.js';
 import { PqcError } from './errors.js';
 import type { KemAlgorithm, PublicKey, SecretKey } from './types.js';
 
@@ -196,7 +196,11 @@ export async function* encryptStream(
   const chunkSize = 2 ** exponent;
   const version = STREAM_ENVELOPE_VERSION[publicKey.algorithm];
 
-  const { cipherText: kemCiphertext, sharedSecret } = spec.kem.encapsulate(publicKey.bytes);
+  const { cipherText: kemCiphertext, sharedSecret } = encapsulateTo(
+    spec,
+    publicKey.bytes,
+    publicKey.algorithm,
+  );
   const header = new Uint8Array([version, spec.headerId, exponent]);
 
   const prefix = new Uint8Array(header.length + kemCiphertext.length);
