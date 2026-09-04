@@ -125,3 +125,39 @@ export function requireKey<K extends 'kem' | 'signer'>(
   }
   return spec as K extends 'kem' ? KemSpec : SignerSpec;
 }
+
+/**
+ * Encapsulates to a public key, mapping any upstream `@noble` throw to a
+ * documented `PqcError`.
+ *
+ * Length validation happens in {@link requireKey}, but a key can be the right
+ * length and still be cryptographically unusable: X-Wing's `pk_X` half is an
+ * X25519 element, and `@noble/curves` throws for the small-order points
+ * (`0`, `1`, both order-8 points, `p-1`) because they drive the shared secret
+ * to all-zero. That is fail-closed and correct, but the raw error must not
+ * reach callers — errors carry only lengths, algorithm names and key use.
+ *
+ * @example
+ * ```ts
+ * import { KEM_ALGORITHMS, encapsulateTo } from '@pqc-sdk/core';
+ *
+ * const spec = KEM_ALGORITHMS['x-wing'];
+ * const { publicKey } = spec.kem.keygen();
+ * const { cipherText, sharedSecret } = encapsulateTo(spec, publicKey, 'x-wing');
+ * console.log(cipherText.length, sharedSecret.length); // 1120 32
+ * ```
+ */
+export function encapsulateTo(
+  spec: KemSpec,
+  publicKey: Uint8Array,
+  algorithm: KemAlgorithm,
+): { cipherText: Uint8Array; sharedSecret: Uint8Array } {
+  try {
+    return spec.kem.encapsulate(publicKey);
+  } catch (cause) {
+    if (cause instanceof PqcError) {
+      throw cause;
+    }
+    throw new PqcError('INVALID_KEY', `${algorithm} public key is not a valid encapsulation key`);
+  }
+}
