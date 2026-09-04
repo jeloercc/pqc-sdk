@@ -199,3 +199,32 @@ tidier — worth deciding before implementing either.
 - [_SoK: Why Johnny Can't Fix PGP Standardization_](https://arxiv.org/pdf/2008.06913) — surveys sign-then-encrypt forwarding attacks in deployed formats
 - [RFC 9180 §5.1 (HPKE `mode_auth`)](https://www.rfc-editor.org/rfc/rfc9180.html) — an alternative route to sender authentication, relevant if `docs/proposals/hpke-alignment.md` is adopted
 - Signcryption as a single primitive originates with Zheng (1997); surveyed in the [code-based signcryption literature](https://arxiv.org/pdf/2112.07130). Noted for completeness — **not** proposed here, since no standardised, vetted implementation exists to call.
+
+## Review decisions (2026-09-03)
+
+Approved as proposed, **second in priority** — after
+[HPKE](./hpke-alignment.md), before
+[user-supplied AAD](./user-supplied-aad.md). The construction is ratified as
+written:
+
+1. **Follow the Davis (2001) repair**, binding the recipient identity into
+   the signed data. Approved as the construction — not a new primitive, and
+   explicitly not an unstandardised academic signcryption scheme, since none
+   has a vetted implementation to call rather than write.
+2. **Length-prefixed fields are required**, not optional. Naive
+   concatenation is ambiguous — `("bo", "bhello")` and `("bob", "hello")`
+   produce identical signed bytes — and that ambiguity bypasses the recipient
+   assertion, which is the entire security property.
+3. **A domain-separation tag is required.** A fixed constant label in the
+   signed input, so a signature produced here can never be confused with one
+   produced for another purpose by another part of an application.
+4. **The surreptitious-forwarding attack itself goes in the test suite** —
+   Alice signcrypts to Bob, Bob re-encrypts the inner payload to Charlie,
+   Charlie's `unsigncrypt` must fail. As recorded in §5: _without that test
+   the function is decorative._ The encoding-ambiguity regression from
+   decision 2 is required alongside it.
+5. **Encoding specified before implementation**, in
+   `docs/serialization-format.md`, per the spec-before-impl habit.
+
+The open questions in §8 (identifier form, S/E/S mode, namespacing) remain
+open and are not settled by this approval.

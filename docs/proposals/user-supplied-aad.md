@@ -159,3 +159,27 @@ code and mostly in documentation and tests.
    (`docs/proposals/hpke-alignment.md`)? HPKE's `info`/`aad` split is richer
    than a single field; adopting HPKE later may make this API a subset. Worth
    deciding whether to match HPKE's two-channel shape now.
+
+## Review decisions (2026-09-03)
+
+Approved as proposed, **last in priority** — after
+[HPKE](./hpke-alignment.md) and [signcryption](./signcryption.md). Last by
+sequencing, not by doubt: the central design question is ratified as
+answered.
+
+1. **AAD is caller-supplied on both sides and is never stored in the
+   envelope.** Approved as recommended in §2.
+2. **The reasoning is ratified in the order the proposal gives it**, and this
+   matters for anyone revisiting the decision later: a self-describing AAD is
+   a **tautology** — the security property depends on the verifier asserting
+   the expected context independently, not on reading it back from the
+   ciphertext — and storing it would **publish the very metadata a caller
+   wanted to bind**, since AAD is authenticated but never encrypted.
+   **Byte-for-byte format compatibility is a bonus, not the justification.**
+   A future revisit that weighs only the compatibility argument would be
+   re-deciding this on the wrong grounds.
+3. The open questions in §7 (length cap, `string` vs `Uint8Array`, a
+   structured helper, and whether to match HPKE's two-channel `info`/`aad`
+   shape) remain open. Question 4 in particular should be revisited **after**
+   the HPKE combiner question is settled, since a likely HPKE adoption would
+   argue for matching its shape from the start.
