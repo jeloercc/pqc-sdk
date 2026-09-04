@@ -1,4 +1,4 @@
-import { XWing } from '@noble/post-quantum/hybrid.js';
+import { ml_kem768_x25519 } from '@noble/post-quantum/hybrid.js';
 import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
 import { ml_kem768 } from '@noble/post-quantum/ml-kem.js';
 
@@ -13,7 +13,7 @@ interface AlgorithmSpec {
 
 /**
  * Structural KEM surface shared by `@noble` implementations (`ml_kem768`,
- * `XWing`). The optional second argument of `encapsulate` is the
+ * `ml_kem768_x25519`). The optional second argument of `encapsulate` is the
  * derandomization seed used only by deterministic test vectors.
  */
 export interface NobleKem {
@@ -60,7 +60,7 @@ export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
     kind: 'kem',
     envelopeVersion: 2,
     headerId: 2,
-    kem: XWing,
+    kem: ml_kem768_x25519,
     seedLength: 32,
     publicKeyLength: 1216,
     secretKeyLength: 32,
