@@ -81,7 +81,7 @@ No `node_modules` or `nodeModulesDir` was needed: Deno's `npm:` resolution
 handles the transitive dependencies (@noble/hashes) on its own.
 
 **x-wing (2026-07-20)**: the import map needed one more entry —
-`"@noble/post-quantum/hybrid.js": "npm:@noble/post-quantum@^0.6.1/hybrid.js"`
+`"@noble/post-quantum/hybrid.js": "npm:@noble/post-quantum@^0.7.1/hybrid.js"`
 — alongside the existing `ml-kem.js`/`ml-dsa.js` mappings; without it Deno
 refuses the import with "not a dependency and not in import map". Once added,
 the roundtrip ran with no other changes.
