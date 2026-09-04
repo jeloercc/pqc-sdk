@@ -195,3 +195,37 @@ Proposed sequencing:
 - [Go `crypto/hpke`](https://pkg.go.dev/crypto/hpke) — page returned HTTP 500 when fetched on 2026-09-03; the `MLKEM768X25519` / X-Wing equivalence attributed to it here comes from secondary sources and **must be confirmed against the package source**.
 - [Rust `hpke` crate](https://lib.rs/crates/hpke)
 - [draft-reddy-cose-jose-pqc-hybrid-hpke](https://datatracker.ietf.org/doc/draft-reddy-cose-jose-pqc-hybrid-hpke/07/) — related JOSE/COSE binding, not required here but relevant if JWT/COSE interop is ever wanted
+
+## Review decisions (2026-09-03)
+
+Approved as a proposal, and placed **first in priority — but gated**. No
+implementation work begins until the blocking question below is answered.
+
+1. **Priority: first of the three**, ahead of
+   [signcryption](./signcryption.md) and
+   [user-supplied AAD](./user-supplied-aad.md). The strategic argument is
+   accepted: an SDK whose ciphertexts only its own implementation can read
+   has a ceiling, and HPKE is the standard that removes it.
+2. **Gated on the combiner question in §1**, which is research, not code.
+   Whether KEM ID `0x647a` (`MLKEM768-X25519`) uses the X-Wing combiner
+   verbatim decides the cost of everything downstream, and it must be settled
+   from **primary text** before anything is built:
+   - **If it is X-Wing** — existing `x-wing` keys are already HPKE keys,
+     interop is close, and the work is an envelope layer rather than a crypto
+     change.
+   - **If it is not** — a third KEM in the SDK is a _different project_ and
+     should be named as one, not folded into this proposal.
+3. **Verification route, in order.** Priority source is the **Go standard
+   library `crypto/hpke` source on GitHub**: if it implements
+   `MLKEM768X25519`, the combiner is in the code and its test vectors are
+   primary evidence. Compare those vectors against
+   [`draft-connolly-cfrg-xwing-kem-10`](https://datatracker.ietf.org/doc/html/draft-connolly-cfrg-xwing-kem-10)
+   Appendix C. **Matching vectors settle it affirmatively; a different
+   combiner settles it negatively with equal force.** Secondary paths if that
+   fails: the draft's referenced `[CONCRETE]`/`[GENERIC]` documents, then the
+   CFRG list archives.
+4. **The answer is recorded in this document**, with the exact citation and
+   the date, whichever way it lands — not only in a session report. This
+   document is the record. (The bundle-size figure in
+   `docs/compatibility.md` is the cautionary precedent: a correctly measured
+   number that silently expired because nothing re-checked it.)
