@@ -1,5 +1,3 @@
-import { ml_kem768_x25519 } from '@noble/post-quantum/hybrid.js';
-
 import { PqcError, truncateForError } from './errors.js';
 // ML-KEM and ML-DSA resolve to vendored copies of @noble/post-quantum 0.7.1, not to the npm
 // package. Four FIPS corrections live inside the primitives, and the published `dist`
@@ -12,11 +10,16 @@ import { PqcError, truncateForError } from './errors.js';
 //   ML-DSA  — F204-13 (floating-point Decompose/Power2Round), F204-10 (zeroization on the
 //             verification path).
 //
-// X-Wing and SLH-DSA still resolve against the npm package. See
+// X-Wing's embedded ML-KEM-768 gets the same two corrections via `./x-wing.ts`, which
+// reconstructs @noble/post-quantum/hybrid.js's own `ml_kem768_x25519` preset with the
+// vendored `ml_kem768` substituted for its npm-internal one — see that file for why the
+// combiner itself (`combineKEMS`/`expandSeedXof`/`_ecdhKem`) did not need vendoring.
+// SLH-DSA still resolves against the npm package (not yet implemented by this SDK). See
 // packages/core/src/vendor/ml-kem/NOTICE.md for provenance and the re-vendoring procedure,
 // and docs/compliance/FIPS-203-MATRIX.md §1.3 / FIPS-204-MATRIX.md §1.3 for why it matters.
 import { ml_dsa65 } from './vendor/ml-dsa/ml-dsa.js';
 import { ml_kem768, RbgFailureError } from './vendor/ml-kem/ml-kem.js';
+import { ml_kem768_x25519 } from './x-wing.js';
 import type { Algorithm, KemAlgorithm, KeyUse, PqcKey, SignatureAlgorithm } from './types.js';
 
 interface AlgorithmSpec {

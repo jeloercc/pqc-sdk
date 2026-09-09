@@ -5,7 +5,8 @@
 Standard_ (NIST, August 2024)
 **Primitive provider:** `@noble/post-quantum@0.7.1` (exact pin), with the ML-KEM surface
 vendored into `packages/core/src/vendor/ml-kem/` — see §1.3
-**Assessment date:** 2026-09-07 (initial), 2026-09-07 (corrective pass — see §4.4)
+**Assessment date:** 2026-09-07 (initial), 2026-09-07 (corrective pass), 2026-09-09
+(corrective pass — see §4.4)
 **Method:** static source analysis. Rows recorded as CONFORMING on the strength of a
 correction cite the specific test that demonstrates it; those tests were executed.
 
@@ -73,8 +74,15 @@ closable from here at all.
 `@noble/post-quantum@0.7.1` (`ml-kem.ts`, `_crystals.ts`, `utils.ts`) is copied into
 `packages/core/src/vendor/ml-kem/` under its MIT license, and
 `KEM_ALGORITHMS['ml-kem-768']` resolves to that copy. Because `src/` is bundled into
-`dist` by tsup, a correction made there does ship to consumers. X-Wing, ML-DSA and
-SLH-DSA continue to resolve against the npm package and remain Provider-scope. See
+`dist` by tsup, a correction made there does ship to consumers.
+
+As of 2026-09-09, `KEM_ALGORITHMS['x-wing']`'s embedded ML-KEM-768 also resolves to that
+copy, via `packages/core/src/x-wing.ts` (see §3.10) — X-Wing's own X25519 component and
+the generic hybrid combiner it uses (`combineKEMS`/`expandSeedXof`/`_ecdhKem`) still come
+from the npm package and remain Provider-scope, since neither performs ML-KEM arithmetic
+and neither carries an ML-KEM finding. ML-DSA is vendored separately (see
+`FIPS-204-MATRIX.md` §1.3); SLH-DSA is not yet implemented by this SDK and, when it is,
+will resolve entirely against the npm package and remain Provider-scope. See
 `packages/core/src/vendor/ml-kem/NOTICE.md` for provenance, digests and the maintenance
 procedure.
 
@@ -169,6 +177,20 @@ this row from being settled.
 Suggested direction, for a later remediation PR: an explicit standardization-status
 field on the algorithm spec, or a separate exported constant partitioning FIPS-approved
 from draft algorithms. Not actioned in this pass.
+
+**Update, 2026-09-09.** X-Wing's embedded ML-KEM-768 component now resolves to the
+vendored, FIPS-corrected copy (`vendor/ml-kem/ml-kem.ts`) rather than to
+`@noble/post-quantum`'s own internal one — see `packages/core/src/x-wing.ts`, and §3.10
+for why this was needed and what it closed. This was done for **engineering reasons**:
+keeping the two known ML-KEM defects (F203-19, F203-18) fixed on the code path
+`pqc.keys.generate()` actually uses by default, since a downstream consumer's shared
+secret does not carry a label saying which named algorithm produced it. **It is not, and
+must not be read as, a claim of FIPS 203 coverage for X-Wing.** X-Wing is still a CFRG
+Internet-Draft construction, still not a FIPS 203 algorithm, and this row's status is
+unchanged by that work — **INDETERMINATE**, for the same segregation reason recorded
+above. Correcting the component ML-KEM-768's arithmetic method does not change what
+X-Wing _is_; X-Wing counted for nothing toward FIPS 203 coverage before this change and
+counts for nothing toward it now.
 
 ### 3.3 F203-04, F203-05, F203-10 — Input validation on the encapsulation path
 
@@ -499,9 +521,11 @@ that reading is defensible and the evidence above supports it equally well — t
 not change, only the label. What must not happen is the qualifier being dropped and the
 row being read as plainly conforming.
 
-**Scope.** This closes the row for ML-KEM only. ML-DSA, SLH-DSA and X-Wing continue to
-resolve against the npm package and remain Provider-scope for this requirement, not
-closable from this repository (§1.3).
+**Scope.** This closed the row for the `ml-kem-768` algorithm entry on 2026-09-08.
+**X-Wing's embedded ML-KEM-768 was not covered at the time** — it continued to run the
+unpatched double-ternary selection this row describes as closed, until 2026-09-09; see
+§3.10 for that gap and its closure. ML-DSA and SLH-DSA remain Provider-scope for this
+requirement, not closable from this repository (§1.3).
 
 ### 3.9 F203-19 — Floating-point arithmetic in Compress_d
 
@@ -577,6 +601,76 @@ because output equivalence is not the concern.
 Closed for consumers, not merely locally: the fix lives in `src/`, which tsup bundles into
 `dist`. Had it been applied to `node_modules` it would have closed nothing (§1.3).
 
+**Scope, added 2026-09-09.** This closed the row for the `ml-kem-768` algorithm entry on
+2026-09-07. **X-Wing's embedded ML-KEM-768 was not covered at the time** — it continued
+to run the unpatched floating-point `encode: (i) => ((i << d) + Q / 2) / Q` this row
+describes as closed, until 2026-09-09; see §3.10 for that gap and its closure.
+
+### 3.10 F203-19, F203-18 — the gap in X-Wing's embedded ML-KEM-768
+
+**Status: gap existed 2026-09-07 (F203-19) / 2026-09-08 (F203-18) through 2026-09-09;
+closed 2026-09-09.**
+
+Both §3.8 and §3.9 were marked CONFORMING as soon as the vendored copy existed and each
+row's test suite passed against it — correctly, for the `ml-kem-768` algorithm entry.
+Neither closure examined any other registry entry. `x-wing` (`KEM_ALGORITHMS['x-wing']`)
+is `pqc.keys.generate()`'s **default** (`keys.ts:51`), and until 2026-09-09 it was built
+from `@noble/post-quantum/hybrid.js`'s own `ml_kem768_x25519` preset, which constructs its
+embedded ML-KEM-768 from that package's _own_ internal, unpatched `ml-kem.ts`
+(`hybrid.ts` imports it as `import { ml_kem1024, ml_kem768 } from './ml-kem.ts'`) — not
+from `vendor/ml-kem/ml-kem.ts`. So for the entire period spanning both closures, the
+default key-generation path in this SDK still executed, on every X-Wing encapsulation and
+decapsulation:
+
+- the floating-point `Compress_d` expression `((i << d) + Q / 2) / Q` that §3.9 records
+  as closed for `ml-kem-768`, and
+- the double-ternary implicit-reject/zeroization selection
+  (`!isValid ? Khat : Kbar` / `isValid ? Khat : Kbar`) that §3.8 records as closed for
+  `ml-kem-768`.
+
+Confirmed by tracing the call path, not inferred from the two sharing a package:
+`combineKEMS`'s `encapsulate`/`decapsulate` call `rawKems[i].encapsulate(...)` /
+`.decapsulate(...)` directly on whichever `ml_kem768` object the preset was built with
+(`hybrid.ts:549,577`), and the npm package's own `ml-kem.ts` still contains both
+unpatched expressions verbatim at the pinned `0.7.1` version.
+
+**Why the earlier closures did not catch this.** §1.2's rule — a row moves to CONFORMING
+only on a named, executed test — was followed for the `ml-kem-768` entry specifically;
+nothing in that rule required re-checking every other registry entry that happens to
+embed the same primitive under a different name. The gap was found on 2026-09-09, during
+a review of this matrix's own scoping, prompted by the observation that X-Wing embeds
+ML-KEM-768 and that FIPS 203 §3.3's combined-KEM language (cited at F203-03/§3.2) says
+nothing that would have extended either row's closure to a non-FIPS composite — the two
+closures were correct on their own terms and simply never scoped to ask the question.
+
+**The fix.** `packages/core/src/x-wing.ts` reconstructs `ml_kem768_x25519` from
+`@noble/post-quantum/hybrid.js`'s own public `combineKEMS`, `expandSeedXof` and
+`_ecdhKem` exports — verbatim, same argument order, same hard-coded domain-separation
+label — substituting the vendored `ml_kem768` for the npm-internal one. None of those
+three combiner functions perform ML-KEM arithmetic, so neither F203-19 nor F203-18
+applies to them, and none needed vendoring. `algorithms.ts`'s `x-wing` entry now imports
+`ml_kem768_x25519` from that module instead of from `@noble/post-quantum/hybrid.js`.
+
+**Objective evidence.** `packages/core/src/x-wing.test.ts`, 6 cases: identical component
+`lengths` between the two presets; identical keys, ciphertext and shared secret between
+the vendored-backed and npm-backed presets under matched deterministic seeds (proving the
+swap changed method, not output — the same argument already established for the
+standalone rows in §3.8/§3.9, extended here to the composite); a bidirectional round-trip
+(vendored-encapsulated ↔ npm-decapsulated, and the reverse) showing existing X-Wing keys
+and ciphertexts remain valid; and a tampered-ciphertext case showing both implementations
+implicitly reject to the same (wrong) secret. The pre-existing `xwing-vectors.test.ts`
+(draft-10 Appendix C KAT vectors) and `properties.test.ts`'s X-Wing property suite
+continue to pass unchanged through the repointed path.
+
+**Scope, restated.** This closes the gap for ML-KEM-768's floating-point and
+implicit-reject behavior wherever it is embedded in this repository's registry —
+`ml-kem-768` directly, and now `x-wing`'s component. It does **not** extend FIPS 203
+coverage to X-Wing itself (§3.2), and it does not touch X-Wing's X25519 component or its
+combiner (`combineKEMS`/`expandSeedXof`/`_ecdhKem`, still sourced from
+`@noble/post-quantum/hybrid.js`), which perform no ML-KEM arithmetic, carry no FIPS 203
+finding, and remain Provider-scope. SLH-DSA is unaffected and remains Provider-scope; it
+does not embed ML-KEM.
+
 ---
 
 ## 4. Summary
@@ -621,7 +715,9 @@ duty-holder, and they are not equally closable:
   zeroize a primitive boolean — limits the correction did not and cannot remove (§3.8).
   Its status is also **proposed, not settled**: §3.8 sets out why `NONCONFORMING` remains
   a defensible reading and invites the assessor to choose. It stays Provider-scope for
-  ML-DSA, SLH-DSA and X-Wing.
+  ML-DSA and SLH-DSA. It no longer stays Provider-scope for X-Wing's embedded
+  ML-KEM-768 as of 2026-09-09 — that component-level gap existed from this row's closure
+  until then and is recorded, with dates, in §3.10.
 - **F203-01** is a project-scope shortfall, not a FIPS 203 breach.
 - **F203-05** and **F203-10** are counted as conforming, but on delegated evidence only.
   Rows moving to CONFORMING in later passes does not make the remaining delegated rows
@@ -674,8 +770,9 @@ documented language limitation)` as proposed, or `NONCONFORMING` on the ground t
 
 ### 4.4 Change log
 
-| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-09-07 | Initial assessment. 21 rows recorded; F203-11, F203-12, F203-18, F203-19 NONCONFORMING.                                                                                                                                                                                                                                                                                                                                                                           |
-| 2026-09-07 | Corrective pass. ML-KEM surface vendored (§1.3); F203-11 and F203-19 closed with the evidence cited in §3.4, §3.9. Keyword-definition citation corrected from §1.3 to §2.1.                                                                                                                                                                                                                                                                                       |
-| 2026-09-08 | Corrective pass. F203-18: implicit-reject selection made branch-free at both `decapsulate` sites, both candidates now destroyed unconditionally; proposed **CONFORMING (with documented language limitation)**, pending assessor review (§3.8). F203-12: reclassified NONCONFORMING → INDETERMINATE — a classification correction, no code change; runtime randomness sources documented here and in `SECURITY.md` (§3.5). Qualifier convention recorded in §1.2. |
+| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-07 | Initial assessment. 21 rows recorded; F203-11, F203-12, F203-18, F203-19 NONCONFORMING.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 2026-09-07 | Corrective pass. ML-KEM surface vendored (§1.3); F203-11 and F203-19 closed with the evidence cited in §3.4, §3.9. Keyword-definition citation corrected from §1.3 to §2.1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-09-08 | Corrective pass. F203-18: implicit-reject selection made branch-free at both `decapsulate` sites, both candidates now destroyed unconditionally; proposed **CONFORMING (with documented language limitation)**, pending assessor review (§3.8). F203-12: reclassified NONCONFORMING → INDETERMINATE — a classification correction, no code change; runtime randomness sources documented here and in `SECURITY.md` (§3.5). Qualifier convention recorded in §1.2.                                                                                                                                                                                                                                                                                                                                                                           |
+| 2026-09-09 | Corrective pass. Found and closed a scope gap (§3.10): X-Wing's embedded ML-KEM-768 — `pqc.keys.generate()`'s default path — still ran the unpatched floating-point `Compress_d` (F203-19) and the unpatched double-ternary implicit-reject selection (F203-18) after both rows had already closed for the `ml-kem-768` algorithm entry alone. `packages/core/src/x-wing.ts` repoints X-Wing at the vendored `ml_kem768`, reusing `@noble/post-quantum/hybrid.js`'s own `combineKEMS`/`expandSeedXof`/`_ecdhKem` (Provider-scope, no ML-KEM finding applies to them) rather than vendoring them; evidence in `x-wing.test.ts`. §1.3 and §3.2 updated to describe the new boundary. Row statuses for F203-03, F203-18 and F203-19 are unchanged by this pass — see §3.2 for why closing the gap is not a FIPS 203 coverage claim for X-Wing. |

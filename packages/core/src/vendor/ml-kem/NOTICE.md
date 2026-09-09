@@ -57,9 +57,21 @@ Vendoring the minimal ML-KEM surface into `src/` is the only mechanism by which 
 corrections actually ship to consumers of this SDK. Each modification is annotated inline
 and covered by a regression test under `packages/core/src/vendor/ml-kem/__tests__/`.
 
-`@noble/post-quantum` remains a dependency of this package and continues to provide
-ML-DSA, SLH-DSA, Falcon and X-Wing. Only the ML-KEM entry points in
-`packages/core/src/algorithms.ts` resolve to this vendored copy.
+`@noble/post-quantum` remains a dependency of this package. As of 2026-09-09 it no longer
+provides X-Wing: `x-wing`'s embedded ML-KEM-768 ran the two defects above on every
+encapsulation and decapsulation until then (see `docs/compliance/FIPS-203-MATRIX.md`
+§3.10), because `@noble/post-quantum/hybrid.js` builds its `ml_kem768_x25519` preset from
+that package's own unpatched `ml-kem.ts`, not from this vendored copy.
+`packages/core/src/x-wing.ts` closes that gap by reconstructing the same preset from
+`hybrid.js`'s public `combineKEMS`, `expandSeedXof` and `_ecdhKem` exports — generic
+seed-expansion/composition glue with no ML-KEM arithmetic in it, so it did not need
+vendoring — substituting this directory's `ml_kem768` for the npm-internal one.
+
+What `@noble/post-quantum` still provides to this package: that combiner glue for
+X-Wing, plus SLH-DSA and Falcon (neither implemented by this SDK yet). ML-DSA is vendored
+separately, under `packages/core/src/vendor/ml-dsa/`, for the same reason as ML-KEM. Only
+the ML-KEM entry points in `packages/core/src/algorithms.ts`, plus `x-wing.ts`'s
+reconstructed preset, resolve to this vendored copy.
 
 ## Maintenance
 
@@ -68,8 +80,15 @@ When upgrading `@noble/post-quantum`, re-vendor rather than hand-merge:
 1. Copy the three files again from the new version's `src/`.
 2. Re-apply the modifications listed in each file header (they are small and localised).
 3. Update the version, date and digests in this file.
-4. Run the full `packages/core` test suite. The equivalence and ACVP vector tests are the
-   tripwire — do not adjust them to match new output.
+4. Confirm `@noble/post-quantum/hybrid.js` still exports `combineKEMS`, `expandSeedXof`
+   and `_ecdhKem` with the shapes `packages/core/src/x-wing.ts` relies on.
+   `_ecdhKem`'s leading underscore is Noble's own convention for an internal API (its
+   README says so explicitly), so the package does not owe these a semver guarantee — a
+   removed or reshaped export is a real upgrade hazard, not a hypothetical one.
+5. Run the full `packages/core` test suite. The equivalence and ACVP vector tests are the
+   tripwire — do not adjust them to match new output. `x-wing.test.ts` is the tripwire
+   specific to step 4: it fails if `hybrid.js`'s own `ml_kem768_x25519` preset ever
+   diverges from `x-wing.ts`'s reconstruction of it.
 
 ## License
 
