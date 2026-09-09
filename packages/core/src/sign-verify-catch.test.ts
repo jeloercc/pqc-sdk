@@ -4,15 +4,21 @@ import type { PublicKey } from './types.js';
 
 // `verify` wraps the underlying signer in a try/catch that fails closed to
 // `false` (sign.ts). That catch is defense-in-depth: empirically, no signature
-// byte-pattern makes @noble's `ml_dsa65.verify` throw — it returns `false` for
-// every malformed signature (verified with 6000+ random/structured inputs, and
+// byte-pattern makes `ml_dsa65.verify` throw — it returns `false` for every
+// malformed signature (verified with 6000+ random/structured inputs, and
 // confirmed by reading its source: length, bad-hint and norm failures all
 // return `false`). So the only honest way to exercise the catch is to force the
 // signer itself to throw and assert `verify` still resolves to `false` instead
 // of leaking the error. This mock is scoped to this file so the real
 // sign/verify roundtrip suite (sign.test.ts) is unaffected.
-vi.mock('@noble/post-quantum/ml-dsa.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@noble/post-quantum/ml-dsa.js')>();
+//
+// The specifier must track wherever `algorithms.ts` actually resolves ML-DSA.
+// It was `@noble/post-quantum/ml-dsa.js` until the primitive was vendored; a
+// mock left pointing at the npm package still *passes*, because an all-zero
+// signature fails verification on its own — but it exercises nothing. If ML-DSA
+// is ever re-pointed, this path moves with it.
+vi.mock('./vendor/ml-dsa/ml-dsa.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./vendor/ml-dsa/ml-dsa.js')>();
   return {
     ...actual,
     ml_dsa65: {
