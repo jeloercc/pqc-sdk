@@ -1,6 +1,12 @@
 import { requireKey, SIGNATURE_ALGORITHMS, type SignerSpec } from './algorithms.js';
 import { PqcError } from './errors.js';
-import type { PqcKey, PublicKey, SecretKey, SignatureOptions } from './types.js';
+import type {
+  PqcKey,
+  PublicKey,
+  SecretKey,
+  SignatureAlgorithm,
+  SignatureOptions,
+} from './types.js';
 
 /** FIPS 204 §5.2 caps the signing context string at 255 bytes. */
 const MAX_CONTEXT_LENGTH = 255;
@@ -64,8 +70,10 @@ function hasWrongVerificationKeyLength(publicKey: PqcKey): boolean {
 }
 
 /**
- * Signs data with ML-DSA-65 (FIPS 204) in hedged mode (randomized signing,
- * the standard's default). Returns the 3309-byte signature.
+ * Signs data with ML-DSA (FIPS 204) in hedged mode (randomized signing, the
+ * standard's default). Returns the signature, whose length depends on the
+ * key's parameter set (2420 bytes for ML-DSA-44, 3309 for ML-DSA-65, 4627 for
+ * ML-DSA-87).
  *
  * @example
  * ```ts
@@ -75,9 +83,9 @@ function hasWrongVerificationKeyLength(publicKey: PqcKey): boolean {
  * const signature = await pqc.sign(document, pair.secretKey);
  * ```
  */
-export async function sign(
+export async function sign<A extends SignatureAlgorithm>(
   data: Uint8Array | string,
-  secretKey: SecretKey<'ml-dsa-65'>,
+  secretKey: SecretKey<A>,
   options?: SignatureOptions,
 ): Promise<Uint8Array> {
   const spec = requireKey(secretKey, 'signer', 'secret', 'sign');
@@ -85,7 +93,7 @@ export async function sign(
 }
 
 /**
- * Verifies an ML-DSA-65 signature. Returns `false` for invalid or malformed
+ * Verifies an ML-DSA signature. Returns `false` for invalid or malformed
  * signatures, and — per FIPS 204 §3.6.2 — for a public key of the wrong length.
  * It never throws because of a corrupted signature or a mis-sized key; it throws
  * only when the key is not an ML-DSA public key at all (wrong algorithm, wrong
@@ -99,10 +107,10 @@ export async function sign(
  * if (!valid) throw new Error('invalid signature');
  * ```
  */
-export async function verify(
+export async function verify<A extends SignatureAlgorithm>(
   data: Uint8Array | string,
   signature: Uint8Array,
-  publicKey: PublicKey<'ml-dsa-65'>,
+  publicKey: PublicKey<A>,
   options?: SignatureOptions,
 ): Promise<boolean> {
   // FIPS 204 §3.6.2: a wrong-length public key must verify to `false`, not throw.

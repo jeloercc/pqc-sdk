@@ -6,7 +6,8 @@
 **Primitive provider:** `@noble/post-quantum@0.7.1` (exact pin), ML-DSA resolves to the npm
 package — **not** vendored, unlike ML-KEM (see §1.3)
 **Assessment dates:** 2026-09-08 (registry pass — Phase 1, Stage 2); 2026-09-08
-(conformity pass — Phase 2); 2026-09-08 (corrective pass — F204-08)
+(conformity pass — Phase 2); 2026-09-08 (corrective pass — F204-08); 2026-09-09
+(corrective pass — F204-01, F204-04 — see §4.4)
 **Method:** static source analysis of `packages/core/src` and of the pinned provider,
 supplemented by direct runtime probes against the built `dist` for rows where reading alone
 could not settle behaviour (F204-06/07, F204-08 — see §3.3, §3.4). The registry and
@@ -118,10 +119,10 @@ F204-08 was the opposite case and must not be confused with them: **SDK-scope**,
 
 | Req ID      | FIPS 204 Quote                                                                                                                                                                                                 | Section                   | Normative Force      | Applicability                                                                   | SDK Component                                                                  | Evidence Required                                                                                            | Current Status                                                         |
 | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | -------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| **F204-01** | "Three ML-DSA parameter sets are included in Table 1." + "ML-DSA-44 is claimed to be in security strength category 2, ML-DSA-65 is claimed to be in category 3, and ML-DSA-87 is claimed to be in category 5"  | §4, Tables 1–2            | Definitional         | Project scope declares all three; FIPS mandates none                            | `types.ts:10`, `algorithms.ts:76-85`                                           | Registry entry, exported type member, Table 2 byte lengths, ACVP round-trip per set                          | **PARTIALLY CONFORMING** — 1 of 3 sets exposed; see §3.1               |
+| **F204-01** | "Three ML-DSA parameter sets are included in Table 1." + "ML-DSA-44 is claimed to be in security strength category 2, ML-DSA-65 is claimed to be in category 3, and ML-DSA-87 is claimed to be in category 5"  | §4, Tables 1–2            | Definitional         | Project scope declares all three; FIPS mandates none                            | `types.ts:10`, `algorithms.ts:104-129`                                         | Registry entry, exported type member, Table 2 byte lengths, ACVP round-trip per set                          | **CONFORMING** — all 3 sets exposed and evidenced; see §3.1            |
 | **F204-02** | "The seed 𝜉 shall be a fresh (i.e., not previously used) random value generated using an approved RBG, as prescribed in SP 800-90A, SP 800-90B, and SP 800-90C"                                                | §3.6.1                    | SHALL                | Applicable to the deployed module; source is the host runtime                   | `keys.ts:53` (`randomBytes(spec.seedLength)`)                                  | Freshness per invocation **and** an RBG validated under SP 800-90A/B/C inside a module boundary              | **INDETERMINATE** — freshness met, approval not determinable; see §3.2 |
-| **F204-03** | "the RBG used shall have a security strength of at least 192 bits for ML-DSA-65 and 256 bits for ML-DSA-87"                                                                                                    | §3.6.1                    | SHALL                | ML-DSA-65 applicable; ML-DSA-87 not registered                                  | Host RBG — outside repository control                                          | Documented security-strength claim for the host entropy source on each supported runtime                     | **INDETERMINATE** — see §3.2                                           |
-| **F204-04** | "For ML-DSA-44, the RBG should have a security strength of at least 192 bits and shall have a security strength of at least 128 bits."                                                                         | §3.6.1                    | SHOULD + SHALL       | **Not applicable** — ML-DSA-44 is not registered                                | `types.ts:10` (closed union excludes `ml-dsa-44`)                              | —                                                                                                            | **NOT APPLICABLE** — see §3.1                                          |
+| **F204-03** | "the RBG used shall have a security strength of at least 192 bits for ML-DSA-65 and 256 bits for ML-DSA-87"                                                                                                    | §3.6.1                    | SHALL                | Both clauses applicable — ML-DSA-65 and ML-DSA-87 are both registered           | Host RBG — outside repository control                                          | Documented security-strength claim for the host entropy source on each supported runtime                     | **INDETERMINATE** — see §3.2                                           |
+| **F204-04** | "For ML-DSA-44, the RBG should have a security strength of at least 192 bits and shall have a security strength of at least 128 bits."                                                                         | §3.6.1                    | SHOULD + SHALL       | Applicable — ML-DSA-44 is now registered                                        | Host RBG — outside repository control                                          | Documented security-strength claim for the host entropy source on each supported runtime                     | **INDETERMINATE** — activated 2026-09-09; see §3.1                     |
 | **F204-05** | "While this value should ideally be generated by an approved RBG, other methods for generating fresh random values may be used."                                                                               | §3.6.1                    | SHOULD + MAY         | Applicable — the SDK signs in hedged mode only                                  | `sign.ts:45`; provider `sign` → `randomBytes(signRandBytes)` (`ml-dsa.js:453`) | `rnd` freshly generated per signature; approval is a recommendation, and `may` permits other fresh sources   | **CONFORMING** — the `may` clause is met; see §3.2                     |
 | **F204-06** | "2: if 𝜉 = NULL then / 3: return ⊥ ▷ return an error indication if random bit generation failed"                                                                                                               | §5.1, Alg. 1              | Definitional         | Applicable                                                                      | `keys.ts:50-53`, provider `keygen` (`ml-dsa.js:363-368`)                       | RBG failure during key generation produces an error indication and yields no key                             | **CONFORMING (delegated)** — see §3.3                                  |
 | **F204-07** | "6: if 𝑟𝑛𝑑 = NULL then / 7: return ⊥ ▷ return an error indication if random bit generation failed"                                                                                                             | §5.2, Alg. 2 (and Alg. 4) | Definitional         | Applicable for Alg. 2; Alg. 4 not exposed                                       | `sign.ts:44-45`, provider `sign` (`ml-dsa.js:450-454`)                         | RBG failure during signing produces an error indication and yields no signature                              | **CONFORMING (delegated)** — see §3.3                                  |
@@ -147,35 +148,100 @@ F204-08 was the opposite case and must not be confused with them: **SDK-scope**,
 
 ### 3.1 F204-01, F204-04 — Parameter sets
 
-**Confirmed as flagged in Stage 2.** `algorithms.ts:45` declares
-`readonly signer: typeof ml_dsa65` — a **concrete** type, not a structural interface. ML-KEM
-has `NobleKem` (`algorithms.ts:23-30`) for exactly this purpose; the signature side has no
-equivalent. `types.ts:10` declares `SignatureAlgorithm = 'ml-dsa-65'`, a closed single-member
-union, so `SIGNATURE_ALGORITHMS` is a `Record` over one key.
+**Status: F204-01 CLOSED 2026-09-09 (all three sets exposed and evidenced). F204-04
+activated 2026-09-09 and determined INDETERMINATE — see the second half of this section.**
+
+**The Stage 2 flag is resolved.** `algorithms.ts` declared `readonly signer: typeof ml_dsa65`
+— a **concrete** type, not a structural interface — which made adding a second parameter set
+a type change, not a registry line. It is now `NobleSigner`, a structural interface mirroring
+`NobleKem`'s role on the KEM side: it declares only `keygen`, `sign` and `verify`, the three
+methods the SDK actually calls, and any `@noble` signer object matching that shape satisfies
+it regardless of which parameter set built it. `types.ts` widens
+`SignatureAlgorithm` from the closed single-member union `'ml-dsa-65'` to
+`'ml-dsa-44' | 'ml-dsa-65' | 'ml-dsa-87'`.
 
 | Parameter set | Exported by the provider     | Registered in the SDK | Reachable by a consumer |
 | ------------- | ---------------------------- | --------------------- | ----------------------- |
-| ML-DSA-44     | `ml_dsa44` (`ml-dsa.js:718`) | No                    | No                      |
+| ML-DSA-44     | `ml_dsa44` (`ml-dsa.js:718`) | **Yes**               | **Yes**                 |
 | ML-DSA-65     | `ml_dsa65` (`ml-dsa.js:728`) | **Yes**               | **Yes**                 |
-| ML-DSA-87     | `ml_dsa87` (`ml-dsa.js:738`) | No                    | No                      |
+| ML-DSA-87     | `ml_dsa87` (`ml-dsa.js:738`) | **Yes**               | **Yes**                 |
 
-`SIGNATURE_ALGORITHMS['ml-dsa-65']` (`algorithms.ts:76-85`) records `publicKeyLength: 1952`,
-`secretKeyLength: 4032`, `signatureLength: 3309`, matching FIPS 204 Table 2 exactly.
-Round-trip evidence: `nist-vectors.test.ts:78` (`NIST ACVP ML-DSA-65 keyGen (FIPS 204)`) and
-`nist-vectors.test.ts:87` (`NIST ACVP ML-DSA-65 sigVer (FIPS 204, pure)`).
+`SIGNATURE_ALGORITHMS` (`algorithms.ts:104-129`) now carries all three entries, each pointing
+at the vendored `getDilithium(...)` closure for its parameter set (`vendor/ml-dsa/ml-dsa.ts`),
+with byte lengths read from the provider at runtime rather than assumed — pulled directly from
+`ml_dsa44.lengths` / `ml_dsa65.lengths` / `ml_dsa87.lengths` and cross-checked against FIPS 204
+Table 2 before registering them:
 
-**Ruled a scope limitation, not a FIPS nonconformance.** FIPS 204 defines three parameter
-sets; it does not require an implementation to provide all three. A module implementing only
-ML-DSA-65 is a conforming ML-DSA-65 implementation. `PARTIALLY CONFORMING` records the
-shortfall against the _declared project scope_, which covers all three. Adding a set requires
-the `SignerSpec.signer` refactor first — a type change, not a registry line.
+| Set       | seed | publicKey | secretKey | signature |
+| --------- | ---- | --------- | --------- | --------- |
+| ML-DSA-44 | 32   | 1312      | 2560      | 2420      |
+| ML-DSA-65 | 32   | 1952      | 4032      | 3309      |
+| ML-DSA-87 | 32   | 2592      | 4896      | 4627      |
 
-**F204-04 follows from this.** Its thresholds are ML-DSA-44-specific, and ML-DSA-44 is not
-registered, so the row addresses a construct this SDK does not expose. `NOT APPLICABLE`. It
-is retained rather than deleted because it activates the moment ML-DSA-44 is added, and it
-carries a consequence clause that would travel with it: "If an approved RBG with at least 128
-bits of security but less than 192 bits of security is used, then the claimed security
-strength of ML-DSA-44 is reduced from category 2 to category 1."
+**Both corrections apply to all three sets, verified by reading the source, not inferred from
+the fact that all three share a package.** `ml_dsa44`, `ml_dsa65` and `ml_dsa87` are each built
+by an independent call to the same `getDilithium(opts)` factory
+(`vendor/ml-dsa/ml-dsa.ts:974,986,998`), and both F204-13's integer-only `decompose`/
+`Power2Round` and F204-10's `finally`-block zeroization in `internal.verify` are defined once,
+inside that factory's body (`ml-dsa.ts:315` onward, `:864-871`) — not reimplemented
+per parameter set. Every call to `getDilithium` gets an independent closure over identical
+corrected logic, parameterized only by `GAMMA2`/`ETA`/etc., not by which correction runs.
+`vendor/ml-dsa/__tests__/rounding-equivalence.test.ts` already exercises this directly: its
+`decompose` suite runs both the ML-DSA-44 gamma2 (95232) and the ML-DSA-65/87 gamma2 (261888)
+cases across the complete domain.
+
+**ACVP round-trip evidence, per set — mandatory for this closure, not follow-up work.** All
+six vector files share the same provenance as the original `mldsa65-*.json` pair: NIST's
+official ACVP-Server repository (`github.com/usnistgov/ACVP-Server`,
+`gen-val/json-files/ML-DSA-keyGen-FIPS204/` and `.../ML-DSA-sigVer-FIPS204/`), recorded in each
+file's own `"source"` field. `mldsa44-keygen.json` and `mldsa87-keygen.json` take the first 5
+of that source's 25 keyGen test-group cases per set, matching the existing `mldsa65-keygen.json`
+precedent exactly (same source, same "first 5" selection). `mldsa44-sigver.json` and
+`mldsa87-sigver.json` take **all 15** cases from each set's `signatureInterface: "external"`,
+`preHash: "pure"` test group — a superset of `mldsa65-sigver.json`'s 11-of-15 selection, chosen
+because the per-set case ordering is randomized upstream (verified — the three groups do not
+share a mutation-category sequence), so there is no faithful way to reproduce the exact same
+11-case cut for the new sets; taking the full group is simpler, reproducible, and strictly more
+evidence. Wired into `nist-vectors.test.ts` as one `describe` block per set (parametrized over
+`ML_DSA_SETS`, replacing three copies of near-identical code with one loop).
+
+| Set       | keyGen cases | sigVer cases | Test result               |
+| --------- | ------------ | ------------ | ------------------------- |
+| ML-DSA-44 | 5            | 15           | 20/20 passing             |
+| ML-DSA-65 | 5            | 11           | 16/16 passing (unchanged) |
+| ML-DSA-87 | 5            | 15           | 20/20 passing             |
+
+**Result: CONFORMING, not merely PARTIALLY CONFORMING-closed-by-fiat.** FIPS 204 defines three
+parameter sets and does not require an implementation to provide all three — a module
+implementing only ML-DSA-65 was, and remains, a conforming ML-DSA-65 implementation. What
+changes the status here is that the row is scored against the _declared project scope_
+(`CLAUDE.md`'s "Algorithms (implemented)" line, updated in this pass from ML-DSA-65 alone to
+"ML-DSA-44/65/87"), and that scope is now fully met with objective evidence per set, not
+merely provider availability
+(§3.1's own opening rule from Stage 2 still holds: availability in the provider is not evidence
+of conformance).
+
+**F204-04 activates as a direct consequence, and is determined here rather than inherited
+silently.** Its thresholds are ML-DSA-44-specific ("For ML-DSA-44, the RBG should have a
+security strength of at least 192 bits and shall have a security strength of at least 128
+bits."); with ML-DSA-44 now registered and reachable, the row addresses a construct this SDK
+does expose, so `NOT APPLICABLE` no longer fits. **INDETERMINATE, for the same reason F204-02
+and F204-03 are** (§3.2): the `shall`/`should` constrain the _source_ of the randomness — the
+generator behind `crypto.getRandomValues` — which is a property of the host runtime, not of
+any code in this repository. This assessment has no visibility into that source's approved
+security strength and can no more show it meets the 128-bit `shall` floor than it can show it
+fails it; `NONCONFORMING` would require demonstrating non-satisfaction, and nothing was
+demonstrated. The consequence clause travels with the row rather than being dropped: "If an
+approved RBG with at least 128 bits of security but less than 192 bits of security is used,
+then the claimed security strength of ML-DSA-44 is reduced from category 2 to category 1" —
+also indeterminate, for the identical reason.
+
+**F204-03's applicability text is corrected in the same pass.** Its quote already covered both
+ML-DSA-65 (192 bits) and ML-DSA-87 (256 bits); the row's Applicability column previously read
+"ML-DSA-65 applicable; ML-DSA-87 not registered" because ML-DSA-87 was not exposed when that
+row was written. It is now registered, so both clauses are applicable. The row's determination
+does not change — it was already `INDETERMINATE` for the ML-DSA-65 clause alone, for the same
+host-visibility reason that now governs both clauses uniformly.
 
 ### 3.2 F204-02, F204-03, F204-05 — Randomness
 
@@ -192,8 +258,11 @@ approval half is what leaves the row unsettled. Runtime randomness sources per s
 target are documented in `SECURITY.md` § "Randomness source"; that table asserts nothing about
 SP 800-90 approval status.
 
-F204-03's ML-DSA-87 clause is inert here (not registered); the row is ruled on its ML-DSA-65
-clause alone.
+**Corrected 2026-09-09:** F204-03's ML-DSA-87 clause was inert here through the row's original
+determination, because ML-DSA-87 was not registered at the time. It is now registered (§3.1),
+so both the ML-DSA-65 and ML-DSA-87 clauses are applicable. The row's determination is
+unchanged by that — it was already `INDETERMINATE` on the ML-DSA-65 clause alone, for the host-
+visibility reason above, which governs the ML-DSA-87 clause identically.
 
 **F204-05 is CONFORMING, and its weaker force is why.** FIPS 204 makes approval a `should` for
 `rnd`, then explicitly permits alternatives: "other methods for generating fresh random values
@@ -579,18 +648,19 @@ this SDK does not implement or expose.
 ## 4. Summary
 
 Conformity pass, 2026-09-08, updated by the corrective passes that closed F204-08, F204-10
-and F204-13. All 22 rows determined; none remain `NOT EVALUATED`.
+and F204-13, and by the 2026-09-09 pass that closed F204-01 and activated F204-04. All 22
+rows determined; none remain `NOT EVALUATED`.
 
 | Status                                            | Count  | Req IDs                                                                |
 | ------------------------------------------------- | ------ | ---------------------------------------------------------------------- |
-| CONFORMING                                        | 7      | F204-05, F204-08, F204-10, F204-11, F204-13, F204-15, F204-16          |
+| CONFORMING                                        | 8      | F204-01, F204-05, F204-08, F204-10, F204-11, F204-13, F204-15, F204-16 |
 | CONFORMING (delegated)                            | 4      | F204-06, F204-07, F204-09, F204-21                                     |
-| PARTIALLY CONFORMING                              | 1      | F204-01                                                                |
+| PARTIALLY CONFORMING                              | 0      | —                                                                      |
 | NONCONFORMING                                     | 0      | —                                                                      |
 | NONCONFORMING (provider-scope, not closable here) | 0      | —                                                                      |
-| INDETERMINATE                                     | 2      | F204-02, F204-03                                                       |
+| INDETERMINATE                                     | 3      | F204-02, F204-03, F204-04                                              |
 | NOT EVALUATED                                     | 0      | —                                                                      |
-| NOT APPLICABLE                                    | 8      | F204-04, F204-12, F204-14, F204-17, F204-18, F204-19, F204-20, F204-22 |
+| NOT APPLICABLE                                    | 7      | F204-12, F204-14, F204-17, F204-18, F204-19, F204-20, F204-22          |
 | **Total**                                         | **22** |                                                                        |
 
 ### 4.1 Aggregate-score caution
@@ -611,12 +681,20 @@ are not equally closable:
   change to `packages/core/src` can close them for consumers, because `dist` imports
   `@noble/post-quantum` as an external runtime import. Closing them would require vendoring
   `ml-dsa.ts` as was done for ML-KEM — a decision this document does not make.
-- **The 8 `NOT APPLICABLE` rows are the largest single group, and that is a statement about
+- **The 7 `NOT APPLICABLE` rows are the largest single group, and that is a statement about
   surface area, not about quality.** Four are HashML-DSA, one is the deterministic variant,
-  one is ML-DSA-44 — all constructs the SDK does not expose. A larger surface would convert
-  them into rows requiring evidence.
-- **F204-02 and F204-03 cannot be settled here at all**, and are the requirements most likely
-  to matter to a downstream compliance reviewer.
+  two cover symmetric-primitive/key-binding constructs — all constructs the SDK does not
+  expose. A larger surface would convert them into rows requiring evidence. (ML-DSA-44 left
+  this group on 2026-09-09, when it stopped being one of those unexposed constructs — see
+  F204-04 below.)
+- **F204-01 closed 2026-09-09** by exposing all three parameter sets with per-set ACVP
+  round-trip evidence (§3.1). Availability in the provider was never the gate — the row
+  moved on registration plus evidence, exactly as its own opening rule required.
+- **F204-02, F204-03 and F204-04 cannot be settled here at all**, and are the requirements
+  most likely to matter to a downstream compliance reviewer. F204-04 joined this group on
+  2026-09-09, the moment ML-DSA-44 became reachable — it did not inherit `INDETERMINATE`
+  by default; the same host-RBG-visibility reasoning as F204-02/03 was re-derived and written
+  out explicitly for it (§3.1).
 - **Four rows carry `(delegated)`**, meaning their evidence is source inspection of a
   dependency rather than a test in this repository. A provider version bump could change any
   of them silently.
@@ -630,9 +708,10 @@ Program or the Cryptographic Algorithm Validation Program. This matrix records t
 validation-readiness, and official validation status are three separate things, and only the
 first is addressed here.
 
-ACVP known-answer vectors (`packages/core/src/vectors/mldsa65-keygen.json`,
-`mldsa65-sigver.json`, exercised by `nist-vectors.test.ts:78` and `:87`) are assurance
-evidence. They demonstrate input/output agreement with the standard on the tested paths.
+ACVP known-answer vectors (`packages/core/src/vectors/mldsa{44,65,87}-keygen.json` and
+`mldsa{44,65,87}-sigver.json`, all six exercised by the `ML_DSA_SETS`-parametrized blocks in
+`nist-vectors.test.ts`, added 2026-09-09 for the `-44`/`-87` pair) are assurance evidence.
+They demonstrate input/output agreement with the standard on the tested paths.
 **They are not automatic proof of every internal normative condition** — F204-13 is the
 standing counterexample here, exactly as F203-19 is in the FIPS 203 matrix: the vectors pass
 while the requirement is breached, because a known-answer test cannot observe _how_ a result
@@ -654,15 +733,15 @@ was computed.
    `@noble/post-quantum` bump, re-copy and re-apply rather than hand-merge, per
    `packages/core/src/vendor/ml-kem/NOTICE.md`. The equivalence and zeroization suites are
    the tripwire; do not adjust them to match new output.
-6. **F204-01** — expose ML-DSA-44 and ML-DSA-87, which requires refactoring
-   `SignerSpec.signer` from `typeof ml_dsa65` to a structural interface first. Each added set
-   needs its own pass over this matrix; provider availability is not conformance.
+6. ~~**F204-01** — expose ML-DSA-44 and ML-DSA-87~~ — closed 2026-09-09 (§3.1). No further
+   action; F204-04 activated as its direct consequence and was determined in the same pass.
 
 ### 4.4 Change log
 
-| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-09-08 | Registry pass (Phase 1, Stage 2). 22 rows registered from FIPS 204; 18 NOT EVALUATED, 4 NOT APPLICABLE. No code read for conformity, no code changed.                                                                                                                                                                                                                                                            |
-| 2026-09-08 | Conformity pass (Phase 2). All 22 rows determined against `packages/core/src` with file/line and test citations. F204-08 NONCONFORMING (SDK-scope); F204-10 and F204-13 NONCONFORMING (provider-scope). The §3.6.2 / `sign.ts` thread carried over from the FIPS 203 Stage 4 report is verified and resolved in §3.4. No code changed.                                                                           |
-| 2026-09-08 | Corrective pass. ML-DSA surface vendored into `packages/core/src/vendor/ml-dsa/` and wired through `algorithms.ts`. F204-13 closed (integer-only Decompose/Power2Round/HINT_M/GAMMA2, exhaustively verified over Z_q) and F204-10 closed (try/finally zeroization in `internal.verify`). Output cross-verified against the unpatched npm primitive in both directions. NONCONFORMING count now 0 in every scope. |
-| 2026-09-08 | Corrective pass. F204-08 closed: `verify` returns `false` for a wrong-length public key via `hasWrongVerificationKeyLength` in `sign.ts`, scoped so that every other malformed-key condition still throws through an unmodified `requireKey`. Two regression tests added to `sign.test.ts`. NONCONFORMING count now 0 SDK-scope, 2 provider-scope.                                                               |
+| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-08 | Registry pass (Phase 1, Stage 2). 22 rows registered from FIPS 204; 18 NOT EVALUATED, 4 NOT APPLICABLE. No code read for conformity, no code changed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2026-09-08 | Conformity pass (Phase 2). All 22 rows determined against `packages/core/src` with file/line and test citations. F204-08 NONCONFORMING (SDK-scope); F204-10 and F204-13 NONCONFORMING (provider-scope). The §3.6.2 / `sign.ts` thread carried over from the FIPS 203 Stage 4 report is verified and resolved in §3.4. No code changed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 2026-09-08 | Corrective pass. ML-DSA surface vendored into `packages/core/src/vendor/ml-dsa/` and wired through `algorithms.ts`. F204-13 closed (integer-only Decompose/Power2Round/HINT_M/GAMMA2, exhaustively verified over Z_q) and F204-10 closed (try/finally zeroization in `internal.verify`). Output cross-verified against the unpatched npm primitive in both directions. NONCONFORMING count now 0 in every scope.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 2026-09-08 | Corrective pass. F204-08 closed: `verify` returns `false` for a wrong-length public key via `hasWrongVerificationKeyLength` in `sign.ts`, scoped so that every other malformed-key condition still throws through an unmodified `requireKey`. Two regression tests added to `sign.test.ts`. NONCONFORMING count now 0 SDK-scope, 2 provider-scope.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 2026-09-09 | Corrective pass. F204-01 closed: `SignerSpec.signer` refactored from `typeof ml_dsa65` to the structural `NobleSigner` interface (mirroring `NobleKem`); `SignatureAlgorithm` widened to `'ml-dsa-44' \| 'ml-dsa-65' \| 'ml-dsa-87'`; both registered with byte lengths read from the provider at runtime. Confirmed F204-13/F204-10 apply to all three sets by reading `getDilithium`'s shared factory body, not by inference. Six new ACVP vector files added (same NIST ACVP-Server provenance as the existing `mldsa65-*.json` pair), wired into `nist-vectors.test.ts` as a parametrized loop; 20/16/20 keyGen+sigVer cases pass for -44/-65/-87 respectively. F204-04 activated as a direct consequence and determined **INDETERMINATE**, explicitly, for the same host-RBG-visibility reason as F204-02/F204-03 — not inherited silently. F204-03's applicability text corrected to reflect ML-DSA-87 now being registered (§3.2); its determination is unchanged. `SUPPORTED_ALGORITHMS`, `sign`/`verify` (now generic over `SignatureAlgorithm`), the CLI's `keygen --algorithm` help text, and `docs/serialization-format.md`'s key-length table updated to match. |
