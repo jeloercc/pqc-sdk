@@ -18,6 +18,7 @@ export default tseslint.config(
       'packages/core/src/vendor/ml-kem/ml-kem.ts',
       'packages/core/src/vendor/ml-kem/_crystals.ts',
       'packages/core/src/vendor/ml-kem/utils.ts',
+      'packages/core/src/vendor/ml-dsa/ml-dsa.ts',
     ],
   },
   js.configs.recommended,
