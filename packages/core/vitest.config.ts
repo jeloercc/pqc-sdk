@@ -16,7 +16,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.bench.ts'],
+      // src/vendor/** is third-party code copied verbatim from @noble/post-quantum (see
+      // src/vendor/ml-kem/NOTICE.md). Its utils.ts serves every noble algorithm, so most
+      // of it is unreachable from the ML-KEM surface and would drag the ratios below the
+      // thresholds without saying anything about this SDK's own test quality. The local
+      // modifications are covered directly by src/vendor/ml-kem/__tests__/.
+      exclude: ['src/**/*.test.ts', 'src/**/*.bench.ts', 'src/vendor/**'],
       thresholds: {
         lines: 90,
         functions: 90,
