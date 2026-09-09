@@ -1,8 +1,18 @@
 import { ml_kem768_x25519 } from '@noble/post-quantum/hybrid.js';
 import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
-import { ml_kem768 } from '@noble/post-quantum/ml-kem.js';
 
 import { PqcError, truncateForError } from './errors.js';
+// ML-KEM resolves to a vendored copy of @noble/post-quantum 0.7.1, not to the npm package.
+// Three FIPS 203 corrections live inside the primitive, and the published `dist` imports
+// @noble/post-quantum as an external runtime import — consumers execute their own registry
+// copy, so a patch or override here would never reach them. Vendoring into `src/` is the
+// only mechanism by which those corrections ship: F203-19 (floating-point Compress_d),
+// F203-11 (RBG failure attribution), F203-18 (branch-free implicit-reject selection).
+//
+// X-Wing, ML-DSA and SLH-DSA still resolve against the npm package. See
+// packages/core/src/vendor/ml-kem/NOTICE.md for provenance and the re-vendoring procedure,
+// and docs/compliance/FIPS-203-MATRIX.md §1.3 for why it matters.
+import { ml_kem768, RbgFailureError } from './vendor/ml-kem/ml-kem.js';
 import type { Algorithm, KemAlgorithm, KeyUse, PqcKey, SignatureAlgorithm } from './types.js';
 
 interface AlgorithmSpec {
@@ -157,6 +167,17 @@ export function encapsulateTo(
   } catch (cause) {
     if (cause instanceof PqcError) {
       throw cause;
+    }
+    // Order matters: the specific case first. FIPS 203 Algorithm 20 (steps 2-4) separates
+    // "the RBG failed" from an input-check failure, so the two must not collapse into one
+    // code — an entropy outage would otherwise send an operator to debug key distribution.
+    // Only reachable for ml-kem-768, which resolves to the vendored primitive; the x-wing
+    // path still falls through to INVALID_KEY below.
+    if (cause instanceof RbgFailureError) {
+      throw new PqcError(
+        'RBG_FAILURE',
+        `${algorithm} encapsulation aborted: the platform RBG failed to produce randomness`,
+      );
     }
     throw new PqcError('INVALID_KEY', `${algorithm} public key is not a valid encapsulation key`);
   }
