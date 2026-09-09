@@ -7,7 +7,7 @@
 export type KemAlgorithm = 'ml-kem-768' | 'x-wing';
 
 /** Digital signature algorithm. */
-export type SignatureAlgorithm = 'ml-dsa-65';
+export type SignatureAlgorithm = 'ml-dsa-44' | 'ml-dsa-65' | 'ml-dsa-87';
 
 /** Algorithms supported by the SDK. */
 export type Algorithm = KemAlgorithm | SignatureAlgorithm;

@@ -4,8 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import { pqc } from './index.js';
 import { generateKeyPairFromSeed } from './keys.js';
-import mldsaKeygen from './vectors/mldsa65-keygen.json';
-import mldsaSigver from './vectors/mldsa65-sigver.json';
+import mldsa44Keygen from './vectors/mldsa44-keygen.json';
+import mldsa44Sigver from './vectors/mldsa44-sigver.json';
+import mldsa65Keygen from './vectors/mldsa65-keygen.json';
+import mldsa65Sigver from './vectors/mldsa65-sigver.json';
+import mldsa87Keygen from './vectors/mldsa87-keygen.json';
+import mldsa87Sigver from './vectors/mldsa87-sigver.json';
 import mlkemEncapDecap from './vectors/mlkem768-encapdecap.json';
 import mlkemKeygen from './vectors/mlkem768-keygen.json';
 
@@ -75,29 +79,41 @@ describe('NIST ACVP ML-KEM-768 encapDecap (FIPS 203)', () => {
   );
 });
 
-describe('NIST ACVP ML-DSA-65 keyGen (FIPS 204)', () => {
-  it.each(mldsaKeygen.cases)('tcId $tcId: seed produces the expected pk/sk', ({ seed, pk, sk }) => {
-    const pair = generateKeyPairFromSeed('ml-dsa-65', hexToBytes(seed));
+// One block per FIPS 204 parameter set. All three vector files come from the
+// same NIST ACVP-Server source as the original ml-dsa-65 files (see each
+// JSON's "source" field) — see docs/compliance/FIPS-204-MATRIX.md §3.1 for
+// the F204-01 closure this evidence supports.
+const ML_DSA_SETS = [
+  { algorithm: 'ml-dsa-44' as const, keygen: mldsa44Keygen, sigver: mldsa44Sigver },
+  { algorithm: 'ml-dsa-65' as const, keygen: mldsa65Keygen, sigver: mldsa65Sigver },
+  { algorithm: 'ml-dsa-87' as const, keygen: mldsa87Keygen, sigver: mldsa87Sigver },
+];
 
-    expect(Buffer.from(pair.publicKey.bytes).toString('hex')).toBe(pk.toLowerCase());
-    expect(Buffer.from(pair.secretKey.bytes).toString('hex')).toBe(sk.toLowerCase());
+for (const { algorithm, keygen, sigver } of ML_DSA_SETS) {
+  describe(`NIST ACVP ${algorithm.toUpperCase()} keyGen (FIPS 204)`, () => {
+    it.each(keygen.cases)('tcId $tcId: seed produces the expected pk/sk', ({ seed, pk, sk }) => {
+      const pair = generateKeyPairFromSeed(algorithm, hexToBytes(seed));
+
+      expect(Buffer.from(pair.publicKey.bytes).toString('hex')).toBe(pk.toLowerCase());
+      expect(Buffer.from(pair.secretKey.bytes).toString('hex')).toBe(sk.toLowerCase());
+    });
   });
-});
 
-describe('NIST ACVP ML-DSA-65 sigVer (FIPS 204, pure)', () => {
-  it.each(mldsaSigver.cases)(
-    'tcId $tcId: verify returns $testPassed ($reason)',
-    async ({ pk, message, context, signature, testPassed }) => {
-      const publicKey = pqc.keys.deserialize(
-        `pqcv1.ml-dsa-65.public.${Buffer.from(hexToBytes(pk)).toString('base64url')}`,
-        { algorithm: 'ml-dsa-65', use: 'public' },
-      );
+  describe(`NIST ACVP ${algorithm.toUpperCase()} sigVer (FIPS 204, pure)`, () => {
+    it.each(sigver.cases)(
+      'tcId $tcId: verify returns $testPassed ($reason)',
+      async ({ pk, message, context, signature, testPassed }) => {
+        const publicKey = pqc.keys.deserialize(
+          `pqcv1.${algorithm}.public.${Buffer.from(hexToBytes(pk)).toString('base64url')}`,
+          { algorithm, use: 'public' },
+        );
 
-      const result = await pqc.verify(hexToBytes(message), hexToBytes(signature), publicKey, {
-        context: hexToBytes(context),
-      });
+        const result = await pqc.verify(hexToBytes(message), hexToBytes(signature), publicKey, {
+          context: hexToBytes(context),
+        });
 
-      expect(result).toBe(testPassed);
-    },
-  );
-});
+        expect(result).toBe(testPassed);
+      },
+    );
+  });
+}

@@ -17,7 +17,7 @@ import { PqcError, truncateForError } from './errors.js';
 // SLH-DSA still resolves against the npm package (not yet implemented by this SDK). See
 // packages/core/src/vendor/ml-kem/NOTICE.md for provenance and the re-vendoring procedure,
 // and docs/compliance/FIPS-203-MATRIX.md §1.3 / FIPS-204-MATRIX.md §1.3 for why it matters.
-import { ml_dsa65 } from './vendor/ml-dsa/ml-dsa.js';
+import { ml_dsa44, ml_dsa65, ml_dsa87 } from './vendor/ml-dsa/ml-dsa.js';
 import { ml_kem768, RbgFailureError } from './vendor/ml-kem/ml-kem.js';
 import { ml_kem768_x25519 } from './x-wing.js';
 import type { Algorithm, KemAlgorithm, KeyUse, PqcKey, SignatureAlgorithm } from './types.js';
@@ -51,10 +51,26 @@ export interface KemSpec extends AlgorithmSpec {
   readonly kem: NobleKem;
 }
 
+/**
+ * Structural signer surface shared by `@noble` ML-DSA implementations
+ * (`ml_dsa44`, `ml_dsa65`, `ml_dsa87`). Mirrors {@link NobleKem}'s role on the
+ * KEM side — declares only the methods the SDK actually calls.
+ */
+export interface NobleSigner {
+  keygen(seed?: Uint8Array): { publicKey: Uint8Array; secretKey: Uint8Array };
+  sign(msg: Uint8Array, secretKey: Uint8Array, opts?: { context?: Uint8Array }): Uint8Array;
+  verify(
+    sig: Uint8Array,
+    msg: Uint8Array,
+    publicKey: Uint8Array,
+    opts?: { context?: Uint8Array },
+  ): boolean;
+}
+
 export interface SignerSpec extends AlgorithmSpec {
   readonly kind: 'signer';
   readonly signatureLength: number;
-  readonly signer: typeof ml_dsa65;
+  readonly signer: NobleSigner;
 }
 
 export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
@@ -86,6 +102,14 @@ export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
 };
 
 export const SIGNATURE_ALGORITHMS: Record<SignatureAlgorithm, SignerSpec> = {
+  'ml-dsa-44': {
+    kind: 'signer',
+    signer: ml_dsa44,
+    seedLength: 32,
+    publicKeyLength: 1312,
+    secretKeyLength: 2560,
+    signatureLength: 2420,
+  },
   'ml-dsa-65': {
     kind: 'signer',
     signer: ml_dsa65,
@@ -93,6 +117,14 @@ export const SIGNATURE_ALGORITHMS: Record<SignatureAlgorithm, SignerSpec> = {
     publicKeyLength: 1952,
     secretKeyLength: 4032,
     signatureLength: 3309,
+  },
+  'ml-dsa-87': {
+    kind: 'signer',
+    signer: ml_dsa87,
+    seedLength: 32,
+    publicKeyLength: 2592,
+    secretKeyLength: 4896,
+    signatureLength: 4627,
   },
 };
 
