@@ -1,8 +1,25 @@
-import { ml_kem768_x25519 } from '@noble/post-quantum/hybrid.js';
-import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
-import { ml_kem768 } from '@noble/post-quantum/ml-kem.js';
-
 import { PqcError, truncateForError } from './errors.js';
+// ML-KEM and ML-DSA resolve to vendored copies of @noble/post-quantum 0.7.1, not to the npm
+// package. Four FIPS corrections live inside the primitives, and the published `dist`
+// imports @noble/post-quantum as an external runtime import — consumers execute their own
+// registry copy, so a patch or override here would never reach them. Vendoring into `src/`
+// is the only mechanism by which those corrections ship.
+//
+//   ML-KEM  — F203-19 (floating-point Compress_d), F203-11 (RBG failure attribution),
+//             F203-18 (branch-free implicit-reject selection).
+//   ML-DSA  — F204-13 (floating-point Decompose/Power2Round), F204-10 (zeroization on the
+//             verification path).
+//
+// X-Wing's embedded ML-KEM-768 gets the same two corrections via `./x-wing.ts`, which
+// reconstructs @noble/post-quantum/hybrid.js's own `ml_kem768_x25519` preset with the
+// vendored `ml_kem768` substituted for its npm-internal one — see that file for why the
+// combiner itself (`combineKEMS`/`expandSeedXof`/`_ecdhKem`) did not need vendoring.
+// SLH-DSA still resolves against the npm package (not yet implemented by this SDK). See
+// packages/core/src/vendor/ml-kem/NOTICE.md for provenance and the re-vendoring procedure,
+// and docs/compliance/FIPS-203-MATRIX.md §1.3 / FIPS-204-MATRIX.md §1.3 for why it matters.
+import { ml_dsa44, ml_dsa65, ml_dsa87 } from './vendor/ml-dsa/ml-dsa.js';
+import { ml_kem768, RbgFailureError } from './vendor/ml-kem/ml-kem.js';
+import { ml_kem768_x25519 } from './x-wing.js';
 import type { Algorithm, KemAlgorithm, KeyUse, PqcKey, SignatureAlgorithm } from './types.js';
 
 interface AlgorithmSpec {
@@ -34,10 +51,26 @@ export interface KemSpec extends AlgorithmSpec {
   readonly kem: NobleKem;
 }
 
+/**
+ * Structural signer surface shared by `@noble` ML-DSA implementations
+ * (`ml_dsa44`, `ml_dsa65`, `ml_dsa87`). Mirrors {@link NobleKem}'s role on the
+ * KEM side — declares only the methods the SDK actually calls.
+ */
+export interface NobleSigner {
+  keygen(seed?: Uint8Array): { publicKey: Uint8Array; secretKey: Uint8Array };
+  sign(msg: Uint8Array, secretKey: Uint8Array, opts?: { context?: Uint8Array }): Uint8Array;
+  verify(
+    sig: Uint8Array,
+    msg: Uint8Array,
+    publicKey: Uint8Array,
+    opts?: { context?: Uint8Array },
+  ): boolean;
+}
+
 export interface SignerSpec extends AlgorithmSpec {
   readonly kind: 'signer';
   readonly signatureLength: number;
-  readonly signer: typeof ml_dsa65;
+  readonly signer: NobleSigner;
 }
 
 export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
@@ -69,6 +102,14 @@ export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
 };
 
 export const SIGNATURE_ALGORITHMS: Record<SignatureAlgorithm, SignerSpec> = {
+  'ml-dsa-44': {
+    kind: 'signer',
+    signer: ml_dsa44,
+    seedLength: 32,
+    publicKeyLength: 1312,
+    secretKeyLength: 2560,
+    signatureLength: 2420,
+  },
   'ml-dsa-65': {
     kind: 'signer',
     signer: ml_dsa65,
@@ -76,6 +117,14 @@ export const SIGNATURE_ALGORITHMS: Record<SignatureAlgorithm, SignerSpec> = {
     publicKeyLength: 1952,
     secretKeyLength: 4032,
     signatureLength: 3309,
+  },
+  'ml-dsa-87': {
+    kind: 'signer',
+    signer: ml_dsa87,
+    seedLength: 32,
+    publicKeyLength: 2592,
+    secretKeyLength: 4896,
+    signatureLength: 4627,
   },
 };
 
@@ -157,6 +206,19 @@ export function encapsulateTo(
   } catch (cause) {
     if (cause instanceof PqcError) {
       throw cause;
+    }
+    // Order matters: the specific case first. FIPS 203 Algorithm 20 (steps 2-4) separates
+    // "the RBG failed" from an input-check failure, so the two must not collapse into one
+    // code — an entropy outage would otherwise send an operator to debug key distribution.
+    // Reachable for both ml-kem-768 (the vendored primitive's own sampleRandomness) and
+    // x-wing (x-wing.ts wraps its composed encapsulate to sample via the same
+    // sampleRandomness before combineKEMS's own unpatched default parameter ever runs —
+    // see x-wing.ts's module doc comment and FIPS-203-MATRIX.md §3.4).
+    if (cause instanceof RbgFailureError) {
+      throw new PqcError(
+        'RBG_FAILURE',
+        `${algorithm} encapsulation aborted: the platform RBG failed to produce randomness`,
+      );
     }
     throw new PqcError('INVALID_KEY', `${algorithm} public key is not a valid encapsulation key`);
   }

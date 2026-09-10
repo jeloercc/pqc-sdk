@@ -20,12 +20,12 @@ pqcv1.<algorithm>.<use>.<base64url>
 Four segments joined by `.` (exactly 3 dots — the base64url alphabet cannot
 contain `.`):
 
-| Segment   | Values                                  | Notes                                  |
-| --------- | --------------------------------------- | -------------------------------------- |
-| version   | `pqcv1`                                 | Literal prefix; the format's namespace |
-| algorithm | `ml-kem-768` \| `ml-dsa-65` \| `x-wing` | FIPS 203 / FIPS 204 / X-Wing draft     |
-| use       | `public` \| `secret`                    |                                        |
-| key bytes | base64url (see §5)                      | Raw key bytes, no framing              |
+| Segment   | Values                                                                | Notes                                  |
+| --------- | --------------------------------------------------------------------- | -------------------------------------- |
+| version   | `pqcv1`                                                               | Literal prefix; the format's namespace |
+| algorithm | `ml-kem-768` \| `ml-dsa-44` \| `ml-dsa-65` \| `ml-dsa-87` \| `x-wing` | FIPS 203 / FIPS 204 / X-Wing draft     |
+| use       | `public` \| `secret`                                                  |                                        |
+| key bytes | base64url (see §5)                                                    | Raw key bytes, no framing              |
 
 The `pqcv1` prefix names the _token_ format, not the envelope version — an
 `x-wing` key serializes as a `pqcv1` token and produces v2 envelopes.
@@ -35,7 +35,9 @@ Exact decoded byte lengths (also enforced on deserialize):
 | Algorithm    | public | secret |
 | ------------ | ------ | ------ |
 | `ml-kem-768` | 1184   | 2400   |
+| `ml-dsa-44`  | 1312   | 2560   |
 | `ml-dsa-65`  | 1952   | 4032   |
+| `ml-dsa-87`  | 2592   | 4896   |
 | `x-wing`     | 1216   | 32     |
 
 Key bytes are the FIPS 203/204 encodings as produced by `@noble/post-quantum`
@@ -98,11 +100,12 @@ accepted side by side.
 
 ## 3. Signature (binary)
 
-Output of `pqc.sign`: the raw **3309-byte** ML-DSA-65 signature exactly as
-FIPS 204 encodes it (hedged/randomized signing). No SDK framing, no version
-byte — the format is owned by the standard, not by this SDK. The optional
-signing context (≤ 255 bytes) is _not_ embedded; callers transport it
-alongside the message.
+Output of `pqc.sign`: the raw ML-DSA signature exactly as FIPS 204 encodes it
+(hedged/randomized signing) — 2420 bytes for ML-DSA-44, **3309 bytes** for
+ML-DSA-65, 4627 bytes for ML-DSA-87. No SDK framing, no version byte — the
+format is owned by the standard, not by this SDK. The optional signing
+context (≤ 255 bytes) is _not_ embedded; callers transport it alongside the
+message.
 
 ## 4. CLI files on disk
 

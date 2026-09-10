@@ -9,7 +9,11 @@ export type PqcErrorCode =
   | 'INVALID_CIPHERTEXT'
   | 'DECRYPTION_FAILED'
   | 'INVALID_CHUNK_SIZE'
-  | 'STREAM_OVERFLOW';
+  | 'STREAM_OVERFLOW'
+  // The platform random bit generator failed while an operation was sampling its own
+  // randomness. Distinct from INVALID_KEY: the inputs were fine, the host's entropy
+  // source was not. FIPS 203 Algorithm 20 steps 2-4 define this as its own outcome.
+  | 'RBG_FAILURE';
 
 /**
  * Typed SDK error. Every expected failure exposes a stable `code` so it can

@@ -154,13 +154,16 @@ importers:
       '@noble/ciphers':
         specifier: 2.2.0
         version: 2.2.0
+      '@noble/curves':
+        specifier: 2.4.0
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: 2.4.0
+        version: 2.4.0
       '@noble/post-quantum':
         specifier: 0.7.1
         version: 0.7.1
     devDependencies:
-      '@noble/hashes':
-        specifier: ^2.2.0
-        version: 2.2.0
       '@vitest/coverage-v8':
         specifier: ^3.2.2
         version: 3.2.6(vitest@3.2.6(@types/debug@4.1.13)(@types/node@22.19.21)(lightningcss@1.32.0)(terser@5.48.0)(yaml@2.9.0))
@@ -1958,10 +1961,6 @@ packages:
 
   '@noble/curves@2.4.0':
     resolution: {integrity: sha512-P4/62zrgfH33CneE3Dn4WhJVA22YUU0eR51wKIan4NVRvwsA0YnPTwWGpNbpuacSujmSFLvyzpyuR30+fbq2Ew==}
-    engines: {node: '>= 20.19.0'}
-
-  '@noble/hashes@2.2.0':
-    resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
     engines: {node: '>= 20.19.0'}
 
   '@noble/hashes@2.4.0':
@@ -7355,8 +7354,6 @@ snapshots:
   '@noble/curves@2.4.0':
     dependencies:
       '@noble/hashes': 2.4.0
-
-  '@noble/hashes@2.2.0': {}
 
   '@noble/hashes@2.4.0': {}
 

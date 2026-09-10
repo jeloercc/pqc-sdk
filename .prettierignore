@@ -8,3 +8,12 @@ pnpm-lock.yaml
 apps/docs/api
 apps/docs/compatibility.md
 *.timestamp-*.mjs
+
+# Third-party source vendored verbatim from @noble/post-quantum. Reformatting it to this
+# repo's Prettier config would bury the local modifications in whitespace noise and make
+# the diff against upstream unreviewable. See packages/core/src/vendor/ml-kem/NOTICE.md.
+# Only the copied files — tests written by this repo under __tests__/ stay formatted.
+packages/core/src/vendor/ml-kem/ml-kem.ts
+packages/core/src/vendor/ml-kem/_crystals.ts
+packages/core/src/vendor/ml-kem/utils.ts
+packages/core/src/vendor/ml-dsa/ml-dsa.ts
