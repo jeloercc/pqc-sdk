@@ -1,5 +1,285 @@
 # @pqc-sdk/core
 
+## 0.9.0
+
+### Minor Changes
+
+- f8b4a23: Expose ML-DSA-44 and ML-DSA-87, closing the last PARTIALLY CONFORMING row in FIPS-204-MATRIX.md
+
+  `pqc.keys.generate`, `pqc.sign` and `pqc.verify` now accept `'ml-dsa-44'` and `'ml-dsa-87'`
+  alongside the existing `'ml-dsa-65'`. `SignatureAlgorithm` widens from the closed
+  single-member union `'ml-dsa-65'` to `'ml-dsa-44' | 'ml-dsa-65' | 'ml-dsa-87'`, and
+  `SUPPORTED_ALGORITHMS` gains both new entries.
+
+  **Not a breaking change.** `SignerSpec.signer` moves from the concrete type `typeof
+ml_dsa65` to a new structural interface, `NobleSigner` (mirroring `NobleKem` on the KEM
+  side) — this type is internal, never re-exported from `@pqc-sdk/core`'s public entry
+  point. `sign`/`verify` widen from a literal `'ml-dsa-65'` parameter type to generic-over-
+  `SignatureAlgorithm`, a supertype relaxation: every call that type-checked before still
+  type-checks identically. The one real consequence, flagged rather than glossed over: a
+  consumer with an exhaustive `switch` over `SignatureAlgorithm` gains two unhandled cases —
+  the same reasoning that made `RBG_FAILURE`'s addition to `PqcErrorCode` a `minor` rather
+  than a `patch`.
+
+  Both parameter sets resolve to the vendored, FIPS-corrected `ml-dsa.ts`
+  (`packages/core/src/vendor/ml-dsa/`), not to the npm package. Both FIPS 204 corrections
+  already closed for `ml-dsa-65` — F204-13 (integer-only `Decompose`/`Power2Round`) and
+  F204-10 (zeroization in `internal.verify`) — apply identically to `ml-dsa-44` and
+  `ml-dsa-87`, verified by reading the source rather than inferred from the fact that all
+  three share a package: they're built from three independent calls to the same
+  `getDilithium(opts)` factory, and both corrections are defined once inside that factory's
+  body, not reimplemented per parameter set.
+
+  **ACVP round-trip evidence per set, not follow-up work.** Six new NIST ACVP-Server vector
+  files (`mldsa44-{keygen,sigver}.json`, `mldsa87-{keygen,sigver}.json`) — same provenance as
+  the existing `mldsa65-*.json` pair — are wired into `nist-vectors.test.ts`. 20/16/20
+  keyGen+sigVer cases pass for ML-DSA-44/65/87 respectively.
+
+  **Consequence for the compliance matrix.** F204-01 (`docs/compliance/FIPS-204-MATRIX.md`
+  §3.1) closes from `PARTIALLY CONFORMING` to `CONFORMING`. F204-04 (ML-DSA-44's RBG
+  security-strength threshold) activates as a direct consequence and is determined
+  `INDETERMINATE` — the same reasoning as F204-02/F204-03: this assessment has no
+  visibility into the host RBG's approved security strength. F204-03's applicability text is
+  also corrected, since its ML-DSA-87 clause is no longer "not registered"; its
+  determination (`INDETERMINATE`) does not change.
+
+  `docs/serialization-format.md`'s key-length table and the CLI's `keygen --algorithm` help
+  text are updated to match.
+
+- f8b4a23: `verify` now returns `false` for a wrong-length ML-DSA public key instead of throwing
+
+  FIPS 204 §3.6.2 makes the manner of the response part of the requirement: "If an
+  implementation of ML-DSA can accept inputs for σ or pk of any other length, it **shall
+  return false** whenever the lengths of either of these inputs differ from their lengths
+  specified in this standard."
+
+  The signature half already behaved this way — a wrong-length σ verifies to `false`. The
+  public-key half did not: `requireKey` threw `PqcError('INVALID_KEY')`, and it ran before
+  the try block in `verify`, so the rejection never reached the catch that would have
+  normalised it to `false`.
+
+  **Observable behaviour change.** Code that currently relies on the throw will break:
+
+  ```ts
+  // Before: rejected with PqcError('INVALID_KEY')
+  // Now:    resolves to false
+  await pqc.verify(message, signature, { algorithm: 'ml-dsa-65', use: 'public', bytes });
+  ```
+
+  Any `try`/`catch` around `pqc.verify` that treated `INVALID_KEY` as "the caller supplied a
+  mis-sized verification key" no longer fires for that case. A caller that already treated a
+  `false` result as "do not trust this signature" needs no change — the outcome is the same
+  answer delivered through the return value instead of an exception, and the behaviour was
+  fail-closed before and remains so.
+
+  **The change is scoped to `verify` only.** `requireKey` is unmodified, and every other
+  operation keeps the SDK-wide convention of throwing `INVALID_KEY` for a malformed key:
+  `encrypt`, `decrypt`, `sign`, `encryptStream`, `decryptStream` and the Web Stream variants
+  are untouched. A bad key there is an operator error with no meaningful "no" to return;
+  `verify` is the one operation whose contract is a boolean, and the one the standard names.
+
+  The carve-out covers **length only**. `verify` still throws for every other malformed-key
+  condition — `WRONG_ALGORITHM` for a non-ML-DSA key, `WRONG_KEY_USE` for a secret key passed
+  as public, `UNSUPPORTED_ALGORITHM` for an unknown algorithm — and still throws
+  `INVALID_CONTEXT` for a context string over 255 bytes.
+
+  Two regression tests were added to `sign.test.ts`: one covering five wrong public-key
+  lengths (0, 1951, 1953, and the 1312/2592 lengths that are _valid_ for ML-DSA-44 and
+  ML-DSA-87), mirroring the coverage that already existed for signature length; and one
+  pinning that the carve-out did not widen, so a future change relaxing `requireKey` globally
+  fails immediately.
+
+  No key, signature or envelope format changed. See `docs/compliance/FIPS-204-MATRIX.md`
+  §3.4 for the evidence and the row this closes (F204-08).
+
+- f8b4a23: Vendor the ML-DSA primitive and close two FIPS 204 findings
+
+  `ml-dsa-65` now resolves to a vendored copy of `@noble/post-quantum@0.7.1` at
+  `packages/core/src/vendor/ml-dsa/ml-dsa.ts` rather than to the npm package. X-Wing and
+  SLH-DSA continue to resolve against the npm package; ML-KEM was already vendored.
+
+  This was necessary for the same reason as the ML-KEM vendoring: the published `dist`
+  imports `@noble/post-quantum` as an external runtime import, so consumers execute their own
+  registry-resolved copy and no patch or override in this repository could ever have reached
+  them. Two corrections now ship:
+
+  - **F204-13** — `Decompose`, `Power2Round`, `HINT_M` and the two `GAMMA2` constants used
+    `Math.floor(x / y)`. In JavaScript `/` is always IEEE-754 double division, and wrapping it
+    in `Math.floor` does not change the arithmetic performed, so all five were floating-point
+    operations — which FIPS 204 §3.6.4 prohibits outright. They are now BigInt exact division
+    where the divisor is not a power of two, and a bit shift where it is, following §3.6.4's
+    own guidance. Verified exhaustively over the complete domain: both functions reduce their
+    input `mod q` first, so this is all of Z_q — 8,285,185 + 8,118,529 evaluations for
+    `Decompose` across both γ₂ values and 8,380,417 for `Power2Round`, with **0
+    discrepancies** against the originals.
+  - **F204-10** — `internal.verify` contained no `cleanBytes` call at all; every one of the 14
+    in the file was in key generation or signing. FIPS 204 §3.6.3 extends the destruction duty
+    explicitly to verification, citing signatures used as bearer tokens and signatures over
+    confidential plaintext. Verification now zeroizes its intermediates (`t1`, `tr`, `mu`,
+    `z`, `h`, `c`, `zNtt`, `c2`, `wTick1`) in a `finally`, so it happens on all seven early
+    `return false` paths and not only on success.
+
+  **Not a breaking change.** No key, signature or envelope format changed, and no consumer
+  code needs to change. Both corrections alter _method_, not output — §3.6.4 is a prohibition
+  on the arithmetic medium, and the original expressions were already bit-exact. That was
+  cross-verified directly against the unpatched npm primitive rather than assumed:
+
+  | Direction                                     | Result |
+  | --------------------------------------------- | ------ |
+  | vendored `pqc.sign` → npm `ml_dsa65.verify`   | `true` |
+  | npm `ml_dsa65.sign` → vendored `pqc.verify`   | `true` |
+  | npm `keygen` + `sign` → vendored `pqc.verify` | `true` |
+
+  Existing signatures and keys remain valid in both directions. The 31 NIST ACVP vectors pass
+  unchanged through the public API.
+
+  Two things worth knowing for maintenance:
+
+  - The vendored `ml-dsa.ts` reuses `_crystals.ts` and `utils.ts` from `vendor/ml-kem/` rather
+    than duplicating them. Nothing in those shared files was modified to accommodate ML-DSA.
+  - BigInt division in `Decompose` measured ≈4.2× the cost of the float expression in
+    isolation, and `Decompose` runs per coefficient during both signing and verification.
+    `Power2Round` uses a shift and is unaffected. This is the same trade-off already accepted
+    for ML-KEM's `Compress_d`, and it is a known cost of conformance rather than an oversight.
+
+  On any future `@noble/post-quantum` bump, re-vendor and re-apply the marked modifications
+  rather than hand-merging — see `packages/core/src/vendor/ml-kem/NOTICE.md`. The equivalence
+  and zeroization suites are the intended tripwire.
+
+  See `docs/compliance/FIPS-204-MATRIX.md` §3.5 and §3.6 for the full evidence.
+
+- f8b4a23: Vendor the ML-KEM primitive and close two FIPS 203 findings
+
+  The ML-KEM surface of `@noble/post-quantum@0.7.1` (`ml-kem.ts`, `_crystals.ts`,
+  `utils.ts`) is now vendored into `packages/core/src/vendor/ml-kem/` under its MIT
+  license, and `ml-kem-768` resolves to that copy. X-Wing, ML-DSA and SLH-DSA continue to
+  resolve against the npm package unchanged.
+
+  This was necessary because the published `dist` imports `@noble/post-quantum` as an
+  external runtime import: consumers execute their own registry-resolved copy, so no patch
+  or override in this repository could ever have reached them. Two corrections now ship:
+
+  - **F203-19** — `Compress_d` used IEEE-754 floating-point division (`Q / 2` is 1664.5),
+    which FIPS 203 §3.3 and §4.2.1 prohibit outright. It is now BigInt integer arithmetic.
+    Output is unchanged: verified bit-exact across all 36,619 `(i, d)` pairs of the
+    complete domain, against both the previous implementation and the §4.2.1 definition
+    evaluated in exact rationals.
+  - **F203-11** — a platform RBG failure during encapsulation was reported as
+    `INVALID_KEY`, telling callers the recipient's key was malformed when it was not.
+    FIPS 203 Algorithm 20 steps 2-4 define it as a separate condition, and it now surfaces
+    as the new `RBG_FAILURE` error code.
+  - **F203-18** — decapsulation selected the shared secret with a ternary on the secret
+    implicit-reject flag, and used a second ternary to decide which candidate to zeroize.
+    FIPS 203 §6.3 requires that flag to be destroyed before the algorithm terminates.
+    Selection is now byte-wise mask arithmetic into a fresh buffer and both candidates are
+    destroyed unconditionally, at both `decapsulate` call sites. Output is unchanged on
+    both branches: the ACVP vectors still pass, and the reject path still returns exactly
+    `J(z ‖ c)`. This removes the branch from the source, not from the machine —
+    JavaScript provides no verifiable constant-time guarantee, and that limitation is
+    documented rather than claimed closed.
+
+  No ciphertext, key or envelope format changed, so no golden vectors were regenerated and
+  no migration is needed. The 31 ACVP known-answer vectors pass unchanged against the
+  vendored path.
+
+  **New error code:** `RBG_FAILURE` is added to `PqcErrorCode`. Code that exhaustively
+  switches on that union will need a new branch. Code that previously matched
+  `INVALID_KEY` to detect entropy failures — behaviour that was never correct — will no
+  longer match.
+
+  `@noble/curves` and `@noble/hashes` become direct runtime dependencies of
+  `@pqc-sdk/core` (both pinned to 2.4.0, the versions `@noble/post-quantum@0.7.1` itself
+  depends on). They were already installed transitively; the vendored code imports them
+  directly, so declaring them is correctness, not a new install.
+
+  `SECURITY.md` gains a "Randomness source" section documenting which randomness API each
+  supported runtime resolves to, and stating explicitly that SP 800-90A/B/C validation of
+  that generator is the deployer's responsibility, not this SDK's (FIPS 203 §3.3).
+
+  See `docs/compliance/FIPS-203-MATRIX.md` §3.4, §3.8 and §3.9 for the evidence, and
+  `packages/core/src/vendor/ml-kem/NOTICE.md` for provenance and the re-vendoring
+  procedure.
+
+- f8b4a23: Repoint X-Wing's embedded ML-KEM-768 at the vendored, FIPS-corrected primitive
+
+  `pqc.keys.generate()`'s default algorithm, `x-wing`, embeds ML-KEM-768. Until now that
+  component still resolved to `@noble/post-quantum`'s own internal, unpatched `ml-kem.ts`,
+  not to the vendored copy at `packages/core/src/vendor/ml-kem/ml-kem.ts` that closed
+  **F203-19** (floating-point `Compress_d`) and **F203-18** (branch-based implicit-reject
+  selection) for the standalone `ml-kem-768` algorithm entry. Both rows had already closed
+  for that entry — this was a gap in what the closures covered, not a defect in either
+  correction. See `docs/compliance/FIPS-203-MATRIX.md` §3.10 for the full timeline: the gap
+  existed from each row's original closure (2026-09-07 and 2026-09-08) through 2026-09-09,
+  when it was found and closed in this pass.
+
+  `packages/core/src/x-wing.ts` now reconstructs `@noble/post-quantum/hybrid.js`'s own
+  `ml_kem768_x25519` preset verbatim — same argument order, same hard-coded
+  domain-separation label — substituting the vendored `ml_kem768` for the npm-internal one.
+  The preset's combiner (`combineKEMS`, `expandSeedXof`, `_ecdhKem`) is still imported from
+  `@noble/post-quantum/hybrid.js` rather than vendored: none of those three perform ML-KEM
+  arithmetic, so neither finding applies to them.
+
+  **Not a breaking change, and not a FIPS 203 coverage claim for X-Wing.** X-Wing is a CFRG
+  Internet-Draft construction (`draft-connolly-cfrg-xwing-kem-10`), not a FIPS 203
+  algorithm, and this fix does not change that — see `FIPS-203-MATRIX.md` §3.2. It was made
+  because a downstream consumer's shared secret does not carry a label recording which
+  named algorithm produced it: the arithmetic-method corrections that closed F203-19 and
+  F203-18 for `ml-kem-768` are equally worth having on the code path
+  `pqc.keys.generate()` actually uses by default.
+
+  **Interoperability.** Both corrections were proven output-identical to the code they
+  replaced across their full input domains when originally closed (`compress-equivalence.test.ts`,
+  `implicit-reject.test.ts`), so no key, ciphertext or shared-secret byte changes for any
+  given input. That argument is re-verified for the composite directly: `x-wing.test.ts`
+  cross-checks the vendored-backed and npm-backed presets bidirectionally — vendored
+  encapsulation decapsulates correctly under the npm preset and vice versa, deterministic
+  seeds produce byte-identical keys/ciphertext/shared-secret under both, and a tampered
+  ciphertext implicitly rejects to the same secret under both. Existing X-Wing keys and
+  ciphertexts remain valid.
+
+  `vendor/ml-kem/NOTICE.md` and `docs/compliance/FIPS-203-MATRIX.md` (§1.3, §3.2, §3.8,
+  §3.9, §3.10, §4.4) updated to describe the new boundary: X-Wing's embedded ML-KEM-768 is
+  now vendored; its X25519 component and its generic hybrid combiner remain Provider-scope,
+  since neither carries an ML-KEM finding.
+
+### Patch Changes
+
+- cefdd68: `encrypt` and `encryptStream` now fail with `PqcError('INVALID_KEY')` when a
+  KEM public key is the right length but not a valid encapsulation key, instead
+  of letting a raw `@noble` error escape.
+
+  This is reachable with an X-Wing public key whose `pk_X` half is a small-order
+  X25519 point (`0`, `1`, either order-8 point, or `p-1`): `@noble/curves`
+  throws because those drive the shared secret to all-zero. The behaviour was
+  already fail-closed — nothing was decryptable and no plaintext leaked — but
+  the error crossed the API boundary unmapped, contrary to the documented
+  contract that failures surface as a `PqcError`. `decrypt` already mapped the
+  equivalent decapsulation case.
+
+  Also adds a public-key mutation matrix (`key-mutations.test.ts`), covering the
+  `pk_M` and `pk_X` regions of X-Wing keys, ML-KEM-768 encapsulation keys, and
+  degenerate `ct_X` on decapsulation — regions no suite previously tampered.
+
+- f8b4a23: Record SLH-DSA (FIPS 205) as a deliberate scope decision, not an oversight
+
+  Documentation only — no API or behavior change. `README.md` and `SECURITY.md` gain a
+  short section stating that SLH-DSA is not implemented by choice: its signatures run
+  7,856–49,856 bytes (FIPS 205 Table 2, SLH-DSA-128s through 256f) versus 3,309 bytes for
+  ML-DSA-65; SPHINCS+'s hash-based construction costs tens of thousands of hash-function
+  invocations per signing/verification operation with no native acceleration available in
+  pure JS; and SLH-DSA's target use cases — firmware signing, long-lived roots of trust,
+  hedging against a lattice cryptanalytic break — aren't this SDK's request/response and
+  file-level target. ML-DSA-65 is recorded as the recommended signature algorithm, and a
+  consumer with a genuine SLH-DSA requirement is pointed toward a CMVP-validated module
+  rather than a self-assessed JS library.
+
+  `docs/compliance/FIPS-205-MATRIX.md` §1.3 records the same reasoning with a date
+  (2026-09-09) and explicit reopening conditions (§4.2, unchanged). All 21 rows stay
+  `NOT APPLICABLE` — what changes is that the reason is now a recorded decision rather than
+  a bare "not implemented," and the existing registry (all 12 Table 2 parameter sets mapped
+  against every applicable FIPS 205 requirement) is what makes that decision credible rather
+  than arbitrary.
+
 ## 0.8.3
 
 ### Patch Changes
