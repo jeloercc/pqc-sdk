@@ -280,6 +280,31 @@ ml_dsa65` to a new structural interface, `NobleSigner` (mirroring `NobleKem` on 
   against every applicable FIPS 205 requirement) is what makes that decision credible rather
   than arbitrary.
 
+## 0.8.4
+
+[This release was published to npm on 2026-09-04 (tags `@pqc-sdk/core@0.8.4` /
+`@pqc-sdk/cli@0.8.4`, commit `0aa0e69`), but its version commit was lost when
+`main` was force-pushed on 2026-09-06. Entries below are restored verbatim
+from the tagged commit.]
+
+### Patch Changes
+
+- b2d0498: `encrypt` and `encryptStream` now fail with `PqcError('INVALID_KEY')` when a
+  KEM public key is the right length but not a valid encapsulation key, instead
+  of letting a raw `@noble` error escape.
+
+  This is reachable with an X-Wing public key whose `pk_X` half is a small-order
+  X25519 point (`0`, `1`, either order-8 point, or `p-1`): `@noble/curves`
+  throws because those drive the shared secret to all-zero. The behaviour was
+  already fail-closed — nothing was decryptable and no plaintext leaked — but
+  the error crossed the API boundary unmapped, contrary to the documented
+  contract that failures surface as a `PqcError`. `decrypt` already mapped the
+  equivalent decapsulation case.
+
+  Also adds a public-key mutation matrix (`key-mutations.test.ts`), covering the
+  `pk_M` and `pk_X` regions of X-Wing keys, ML-KEM-768 encapsulation keys, and
+  degenerate `ct_X` on decapsulation — regions no suite previously tampered.
+
 ## 0.8.3
 
 ### Patch Changes
