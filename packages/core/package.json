@@ -30,7 +30,6 @@
     "lint": "eslint . && tsc --noEmit"
   },
   "devDependencies": {
-    "@noble/hashes": "^2.2.0",
     "@vitest/coverage-v8": "^3.2.2",
     "fast-check": "^4.9.0",
     "tsup": "^8.5.0",
@@ -39,6 +38,8 @@
   },
   "dependencies": {
     "@noble/ciphers": "2.2.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
     "@noble/post-quantum": "0.7.1"
   },
   "license": "MIT",
