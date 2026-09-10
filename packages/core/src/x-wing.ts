@@ -34,6 +34,29 @@
  * fail loudly if `hybrid.js`'s own preset ever diverges from this reconstruction, but a
  * removed export fails at the type-check/build step instead.
  *
+ * SECOND CORRECTION (F203-11), on top of the ML-KEM substitution above. Substituting the
+ * vendored `ml_kem768` fixes F203-19/F203-18 for X-Wing's embedded ML-KEM, but F203-11 (RBG
+ * failure surfacing as `INVALID_KEY` instead of `RBG_FAILURE`) is NOT reachable that way:
+ * the failing call is not inside either component KEM. `combineKEMS`'s own returned
+ * `encapsulate` samples its *top-level* combined randomness with a bare default parameter —
+ * `encapsulate(pk, randomness = randomBytes(msgCoder.bytesLen))` in
+ * `@noble/post-quantum/hybrid.js` — using that package's plain, unpatched `randomBytes`,
+ * with no RBG-failure wrapping. Verified by reproducing it: stubbing
+ * `crypto.getRandomValues` to throw and calling this module's own (pre-fix)
+ * `ml_kem768_x25519.encapsulate(publicKey)` threw a raw `Error` from exactly that default
+ * parameter, at `hybrid.js`'s `encapsulate` — never touching either component KEM. See
+ * docs/compliance/FIPS-203-MATRIX.md §3.4 for the full writeup.
+ *
+ * The fix is the same shape as the ML-KEM substitution: intervene one layer above the gap,
+ * in what this module exports, rather than vendor `combineKEMS` to patch its internal
+ * default parameter. `ml_kem768_x25519` below always supplies an explicit `randomness`
+ * argument to the composed object's `encapsulate` — sampled via the vendored
+ * `sampleRandomness` (the exact F203-11 correction, exported from `vendor/ml-kem/ml-kem.ts`
+ * for reuse here) when the caller passes none, forwarded unchanged when the caller does
+ * (preserving the derandomized/seeded path `xwing-vectors.test.ts`'s KAT vectors rely on).
+ * Because the wrapper's own explicit argument is always present, `hybrid.js`'s default
+ * parameter — the actual bug — is never evaluated.
+ *
  * See `vendor/ml-kem/NOTICE.md` for the ML-KEM vendoring this module builds on.
  */
 import { _ecdhKem, combineKEMS, expandSeedXof } from '@noble/post-quantum/hybrid.js';
@@ -42,7 +65,7 @@ import { asciiToBytes, concatBytes } from '@noble/curves/utils.js';
 import { x25519 } from '@noble/curves/ed25519.js';
 import { sha3_256, shake256 } from '@noble/hashes/sha3.js';
 
-import { ml_kem768 } from './vendor/ml-kem/ml-kem.js';
+import { ml_kem768, sampleRandomness } from './vendor/ml-kem/ml-kem.js';
 
 // Verbatim copy of `@noble/post-quantum/hybrid.js`'s own `x25519kem` and `ml_kem768_x25519`
 // construction (see that file, just above and at its `ml_kem768_x25519` export). Argument
@@ -52,8 +75,7 @@ import { ml_kem768 } from './vendor/ml-kem/ml-kem.js';
 // break interoperability with existing X-Wing keys and ciphertexts.
 const x25519kem = /* @__PURE__ */ _ecdhKem(x25519);
 
-/** X25519 + ML-KEM-768 hybrid preset, built from the vendored ML-KEM-768. */
-export const ml_kem768_x25519: KEM = /* @__PURE__ */ (() =>
+const inner: KEM = /* @__PURE__ */ (() =>
   combineKEMS(
     32,
     32,
@@ -63,3 +85,17 @@ export const ml_kem768_x25519: KEM = /* @__PURE__ */ (() =>
     ml_kem768,
     x25519kem,
   ))();
+
+/**
+ * X25519 + ML-KEM-768 hybrid preset, built from the vendored ML-KEM-768, with `encapsulate`
+ * wrapped so an RBG failure during the combined-randomness sampling surfaces as
+ * {@link RbgFailureError} — matching the vendored ML-KEM's own encapsulate — instead of a
+ * raw host error (F203-11; see the module doc comment above).
+ */
+export const ml_kem768_x25519: KEM = Object.freeze({
+  ...inner,
+  encapsulate(publicKey: Uint8Array, randomness?: Uint8Array) {
+    const seed = randomness ?? sampleRandomness(inner.lengths.msgRand!);
+    return inner.encapsulate(publicKey, seed);
+  },
+});
