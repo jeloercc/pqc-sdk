@@ -5,7 +5,8 @@
 (NIST, 13 August 2024)
 **Primitive provider:** `@noble/post-quantum@0.7.1` (exact pin) — exports all 12 parameter
 sets; the SDK registers **none** (see §1.3)
-**Assessment date:** 2026-09-08 (registry pass — Phase 1)
+**Assessment date:** 2026-09-08 (registry pass — Phase 1); 2026-09-09 (scope-decision
+recording — see §1.3, §4.3)
 **Method:** normative registry only. Requirements were extracted from the standard and
 mapped to the code surface that would govern them. **No conformity determination was made.**
 Every row is `NOT APPLICABLE` because SLH-DSA is not implemented by this SDK — an
@@ -25,7 +26,9 @@ the `F205-` prefix.
 > conformity state, because there is no SLH-DSA implementation to assess.** The requirements
 > are registered so that the coverage boundary is explicit and so that adding SLH-DSA starts
 > from a complete list rather than from scratch. Nothing in this document should be read as
-> a claim about SLH-DSA support, in either direction.
+> a claim about SLH-DSA support, in either direction. As of 2026-09-09, the absence itself
+> is a recorded scope decision (§1.3), not an unexamined gap — that changes the _reason_ on
+> every row below, not the row's status.
 
 Quotations are copied verbatim from the standard. Where a requirement is too long to quote
 whole, the operative fragment — the `shall`/`should` and its immediate context — is quoted
@@ -94,6 +97,46 @@ Were SLH-DSA registered today it would be **Provider-scope**, like ML-DSA and un
 `dist` imports `@noble/post-quantum` as an external runtime import, so consumers execute
 their own registry-resolved copy and no patch in this repository reaches it. Only the ML-KEM
 surface was vendored (`packages/core/src/vendor/ml-kem/`).
+
+**Scope decision, recorded 2026-09-09.** Everything above establishes that SLH-DSA is
+absent from the code; this paragraph and the two after it record _why it stays that way_,
+so the absence reads as a decision rather than an unexamined gap. Three factors, in the
+order that matters for a consumer deciding whether this SDK fits their case:
+
+1. **Signature size.** Per FIPS 205 Table 2 (§3.11 below, re-verified against the published
+   PDF for this entry rather than carried over from memory): SLH-DSA signatures range from
+   7,856 bytes (SLH-DSA-128s, security category 1) to 49,856 bytes (SLH-DSA-256f, category 5) — 2.4× to 15× the 3,309-byte ML-DSA-65 signature registered in
+   `FIPS-204-MATRIX.md` §3.1.
+2. **Pure-JS performance cost.** SLH-DSA is built on SPHINCS+: WOTS+ one-time-signature
+   chains, a FORS few-time-signature forest, and a hypertree of Merkle trees, all
+   constructed from repeated hash-function calls — on the order of tens of thousands of
+   invocations per signing or verification operation, with no native acceleration in this
+   SDK or in `@noble/post-quantum`. ML-DSA's lattice arithmetic carries no equivalent
+   per-operation hash count; this is a structural property of the hash-based construction,
+   not an implementation shortfall either library could optimize away.
+3. **Use-case fit.** SLH-DSA's security rests on hash-function properties alone, making it
+   a structurally independent hedge against a cryptanalytic break in the lattice
+   assumptions ML-KEM and ML-DSA both rely on. That is exactly why NIST standardized it
+   alongside, not instead of, the lattice schemes — but the deployments that hedge is
+   built for (firmware signing, long-lived roots of trust, contexts where a multi-decade
+   signature lifetime justifies the size and speed cost) are not this SDK's target of
+   request/response and file-level encryption and signing in ordinary JS/TS services.
+
+**ML-DSA-65 is the recommended signature algorithm in this SDK.** A consumer with a
+genuine SLH-DSA requirement — a long-lived root of trust, or a regulatory mandate naming
+it specifically — likely needs a CMVP-validated cryptographic module rather than a
+self-assessed pure-JS library; see `README.md`'s "How this is verified" section and
+`SECURITY.md` for exactly what "self-assessed" means for this project. Recorded in
+`README.md` and `SECURITY.md` as of this same date, with the same reasoning.
+
+**This decision is reopenable, not permanent, and the registry below is what makes that
+credible.** All 21 rows stay `NOT APPLICABLE` — this is a scope decision about _why_ the
+absence continues, not a change to any row's status, and not a conformity claim of any
+kind. If a consumer presents a concrete use case this positioning doesn't fit, the entry
+conditions in §4.2 are the complete, unchanged starting point for reopening it: this
+matrix's applicability registry was built precisely so that adding SLH-DSA later starts
+from a complete list rather than from scratch, and today's decision does not shorten that
+list or make it stale.
 
 ### 1.4 Structural differences from FIPS 203 and FIPS 204
 
@@ -371,7 +414,11 @@ Registry pass — **no conformity determinations were made**.
 
 Every row is `NOT APPLICABLE` for one reason: **SLH-DSA is not implemented by this SDK**
 (§1.3). This is an applicability finding verified against the code, not a conformity
-judgement, and it is uniform across the table rather than row-specific.
+judgement, and it is uniform across the table rather than row-specific. As of 2026-09-09,
+that reason is a recorded scope decision — signature size, pure-JS performance cost, and
+use-case fit, all detailed in §1.3 — not merely an unimplemented roadmap item; ML-DSA-65
+is the recommended signature algorithm, and the decision is reopenable on a concrete use
+case (§4.2).
 
 ### 4.1 What this document does not say
 
@@ -385,6 +432,11 @@ judgement, and it is uniform across the table rather than row-specific.
 - It records no ACVP evidence: the repository carries no SLH-DSA vectors.
 
 ### 4.2 Entry conditions for an implementation phase
+
+Recording the scope decision in §1.3 (2026-09-09) changed nothing below: this remains the
+complete, unchanged technical starting point for an implementation phase, and it is what a
+consumer's concrete use case would trigger working through — reopening the decision does
+not skip these steps or shorten this list.
 
 1. Refactor `SignerSpec.signer` from `typeof ml_dsa65` to a structural interface before
    registering any SLH-DSA parameter set (§3.11).
@@ -400,6 +452,7 @@ judgement, and it is uniform across the table rather than row-specific.
 
 ### 4.3 Change log
 
-| Date       | Change                                                                                                                                                                                               |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-09-08 | Registry pass (Phase 1). 21 rows registered from FIPS 205; all NOT APPLICABLE, SLH-DSA being unimplemented. Provider exports all 12 Table 2 parameter sets; the SDK registers none. No code changed. |
+| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-08 | Registry pass (Phase 1). 21 rows registered from FIPS 205; all NOT APPLICABLE, SLH-DSA being unimplemented. Provider exports all 12 Table 2 parameter sets; the SDK registers none. No code changed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2026-09-09 | Scope-decision recording (documentation only, no code changed, no row status changed). §1.3 now records SLH-DSA's absence as a deliberate decision — signature size (7,856–49,856 bytes per Table 2 vs. 3,309 bytes for ML-DSA-65, re-verified against the published PDF), pure-JS performance cost (SPHINCS+'s tens-of-thousands-of-hash-invocations path, no native acceleration available), and use-case fit (a hedge against a lattice cryptanalytic break, aimed at firmware signing and long-lived roots of trust, not this SDK's request/response and file-level target) — rather than an unexamined gap. ML-DSA-65 recorded as the recommended signature algorithm; consumers with a genuine SLH-DSA requirement pointed toward a CMVP-validated module. Same reasoning added to `README.md` and `SECURITY.md`. Explicitly reopenable: §4.2's entry conditions are unchanged and are what a concrete use case would trigger working through. All 21 rows remain NOT APPLICABLE. |

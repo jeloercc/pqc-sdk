@@ -37,6 +37,22 @@ and AES-256-GCM from [`@noble/ciphers`](https://github.com/paulmillr/noble-ciphe
 vulnerabilities in those implementations should be reported to their
 maintainers.
 
+**Not implemented (deliberate scope decision, not oversight):** SLH-DSA
+(FIPS 205). Recorded with dates and reasoning in
+[`docs/compliance/FIPS-205-MATRIX.md`](./docs/compliance/FIPS-205-MATRIX.md).
+Three factors drove it, verified against FIPS 205 Table 2 rather than
+estimated: signature size (7,856 bytes for SLH-DSA-128s up to 49,856 bytes
+for SLH-DSA-256f, versus 3,309 bytes for ML-DSA-65 — 2.4×–15× larger); the
+pure-JS performance cost of SPHINCS+'s tens-of-thousands-of-hash-invocations
+signing/verification path, which has no native acceleration here or in
+`@noble/post-quantum`; and use-case fit — SLH-DSA is a hedge against a
+lattice cryptanalytic break, aimed at firmware signing and long-lived roots
+of trust, not the request/response and file-level use this SDK targets.
+**ML-DSA-65 is the recommended signature algorithm.** A consumer with a
+genuine SLH-DSA requirement likely needs a CMVP-validated module rather than
+a self-assessed JS library — see the threat model below for what
+"self-assessed" means in this repo. Reopenable on a concrete use case.
+
 ## Threat model: known limits
 
 So you can assess whether the SDK fits your case:
