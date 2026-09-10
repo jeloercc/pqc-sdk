@@ -60,7 +60,13 @@ export const version = __PQC_CORE_VERSION__;
  * SUPPORTED_ALGORITHMS.includes('x-wing'); // true
  * ```
  */
-export const SUPPORTED_ALGORITHMS = ['ml-kem-768', 'ml-dsa-65', 'x-wing'] as const;
+export const SUPPORTED_ALGORITHMS = [
+  'ml-kem-768',
+  'ml-dsa-44',
+  'ml-dsa-65',
+  'ml-dsa-87',
+  'x-wing',
+] as const;
 
 export type SupportedAlgorithm = (typeof SUPPORTED_ALGORITHMS)[number];
 
