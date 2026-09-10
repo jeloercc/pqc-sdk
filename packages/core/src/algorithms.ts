@@ -210,8 +210,10 @@ export function encapsulateTo(
     // Order matters: the specific case first. FIPS 203 Algorithm 20 (steps 2-4) separates
     // "the RBG failed" from an input-check failure, so the two must not collapse into one
     // code — an entropy outage would otherwise send an operator to debug key distribution.
-    // Only reachable for ml-kem-768, which resolves to the vendored primitive; the x-wing
-    // path still falls through to INVALID_KEY below.
+    // Reachable for both ml-kem-768 (the vendored primitive's own sampleRandomness) and
+    // x-wing (x-wing.ts wraps its composed encapsulate to sample via the same
+    // sampleRandomness before combineKEMS's own unpatched default parameter ever runs —
+    // see x-wing.ts's module doc comment and FIPS-203-MATRIX.md §3.4).
     if (cause instanceof RbgFailureError) {
       throw new PqcError(
         'RBG_FAILURE',

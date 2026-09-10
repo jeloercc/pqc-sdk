@@ -95,6 +95,23 @@ describe('F203-11: RBG failure is reported as RBG_FAILURE, not INVALID_KEY', () 
     });
   });
 
+  it('reports RBG_FAILURE through the true default path — no algorithm argument anywhere', async () => {
+    // The test above pins { algorithm: 'ml-kem-768' }, which is exactly why it could not
+    // see that pqc.keys.generate()'s actual default — x-wing — still let a raw host error
+    // leak as INVALID_KEY (F203-11 was closed for the standalone ml-kem-768 entry only;
+    // x-wing's combiner samples its own top-level randomness in @noble/post-quantum's
+    // unvendored hybrid.js, never touching either component KEM's RBG-failure wrapper).
+    // See FIPS-203-MATRIX.md §3.4 and x-wing.ts's module doc comment.
+    const pair = await pqc.keys.generate();
+    expect(pair.publicKey.algorithm).toBe('x-wing');
+
+    breakEntropy('throw');
+
+    await expect(pqc.encrypt('secret', pair.publicKey)).rejects.toMatchObject({
+      code: 'RBG_FAILURE',
+    });
+  });
+
   it('the RBG_FAILURE message leaks no key material, only the failure and a length', () => {
     const spec = KEM_ALGORITHMS['ml-kem-768'];
     const { publicKey } = spec.kem.keygen();

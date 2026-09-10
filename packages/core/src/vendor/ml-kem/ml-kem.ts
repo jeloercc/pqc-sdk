@@ -105,16 +105,22 @@ export class RbgFailureError extends Error {}
  *
  * The thrown message deliberately carries no key material, no shared secret and no host
  * error text — only the fact of failure and the requested length.
+ *
+ * Exported so `x-wing.ts` can reuse it: `combineKEMS`'s own top-level randomness sampling
+ * (its `encapsulate`'s default parameter, in the npm-sourced, unvendored combiner) has this
+ * same gap, and it is not reachable by correcting ML-KEM's own `encapsulate`/`decapsulate` —
+ * see docs/compliance/FIPS-203-MATRIX.md §3.4 for why X-Wing needs this sampler applied one
+ * layer higher, at the composition in `x-wing.ts`, rather than inside this file.
  */
-const sampleRandomness = (n: number): TRet<Uint8Array> => {
+export const sampleRandomness = (n: number): TRet<Uint8Array> => {
   let out: TRet<Uint8Array>;
   try {
     out = randomBytes(n);
   } catch {
-    throw new RbgFailureError(`ML-KEM: the platform RBG failed to produce ${n} random bytes`);
+    throw new RbgFailureError(`the platform RBG failed to produce ${n} random bytes`);
   }
   if (out == null || out.length !== n) {
-    throw new RbgFailureError(`ML-KEM: the platform RBG failed to produce ${n} random bytes`);
+    throw new RbgFailureError(`the platform RBG failed to produce ${n} random bytes`);
   }
   return out;
 };
