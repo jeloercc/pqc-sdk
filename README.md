@@ -111,6 +111,39 @@ constant-time guarantees, is in [SECURITY.md](./SECURITY.md).
 To report a vulnerability, see [SECURITY.md](./SECURITY.md) — please do not
 open public issues.
 
+## SLH-DSA (FIPS 205): not implemented, by scope decision
+
+**ML-DSA-65 is the recommended signature algorithm in this SDK.** SLH-DSA
+(FIPS 205, the stateless hash-based signature standard built on SPHINCS+) is
+not implemented here, and that is a deliberate scope decision, not an
+oversight — recorded with dates and reasoning in
+[`docs/compliance/FIPS-205-MATRIX.md`](./docs/compliance/FIPS-205-MATRIX.md).
+
+- **Signature size.** Per FIPS 205 Table 2, SLH-DSA signatures range from
+  7,856 bytes (SLH-DSA-128s, security category 1) to 49,856 bytes
+  (SLH-DSA-256f, category 5) — roughly **2.4× to 15× larger** than ML-DSA-65's
+  3,309-byte signature.
+- **Pure-JS performance cost.** SLH-DSA/SPHINCS+ signing and verification make
+  tens of thousands of hash-function invocations per operation (WOTS+ chains,
+  a FORS forest, and a hypertree of Merkle trees, all built from repeated
+  hashing). ML-DSA's lattice arithmetic has no equivalent per-operation hash
+  count. Neither this SDK nor `@noble/post-quantum` accelerates that path with
+  native code.
+- **Use-case fit.** SLH-DSA exists as a structurally independent hedge against
+  a cryptanalytic break in lattice assumptions (the assumptions ML-KEM and
+  ML-DSA both rely on) — its target deployments are firmware signing and
+  long-lived roots of trust, where the multi-decade signature lifetime
+  justifies the size and speed cost. That is not this SDK's target: it is
+  built for request/response and file-level encryption and signing in
+  ordinary JS/TS services.
+
+**If you have a genuine SLH-DSA requirement** — a long-lived root of trust or
+a regulatory mandate specifically naming it — you likely need a
+CMVP-validated cryptographic module, not a self-assessed pure-JS library; see
+[How this is verified](#how-this-is-verified) for exactly what "self-assessed"
+means here. This decision is reopenable: if you have a concrete use case this
+SDK's positioning doesn't fit, open an issue and say so.
+
 ## Quickstart
 
 ```bash
