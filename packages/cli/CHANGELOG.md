@@ -13,6 +13,18 @@
 - Updated dependencies [f8b4a23]
   - @pqc-sdk/core@0.9.0
 
+## 0.8.4
+
+[This release was published to npm on 2026-09-04 (tags `@pqc-sdk/core@0.8.4` /
+`@pqc-sdk/cli@0.8.4`, commit `0aa0e69`), but its version commit was lost when
+`main` was force-pushed on 2026-09-06. Entries below are restored verbatim
+from the tagged commit.]
+
+### Patch Changes
+
+- Updated dependencies [b2d0498]
+  - @pqc-sdk/core@0.8.4
+
 ## 0.8.3
 
 ### Patch Changes
