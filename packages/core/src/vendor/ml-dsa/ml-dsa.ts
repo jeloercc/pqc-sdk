@@ -23,8 +23,8 @@
  * re-exported there as `export { abytesDoc as abytes }`). Nothing in ../ml-kem/utils.ts was
  * modified to accommodate ML-DSA.
  *
- * NOT WIRED UP YET: nothing in packages/core/src imports this file. `algorithms.ts` still
- * resolves ML-DSA to the npm package. Wiring is a separate phase.
+ * Wired up: `algorithms.ts` resolves ML-DSA-44/65/87 to this vendored copy, not the npm
+ * package (commit 0c3acd7).
  *
  * Modifications relative to upstream 0.7.1:
  *   1. Import specifiers './_crystals.ts' and './utils.ts' -> '../ml-kem/*.js'.
