@@ -24,6 +24,11 @@
  * (default: vendor-drift-report.md in the current directory).
  *
  * Usage: node scripts/check-vendor-drift.mjs [--report <path>]
+ *
+ * `evaluateDrift` and friends below are exported so __tests__/ can exercise
+ * the real logic against fixture directories with the network calls
+ * (`fetchLatestVersion`, `fetchPristineSource`) stubbed out — see
+ * scripts/__tests__/check-vendor-drift.test.mjs.
  */
 import { execFileSync } from 'node:child_process';
 import console from 'node:console';
@@ -34,40 +39,30 @@ import { dirname, join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const PACKAGE = '@noble/post-quantum';
+export const PACKAGE = '@noble/post-quantum';
+
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const CORE_DIR = join(SCRIPT_DIR, '..');
-const VENDOR_KEM_DIR = join(CORE_DIR, 'src/vendor/ml-kem');
-const VENDOR_DSA_DIR = join(CORE_DIR, 'src/vendor/ml-dsa');
-const NOTICE_PATH = join(VENDOR_KEM_DIR, 'NOTICE.md');
+const DEFAULT_CORE_DIR = join(SCRIPT_DIR, '..');
 const NOTICE_REL = 'packages/core/src/vendor/ml-kem/NOTICE.md';
 
-const VENDORED_FILES = [
-  { rel: 'ml-kem.ts', dir: VENDOR_KEM_DIR, upstream: 'src/ml-kem.ts' },
-  { rel: '_crystals.ts', dir: VENDOR_KEM_DIR, upstream: 'src/_crystals.ts' },
-  { rel: 'utils.ts', dir: VENDOR_KEM_DIR, upstream: 'src/utils.ts' },
-  { rel: 'ml-dsa.ts', dir: VENDOR_DSA_DIR, upstream: 'src/ml-dsa.ts' },
-];
-
-function sh(cmd, args) {
-  return execFileSync(cmd, args, { encoding: 'utf8' }).trim();
+/** The four vendored files, and where each one's recorded pristine digest lives. */
+export function vendoredFilesFor(coreDir) {
+  const kemDir = join(coreDir, 'src/vendor/ml-kem');
+  const dsaDir = join(coreDir, 'src/vendor/ml-dsa');
+  return [
+    { rel: 'ml-kem.ts', dir: kemDir, upstream: 'src/ml-kem.ts', digestSource: 'notice' },
+    { rel: '_crystals.ts', dir: kemDir, upstream: 'src/_crystals.ts', digestSource: 'notice' },
+    { rel: 'utils.ts', dir: kemDir, upstream: 'src/utils.ts', digestSource: 'notice' },
+    { rel: 'ml-dsa.ts', dir: dsaDir, upstream: 'src/ml-dsa.ts', digestSource: 'header' },
+  ];
 }
 
-function sha256(buf) {
+export function sha256(buf) {
   return createHash('sha256').update(buf).digest('hex');
 }
 
-/** Pulls the first 64-hex-char run following a "sha256 of the pristine copy" label near `anchor`. */
-function findRecordedDigest(text, anchor) {
-  const idx = text.indexOf(anchor);
-  if (idx === -1) return null;
-  const window = text.slice(idx, idx + 300);
-  const match = window.match(/[0-9a-f]{64}/i);
-  return match ? match[0].toLowerCase() : null;
-}
-
-function recordedDigestFromNotice(fileName) {
-  const notice = readFileSync(NOTICE_PATH, 'utf8');
+export function recordedDigestFromNotice(noticePath, fileName) {
+  const notice = readFileSync(noticePath, 'utf8');
   const rowIdx = notice.indexOf(`\`${fileName}\``);
   if (rowIdx === -1) return null;
   const row = notice.slice(rowIdx, notice.indexOf('\n', rowIdx));
@@ -75,40 +70,54 @@ function recordedDigestFromNotice(fileName) {
   return match ? match[0].toLowerCase() : null;
 }
 
-function recordedDigestFromHeader(filePath) {
+export function recordedDigestFromHeader(filePath) {
   const header = readFileSync(filePath, 'utf8').slice(0, 4000);
-  return findRecordedDigest(header, 'sha256 of the pristine copy');
+  const idx = header.indexOf('sha256 of the pristine copy');
+  if (idx === -1) return null;
+  const window = header.slice(idx, idx + 300);
+  const match = window.match(/[0-9a-f]{64}/i);
+  return match ? match[0].toLowerCase() : null;
 }
 
-function main() {
-  const reportArgIdx = process.argv.indexOf('--report');
-  const reportPath =
-    reportArgIdx !== -1 ? process.argv[reportArgIdx + 1] : join(process.cwd(), 'vendor-drift-report.md');
+/** Real (network-hitting) fetchers. Swapped out for stubs in tests. */
+export function fetchLatestVersionFromNpm(packageName = PACKAGE) {
+  return execFileSync('npm', ['view', packageName, 'version'], { encoding: 'utf8' }).trim();
+}
 
-  const corePkg = JSON.parse(readFileSync(join(CORE_DIR, 'package.json'), 'utf8'));
-  const pin = corePkg.dependencies?.[PACKAGE];
-  if (!pin) {
-    throw new Error(`${PACKAGE} not found in packages/core/package.json dependencies`);
-  }
+export function fetchPristineSourceFromNpm(pin, upstreamRelPath, packageName = PACKAGE) {
+  const tmp = mkdtempSync(join(tmpdir(), 'noble-pq-'));
+  execFileSync('npm', ['pack', `${packageName}@${pin}`, '--silent', '--pack-destination', tmp]);
+  const tarball = execFileSync('sh', ['-c', `ls ${tmp}/*.tgz`], { encoding: 'utf8' }).trim();
+  execFileSync('tar', ['-xzf', tarball, '-C', tmp]);
+  return readFileSync(join(tmp, 'package', upstreamRelPath));
+}
 
-  const latest = sh('npm', ['view', PACKAGE, 'version']);
+/**
+ * Core check. Reads the pin and the vendored files' own recorded digests
+ * from `coreDir`; everything that would otherwise hit the network goes
+ * through `fetchLatestVersion` / `fetchPristineSource`, both overridable.
+ */
+export function evaluateDrift({
+  coreDir = DEFAULT_CORE_DIR,
+  pin,
+  fetchLatestVersion = fetchLatestVersionFromNpm,
+  fetchPristineSource = fetchPristineSourceFromNpm,
+  repo = process.env.GITHUB_REPOSITORY ?? 'jeloercc/pqc-sdk',
+} = {}) {
+  const noticePath = join(coreDir, 'src/vendor/ml-kem/NOTICE.md');
+  const files = vendoredFilesFor(coreDir);
+
+  const latest = fetchLatestVersion(PACKAGE);
   const versionDrift = latest !== pin;
 
-  // Fetch the *pinned* version's pristine source and re-check the recorded digests.
-  const tmp = mkdtempSync(join(tmpdir(), 'noble-pq-'));
-  sh('npm', ['pack', `${PACKAGE}@${pin}`, '--silent', '--pack-destination', tmp]);
-  const tarball = sh('sh', ['-c', `ls ${tmp}/*.tgz`]);
-  sh('tar', ['-xzf', tarball, '-C', tmp]);
-
   const baselineMismatches = [];
-  for (const file of VENDORED_FILES) {
+  for (const file of files) {
     const vendoredPath = join(file.dir, file.rel);
-    const upstreamPath = join(tmp, 'package', file.upstream);
-
     const recorded =
-      file.dir === VENDOR_KEM_DIR
-        ? recordedDigestFromNotice(file.rel)
+      file.digestSource === 'notice'
+        ? recordedDigestFromNotice(noticePath, file.rel)
         : recordedDigestFromHeader(vendoredPath);
+
     if (!recorded) {
       baselineMismatches.push({
         file: file.rel,
@@ -117,19 +126,27 @@ function main() {
       continue;
     }
 
-    const fresh = sha256(readFileSync(upstreamPath));
+    const fresh = sha256(fetchPristineSource(pin, file.upstream, PACKAGE));
     if (fresh !== recorded) {
       baselineMismatches.push({ file: file.rel, recorded, fresh });
     }
   }
 
   const hasDrift = versionDrift || baselineMismatches.length > 0;
+  const issueTitle = `Vendoring drift: ${PACKAGE}`;
+  const reportBody = buildReportBody({ pin, latest, versionDrift, baselineMismatches, repo });
 
+  return { pin, latest, versionDrift, baselineMismatches, hasDrift, issueTitle, reportBody };
+}
+
+export function buildReportBody({ pin, latest, versionDrift, baselineMismatches, repo }) {
   const lines = [];
   lines.push('Automated vendoring-drift check for `@noble/post-quantum`.');
   lines.push('');
   if (versionDrift) {
-    lines.push(`**(a) A newer version is published.** Pinned: \`${pin}\`. Latest on npm: \`${latest}\`.`);
+    lines.push(
+      `**(a) A newer version is published.** Pinned: \`${pin}\`. Latest on npm: \`${latest}\`.`,
+    );
   } else {
     lines.push(`**(a) No newer version.** Pinned \`${pin}\` is the latest published version.`);
   }
@@ -149,12 +166,15 @@ function main() {
       );
     }
   } else {
-    lines.push('**(b) No baseline drift.** All recorded pristine-copy digests still match a fresh fetch of upstream.');
+    lines.push(
+      '**(b) No baseline drift.** All recorded pristine-copy digests still match a fresh fetch of upstream.',
+    );
   }
   lines.push('');
-  lines.push('Affected vendored files: `ml-kem.ts`, `_crystals.ts`, `utils.ts` (under `packages/core/src/vendor/ml-kem/`), `ml-dsa.ts` (under `packages/core/src/vendor/ml-dsa/`).');
+  lines.push(
+    'Affected vendored files: `ml-kem.ts`, `_crystals.ts`, `utils.ts` (under `packages/core/src/vendor/ml-kem/`), `ml-dsa.ts` (under `packages/core/src/vendor/ml-dsa/`).',
+  );
   lines.push('');
-  const repo = process.env.GITHUB_REPOSITORY ?? 'jeloercc/pqc-sdk';
   lines.push(
     `See [\`${NOTICE_REL}\`](https://github.com/${repo}/blob/main/${NOTICE_REL}) for the re-vendoring procedure and what each file's modifications are — this issue intentionally does not restate it.`,
   );
@@ -163,20 +183,44 @@ function main() {
     'After re-vendoring, the equivalence and zeroization test suites under `packages/core/src/vendor/*/__tests__/` are the tripwire: do not adjust them to match new output.',
   );
   lines.push('');
-  lines.push('This check is detect-and-notify only — it never modifies the vendored files or package.json.');
-
-  writeFileSync(reportPath, lines.join('\n') + '\n');
-
-  if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, `has-drift=${hasDrift}\n`);
-    appendFileSync(
-      process.env.GITHUB_OUTPUT,
-      `issue-title=Vendoring drift: ${PACKAGE}\n`,
-    );
-  }
-
-  console.log(lines.join('\n'));
-  console.log(`\nhas-drift=${hasDrift}`);
+  lines.push(
+    'This check is detect-and-notify only — it never modifies the vendored files or package.json.',
+  );
+  return lines.join('\n') + '\n';
 }
 
-main();
+function readPin(coreDir) {
+  const corePkg = JSON.parse(readFileSync(join(coreDir, 'package.json'), 'utf8'));
+  const pin = corePkg.dependencies?.[PACKAGE];
+  if (!pin) {
+    throw new Error(`${PACKAGE} not found in packages/core/package.json dependencies`);
+  }
+  return pin;
+}
+
+function main() {
+  const reportArgIdx = process.argv.indexOf('--report');
+  const reportPath =
+    reportArgIdx !== -1
+      ? process.argv[reportArgIdx + 1]
+      : join(process.cwd(), 'vendor-drift-report.md');
+
+  const coreDir = DEFAULT_CORE_DIR;
+  const pin = readPin(coreDir);
+  const result = evaluateDrift({ coreDir, pin });
+
+  writeFileSync(reportPath, result.reportBody);
+
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `has-drift=${result.hasDrift}\n`);
+    appendFileSync(process.env.GITHUB_OUTPUT, `issue-title=${result.issueTitle}\n`);
+  }
+
+  console.log(result.reportBody);
+  console.log(`has-drift=${result.hasDrift}`);
+}
+
+// Only run as the CLI entry point — not when __tests__/ imports this module.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

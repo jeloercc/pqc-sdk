@@ -12,7 +12,9 @@ export default defineConfig({
     __PQC_CORE_VERSION__: JSON.stringify(pkg.version),
   },
   test: {
-    include: ['src/**/*.test.ts'],
+    // scripts/**/*.test.mjs covers CI-only tooling (e.g. check-vendor-drift.mjs) that
+    // isn't part of the published package and so stays out of the coverage.include below.
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.mjs'],
     coverage: {
       provider: 'v8',
       include: ['src/**'],
