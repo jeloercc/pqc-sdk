@@ -1,0 +1,61 @@
+name: Vendor drift check
+
+# Detect-and-notify only: this workflow never edits packages/core/package.json
+# or any file under packages/core/src/vendor/, and never opens a PR. It opens
+# (or updates) a single tracking issue when @noble/post-quantum has a newer
+# release than the pin, or when a vendored file's recorded pristine-copy
+# digest no longer matches a fresh fetch of upstream at the pinned version.
+# Re-vendoring stays a manual, reviewed process — see
+# packages/core/src/vendor/ml-kem/NOTICE.md.
+on:
+  schedule:
+    - cron: '17 9 1 * *' # 09:17 UTC on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Check for vendoring drift
+        id: drift
+        run: node packages/core/scripts/check-vendor-drift.mjs --report vendor-drift-report.md
+
+      - name: Find existing open tracking issue
+        if: steps.drift.outputs.has-drift == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          number=$(gh issue list \
+            --search "\"${{ steps.drift.outputs.issue-title }}\" in:title" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Open tracking issue
+        if: steps.drift.outputs.has-drift == 'true' && steps.existing.outputs.number == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "${{ steps.drift.outputs.issue-title }}" \
+            --body-file vendor-drift-report.md
+
+      - name: Update existing tracking issue
+        if: steps.drift.outputs.has-drift == 'true' && steps.existing.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment "${{ steps.existing.outputs.number }}" \
+            --body-file vendor-drift-report.md
