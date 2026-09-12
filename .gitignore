@@ -26,3 +26,8 @@ keys/
 
 # Transient vitepress config bundle (orphaned when a build is interrupted)
 *.timestamp-*.mjs
+
+# Compiled interop helper binary — built locally by whoever regenerates the
+# CIRCL interop vectors (packages/core/scripts/interop/), never committed or
+# run in CI. go.mod/go.sum stay tracked so the CIRCL version is pinned.
+packages/core/scripts/interop/circl-helper/circl-helper

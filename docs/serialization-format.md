@@ -11,6 +11,23 @@ id alongside the existing ones — leaving every published layout byte-identical
 and still accepted — is additive and ships as a minor (the path envelope v2
 took, acknowledged in `docs/proposals/hybrid-envelope.md` §3).
 
+> **Interoperability boundary.** The `pqcv1` key token and the `pqcenc`
+> ciphertext/streaming envelopes (§1, §2, §9) are this SDK's own encodings,
+> not a wire-interop protocol — nothing outside this SDK's own versions
+> parses a `pqcv1.` token or a `0x01`–`0x04` envelope header, and none of
+> them is expected to. What _is_ interoperable is the standard-defined
+> payload each layer carries: the raw ML-KEM/ML-DSA/X-Wing key, ciphertext
+> and signature bytes underneath the SDK's own framing (§1's key bytes are
+> exactly the FIPS 203/204 or draft-connolly-cfrg-xwing-kem-10 encoding, and
+> §3's signature has no SDK framing at all — "the format is owned by the
+> standard"). Cross-implementation interop tests
+> (`packages/core/src/interop-circl.test.ts`, cross-checked at generation
+> time against Cloudflare's CIRCL — see
+> `packages/core/scripts/interop/generate-circl-vectors.mts`) test exactly
+> that payload layer, never the token or envelope framing — there is nothing
+> on the other side that could "interoperate" with framing only this SDK
+> speaks, and no test should be written to pretend otherwise.
+
 ## 1. Key token (string)
 
 ```
