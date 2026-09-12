@@ -23,6 +23,15 @@
  * A mismatch between this SDK and CIRCL is a finding to report, not
  * something to patch around by adjusting the check.
  *
+ * Deterministic: every keygen, sign, and encapsulate call below (on both the
+ * SDK and CIRCL side) uses a fixed seed via `fixedSeed()` /
+ * `{ extraEntropy: false }` / CIRCL's `randomized: false`. Running this
+ * script twice produces byte-identical output except `meta.generatedAt` —
+ * verified by diffing two consecutive runs before this was committed. This
+ * matters for the same reason it matters for generate-golden-vectors.mjs:
+ * someone questioning the evidence must be able to reproduce it, not just
+ * re-run something that happens to also pass.
+ *
  * Prerequisites:
  *   - `pnpm --filter @pqc-sdk/core build` (this script imports the built
  *     package for the public pqc.sign/pqc.verify calls, exactly like
@@ -39,7 +48,6 @@
 
 import { execFileSync } from 'node:child_process';
 import console from 'node:console';
-import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import process from 'node:process';
@@ -78,6 +86,18 @@ const XWING_DRAFT_VERSION_NOTE =
   'order, same literal domain-separation label. The passing bidirectional cross-check in this ' +
   'file is the evidence that -05 and -10 did not diverge in a way that matters here; it is ' +
   'not assumed from the version numbers.';
+
+/**
+ * Fixed, obviously synthetic byte sequence (test fixtures only — never a real
+ * key or secret). `marker` offsets the pattern per algorithm/purpose so nothing
+ * here can be mistaken for accidental key/seed reuse across the three vectors.
+ * Every seed below — keygen and encapsulation alike — uses this, so
+ * regenerating produces byte-identical output every time (verified by running
+ * this script twice and diffing the output, excluding `meta.generatedAt`).
+ */
+function fixedSeed(length: number, marker: number): Uint8Array {
+  return new Uint8Array(length).map((_, i) => (i + marker) & 0xff);
+}
 
 function toHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('hex');
@@ -118,6 +138,7 @@ interface CirclKemRequest {
   pkHex: string;
   skHex: string;
   sdkCtHex: string;
+  seedHex: string;
 }
 interface CirclResponse {
   circlVersion: string;
@@ -149,12 +170,27 @@ function callCircl(request: {
 // ---------------------------------------------------------------------------
 
 const MLDSA_SETS = [
-  { set: '44' as const, signer: ml_dsa44, message: 'circl interop vector: ML-DSA-44 cross-check' },
-  { set: '65' as const, signer: ml_dsa65, message: 'circl interop vector: ML-DSA-65 cross-check' },
-  { set: '87' as const, signer: ml_dsa87, message: 'circl interop vector: ML-DSA-87 cross-check' },
+  {
+    set: '44' as const,
+    signer: ml_dsa44,
+    message: 'circl interop vector: ML-DSA-44 cross-check',
+    seedMarker: 0x10,
+  },
+  {
+    set: '65' as const,
+    signer: ml_dsa65,
+    message: 'circl interop vector: ML-DSA-65 cross-check',
+    seedMarker: 0x20,
+  },
+  {
+    set: '87' as const,
+    signer: ml_dsa87,
+    message: 'circl interop vector: ML-DSA-87 cross-check',
+    seedMarker: 0x30,
+  },
 ];
 
-const mldsaSeeds = MLDSA_SETS.map(() => randomBytes(32));
+const mldsaSeeds = MLDSA_SETS.map(({ seedMarker }) => fixedSeed(32, seedMarker));
 const mldsaKeys = MLDSA_SETS.map(({ signer }, i) => signer.keygen(mldsaSeeds[i]));
 
 const mldsaCirclRequests: CirclMldsaRequest[] = [];
@@ -162,7 +198,12 @@ for (let i = 0; i < MLDSA_SETS.length; i++) {
   const { signer, message } = MLDSA_SETS[i];
   const { publicKey, secretKey } = mldsaKeys[i];
   const msgBytes = new TextEncoder().encode(message);
-  const sdkSig = signer.sign(msgBytes, secretKey);
+  // extraEntropy: false selects FIPS 204's deterministic variant (rnd = 0^32) —
+  // used ONLY here, for a reproducible fixture. The SDK's own production
+  // signing path (pqc.sign, sign.ts) never exposes this; §3.4 discourages it
+  // for real use due to fault-attack risk. See generate-golden-vectors.mjs for
+  // the same determinism-for-fixtures precedent on the key side.
+  const sdkSig = signer.sign(msgBytes, secretKey, { extraEntropy: false });
   mldsaCirclRequests.push({
     set: MLDSA_SETS[i].set,
     pkHex: toHex(publicKey),
@@ -244,10 +285,15 @@ function runKemCrossCheck(
   label: string,
   kem: {
     keygen: (seed?: Uint8Array) => { publicKey: Uint8Array; secretKey: Uint8Array };
-    encapsulate: (publicKey: Uint8Array) => { cipherText: Uint8Array; sharedSecret: Uint8Array };
+    encapsulate: (
+      publicKey: Uint8Array,
+      seed?: Uint8Array,
+    ) => { cipherText: Uint8Array; sharedSecret: Uint8Array };
     decapsulate: (cipherText: Uint8Array, secretKey: Uint8Array) => Uint8Array;
   },
-  seed: Uint8Array,
+  keygenSeed: Uint8Array,
+  sdkEncapsSeed: Uint8Array,
+  circlEncapsSeed: Uint8Array,
 ): {
   seedHex: string;
   publicKeyHex: string;
@@ -257,12 +303,18 @@ function runKemCrossCheck(
   circlCiphertextHex: string;
   circlSharedSecretHex: string;
 } {
-  const { publicKey, secretKey } = kem.keygen(seed);
+  const { publicKey, secretKey } = kem.keygen(keygenSeed);
 
-  // Direction 1: SDK encapsulates, CIRCL decapsulates with the same secret key.
-  const { cipherText: sdkCt, sharedSecret: sdkSs } = kem.encapsulate(publicKey);
+  // Direction 1: SDK encapsulates (fixed seed, so this is reproducible too),
+  // CIRCL decapsulates with the same secret key.
+  const { cipherText: sdkCt, sharedSecret: sdkSs } = kem.encapsulate(publicKey, sdkEncapsSeed);
   const resp = callCircl({
-    [label]: { pkHex: toHex(publicKey), skHex: toHex(secretKey), sdkCtHex: toHex(sdkCt) },
+    [label]: {
+      pkHex: toHex(publicKey),
+      skHex: toHex(secretKey),
+      sdkCtHex: toHex(sdkCt),
+      seedHex: toHex(circlEncapsSeed),
+    },
   } as { mlkem?: CirclKemRequest; xwing?: CirclKemRequest });
   const kemResp = label === 'mlkem' ? resp.mlkem : resp.xwing;
   if (!kemResp) fail(`${label}: no CIRCL response`, {});
@@ -292,7 +344,7 @@ function runKemCrossCheck(
 
   console.log(`${label}: both directions cross-checked OK.`);
   return {
-    seedHex: toHex(seed),
+    seedHex: toHex(keygenSeed),
     publicKeyHex: toHex(publicKey),
     secretKeyHex: toHex(secretKey),
     sdkCiphertextHex: toHex(sdkCt),
@@ -302,15 +354,38 @@ function runKemCrossCheck(
   };
 }
 
-const xwingSeed = randomBytes(32); // x-wing keygen seed length (see docs/serialization-format.md §1)
-const xwingResult = runKemCrossCheck('xwing', ml_kem768_x25519, xwingSeed);
+// x-wing keygen seed is 32 bytes (see docs/serialization-format.md §1); its
+// encapsulate() takes a 64-byte seed (32 ML-KEM coins + 32 X25519 ephemeral
+// bytes — confirmed at ml_kem768_x25519.lengths.msgRand). CIRCL's own
+// EncapsulationSeedSize for xwing is likewise 64.
+const xwingKeygenSeed = fixedSeed(32, 0x40);
+const xwingSdkEncapsSeed = fixedSeed(64, 0x41);
+const xwingCirclEncapsSeed = fixedSeed(64, 0x42);
+const xwingResult = runKemCrossCheck(
+  'xwing',
+  ml_kem768_x25519,
+  xwingKeygenSeed,
+  xwingSdkEncapsSeed,
+  xwingCirclEncapsSeed,
+);
 
 // ---------------------------------------------------------------------------
 // Priority 3: ML-KEM-768 bidirectional shared-secret cross-check.
 // ---------------------------------------------------------------------------
 
-const mlkemSeed = randomBytes(64); // ml-kem-768 keygen seed length (d || z, 32 + 32)
-const mlkemResult = runKemCrossCheck('mlkem', ml_kem768, mlkemSeed);
+// ml-kem-768 keygen seed is 64 bytes (d || z, 32 + 32); its encapsulate()
+// takes a 32-byte seed (confirmed at ml_kem768.lengths.msgRand). CIRCL's own
+// EncapsulationSeedSize for mlkem768 is likewise 32.
+const mlkemKeygenSeed = fixedSeed(64, 0x50);
+const mlkemSdkEncapsSeed = fixedSeed(32, 0x51);
+const mlkemCirclEncapsSeed = fixedSeed(32, 0x52);
+const mlkemResult = runKemCrossCheck(
+  'mlkem',
+  ml_kem768,
+  mlkemKeygenSeed,
+  mlkemSdkEncapsSeed,
+  mlkemCirclEncapsSeed,
+);
 
 // ---------------------------------------------------------------------------
 // Write the three vector files.
