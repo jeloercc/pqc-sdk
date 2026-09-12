@@ -1,0 +1,61 @@
+name: CIRCL interop drift check
+
+# Detect-and-notify only: this workflow never regenerates the vectors under
+# packages/core/src/vectors/interop/ and never opens a PR. It opens (or
+# updates) a single tracking issue when github.com/cloudflare/circl has a
+# newer release than the version recorded in the vectors' own
+# meta.counterpartVersion. Regenerating stays a manual process requiring Go
+# and a human reading the cross-check results — see
+# packages/core/scripts/interop/generate-circl-vectors.mts.
+on:
+  schedule:
+    - cron: '41 9 1 * *' # 09:41 UTC on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Check for CIRCL interop-vector drift
+        id: drift
+        run: node packages/core/scripts/check-circl-drift.mjs --report circl-drift-report.md
+
+      - name: Find existing open tracking issue
+        if: steps.drift.outputs.has-drift == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          number=$(gh issue list \
+            --search "\"${{ steps.drift.outputs.issue-title }}\" in:title" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Open tracking issue
+        if: steps.drift.outputs.has-drift == 'true' && steps.existing.outputs.number == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "${{ steps.drift.outputs.issue-title }}" \
+            --body-file circl-drift-report.md
+
+      - name: Update existing tracking issue
+        if: steps.drift.outputs.has-drift == 'true' && steps.existing.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment "${{ steps.existing.outputs.number }}" \
+            --body-file circl-drift-report.md
