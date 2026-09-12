@@ -1,13 +1,8 @@
 package main
 
 import (
-	cryptoRand "crypto/rand"
 	"runtime/debug"
 )
-
-func readFullRandom(buf []byte) (int, error) {
-	return cryptoRand.Read(buf)
-}
 
 // circlVersion reports the exact resolved github.com/cloudflare/circl module
 // version (e.g. "v1.6.5"), read from the binary's own build info rather than

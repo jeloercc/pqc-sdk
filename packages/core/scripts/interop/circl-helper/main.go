@@ -43,6 +43,10 @@ type kemRequest struct {
 	PkHex    string `json:"pkHex"`
 	SkHex    string `json:"skHex"`
 	SdkCtHex string `json:"sdkCtHex"`
+	// Fixed encapsulation seed supplied by the caller, so CIRCL's own
+	// encapsulate() is as reproducible as the SDK's — see EncapsulateTo's
+	// seed parameter on both mlkem768.PublicKey and xwing.PublicKey.
+	SeedHex string `json:"seedHex"`
 }
 
 type kemResponse struct {
@@ -103,7 +107,7 @@ func handleMldsa(req mldsaRequest) mldsaResponse {
 		}
 		verifiesSdkSig = mldsa44.Verify(&pub, msg, nil, sdkSig)
 		circlSig = make([]byte, mldsa44.SignatureSize)
-		if err := mldsa44.SignTo(&priv, msg, nil, true, circlSig); err != nil {
+		if err := mldsa44.SignTo(&priv, msg, nil, false, circlSig); err != nil {
 			fmt.Fprintf(os.Stderr, "circl-helper: mldsa44 sign: %v\n", err)
 			os.Exit(1)
 		}
@@ -121,7 +125,7 @@ func handleMldsa(req mldsaRequest) mldsaResponse {
 		}
 		verifiesSdkSig = mldsa65.Verify(&pub, msg, nil, sdkSig)
 		circlSig = make([]byte, mldsa65.SignatureSize)
-		if err := mldsa65.SignTo(&priv, msg, nil, true, circlSig); err != nil {
+		if err := mldsa65.SignTo(&priv, msg, nil, false, circlSig); err != nil {
 			fmt.Fprintf(os.Stderr, "circl-helper: mldsa65 sign: %v\n", err)
 			os.Exit(1)
 		}
@@ -139,7 +143,7 @@ func handleMldsa(req mldsaRequest) mldsaResponse {
 		}
 		verifiesSdkSig = mldsa87.Verify(&pub, msg, nil, sdkSig)
 		circlSig = make([]byte, mldsa87.SignatureSize)
-		if err := mldsa87.SignTo(&priv, msg, nil, true, circlSig); err != nil {
+		if err := mldsa87.SignTo(&priv, msg, nil, false, circlSig); err != nil {
 			fmt.Fprintf(os.Stderr, "circl-helper: mldsa87 sign: %v\n", err)
 			os.Exit(1)
 		}
@@ -174,12 +178,17 @@ func handleMlkem(req kemRequest) kemResponse {
 	ss1 := make([]byte, mlkem768.SharedKeySize)
 	sk.DecapsulateTo(ss1, sdkCt)
 
-	// Direction 2: CIRCL encapsulates fresh, against the same public key.
+	// Direction 2: CIRCL encapsulates against the same public key, using the
+	// caller-supplied fixed seed so this is as reproducible as the SDK side.
 	ct2 := make([]byte, mlkem768.CiphertextSize)
 	ss2 := make([]byte, mlkem768.SharedKeySize)
-	seed := make([]byte, mlkem768.EncapsulationSeedSize)
-	if _, err := readFullRandom(seed); err != nil {
-		fmt.Fprintf(os.Stderr, "circl-helper: mlkem768 encaps seed: %v\n", err)
+	seed := mustHex(req.SeedHex)
+	if len(seed) != mlkem768.EncapsulationSeedSize {
+		fmt.Fprintf(
+			os.Stderr,
+			"circl-helper: mlkem768 encaps seed must be %d bytes, got %d\n",
+			mlkem768.EncapsulationSeedSize, len(seed),
+		)
 		os.Exit(1)
 	}
 	pk.EncapsulateTo(ct2, ss2, seed)
@@ -206,9 +215,13 @@ func handleXwing(req kemRequest) kemResponse {
 
 	ct2 := make([]byte, xwing.CiphertextSize)
 	ss2 := make([]byte, xwing.SharedKeySize)
-	seed := make([]byte, xwing.EncapsulationSeedSize)
-	if _, err := readFullRandom(seed); err != nil {
-		fmt.Fprintf(os.Stderr, "circl-helper: xwing encaps seed: %v\n", err)
+	seed := mustHex(req.SeedHex)
+	if len(seed) != xwing.EncapsulationSeedSize {
+		fmt.Fprintf(
+			os.Stderr,
+			"circl-helper: xwing encaps seed must be %d bytes, got %d\n",
+			xwing.EncapsulationSeedSize, len(seed),
+		)
 		os.Exit(1)
 	}
 	pk.EncapsulateTo(ct2, ss2, seed)
