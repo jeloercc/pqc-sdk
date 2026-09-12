@@ -60,6 +60,25 @@ const REGENERATE_COMMAND =
   '(cd scripts/interop/circl-helper && go build -o circl-helper .) && ' +
   'pnpm exec tsx scripts/interop/generate-circl-vectors.mts';
 
+// Recorded here, not left for an auditor to trip over: CIRCL v1.6.5's own package doc
+// (kem/xwing/xwing.go) says "Implements the final version (-05)", while this SDK targets
+// draft-connolly-cfrg-xwing-kem-10. Read both source trees before writing this generator —
+// CIRCL's combiner (kem/xwing/xwing.go's `combiner` func: SHA3-256(ss_M || ss_X || ct_X ||
+// pk_X || "\.//^\")) is byte-identical to @noble/post-quantum/hybrid.js's ml_kem768_x25519
+// (same hash, same input order, same literal label). The passing bidirectional cross-check
+// below is the actual evidence that -05 and -10 did not diverge in a way that matters here;
+// this note exists so that fact travels with the vector rather than requiring the same
+// source-reading exercise a second time.
+const XWING_DRAFT_VERSION_NOTE =
+  "CIRCL's kem/xwing package documents itself as implementing X-Wing draft -05, while this " +
+  'SDK targets draft-connolly-cfrg-xwing-kem-10. Before generating this vector, the combiner ' +
+  "construction was verified byte-identical between the two by reading both sources: CIRCL's " +
+  "`combiner` (kem/xwing/xwing.go) and @noble/post-quantum/hybrid.js's `ml_kem768_x25519` " +
+  'both compute SHA3-256(ss_M || ss_X || ct_X || pk_X || "\\.//^\\") — same hash, same input ' +
+  'order, same literal domain-separation label. The passing bidirectional cross-check in this ' +
+  'file is the evidence that -05 and -10 did not diverge in a way that matters here; it is ' +
+  'not assumed from the version numbers.';
+
 function toHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('hex');
 }
@@ -302,8 +321,15 @@ mkdirSync(VECTORS_DIR, { recursive: true });
 const generatedAt = new Date().toISOString();
 const circlVersion = circlResp1.circlVersion;
 
-function writeVectorFile(name: string, payload: Record<string, unknown>): void {
+function writeVectorFile(name: string, payload: Record<string, unknown>, extraNote?: string): void {
   const path = join(VECTORS_DIR, name);
+  const baseNote =
+    'Cross-implementation interop vector: this SDK vs. Cloudflare CIRCL (Go), an ' +
+    'independent codebase from @noble/post-quantum. Not an ACVP vector — see ' +
+    'src/nist-vectors.test.ts and docs/compliance/ for those. The cross-check that ' +
+    'matters (does CIRCL accept/produce byte-compatible material) was performed once, ' +
+    "here, at generation time; CI re-checks only this SDK's own behaviour against the " +
+    'committed bytes (a regression guard), since Go/CIRCL never runs in CI.';
   const doc = {
     meta: {
       generatedWith: `@pqc-sdk/core@${version}`,
@@ -311,13 +337,7 @@ function writeVectorFile(name: string, payload: Record<string, unknown>): void {
       counterpartVersion: circlVersion,
       generatedAt,
       regenerateCommand: REGENERATE_COMMAND,
-      note:
-        'Cross-implementation interop vector: this SDK vs. Cloudflare CIRCL (Go), an ' +
-        'independent codebase from @noble/post-quantum. Not an ACVP vector — see ' +
-        'src/nist-vectors.test.ts and docs/compliance/ for those. The cross-check that ' +
-        'matters (does CIRCL accept/produce byte-compatible material) was performed once, ' +
-        "here, at generation time; CI re-checks only this SDK's own behaviour against the " +
-        'committed bytes (a regression guard), since Go/CIRCL never runs in CI.',
+      note: extraNote ? `${baseNote} ${extraNote}` : baseNote,
     },
     ...payload,
   };
@@ -326,7 +346,7 @@ function writeVectorFile(name: string, payload: Record<string, unknown>): void {
 }
 
 writeVectorFile('circl-mldsa.json', { cases: mldsaResults });
-writeVectorFile('circl-xwing.json', { case: xwingResult });
+writeVectorFile('circl-xwing.json', { case: xwingResult }, XWING_DRAFT_VERSION_NOTE);
 writeVectorFile('circl-mlkem768.json', { case: mlkemResult });
 
 console.log('generate-circl-vectors: all cross-checks passed.');
