@@ -111,6 +111,98 @@ constant-time guarantees, is in [SECURITY.md](./SECURITY.md).
 To report a vulnerability, see [SECURITY.md](./SECURITY.md) — please do not
 open public issues.
 
+## FIPS 203/204/205 conformance self-assessment
+
+This is the thing that distinguishes this SDK from wrapping
+`@noble/post-quantum` directly: `docs/compliance/` carries a clause-by-clause
+self-assessment against all three PQC standards this SDK touches. Each
+matrix quotes the normative text verbatim, states whether the requirement
+applies to this codebase, and assigns one of a closed set of statuses —
+`CONFORMING`, `CONFORMING (delegated)`, `NONCONFORMING`, `INDETERMINATE`,
+`NOT APPLICABLE` and so on — never a bare pass/fail. A row moves to
+`CONFORMING` only on the strength of a named, executed test; every row cites
+a file, a line, or a test name as its evidence, never a narrative claim
+alone. The assessment follows a findings-before-fixes discipline: the
+assessment pass itself changes no code, and remediation lands separately,
+referenced by the finding ID.
+
+- [`FIPS-203-MATRIX.md`](./docs/compliance/FIPS-203-MATRIX.md) — 21
+  requirements, ML-KEM-768
+- [`FIPS-204-MATRIX.md`](./docs/compliance/FIPS-204-MATRIX.md) — 22
+  requirements, ML-DSA-44/65/87
+- [`FIPS-205-MATRIX.md`](./docs/compliance/FIPS-205-MATRIX.md) — 21
+  requirements registered, all `NOT APPLICABLE` — SLH-DSA is not
+  implemented; see [below](#slh-dsa-fips-205-not-implemented-by-scope-decision)
+
+**What was found, and fixed.** Across FIPS 203 and FIPS 204, six findings
+were opened as `NONCONFORMING` and closed by an actual code change, each
+with an executed regression test cited in the matrix:
+
+- **Floating-point arithmetic** in ML-KEM's `Compress_d` (F203-19) and in
+  ML-DSA's `Decompose`/`Power2Round`/`HINT_M` (F204-13) — both standards
+  prohibit floating-point arithmetic outright, and JavaScript's `/` is
+  always IEEE-754 double division regardless of whether `Math.floor` wraps
+  it. Replaced with integer-only BigInt/bit-shift arithmetic, verified
+  bit-exact against the code it replaced over the full input domain — all
+  36,619 `(q, d)` pairs for `Compress_d`, and all of `Z_q` (8,380,417
+  values) for `Power2Round` and both `Decompose` branches.
+- **Branch-based implicit-reject selection** in ML-KEM decapsulation
+  (F203-18) — which of two candidate shared secrets survived was decided by
+  a source-level ternary on the secret reject flag. Replaced with a
+  byte-wise arithmetic mask, so every output byte is computed from both
+  candidates unconditionally and the branch disappears.
+- **Missing zeroization on the ML-DSA verification path** (F204-10) —
+  upstream's `internal.verify` had zero `cleanBytes` calls; every decoded
+  or recomputed intermediate survived the call. Wrapped in `try`/`finally`
+  so all nine intermediates are wiped on every exit, including early
+  rejections, while leaving caller-owned buffers (the public key, the
+  signature) untouched.
+- **RBG failure misattributed as an invalid key** (F203-11) — an entropy
+  failure during ML-KEM encapsulation was caught by the same handler as a
+  malformed public key, so a host RBG outage was reported to the operator
+  as a bad recipient key. Given a dedicated `RBG_FAILURE` error code,
+  checked before the generic handler.
+- **Wrong-length public key throwing instead of returning `false`**
+  (F204-08) — FIPS 204 §3.6.2 requires `ML-DSA.Verify` to _return_ `false`
+  on a wrong-length key, not throw; the SDK's own length check ran outside
+  the `try` block that would have normalized it. Moved inside.
+
+Three of these (F203-11, F203-18, F203-19) were closed for the standalone
+`ml-kem-768` algorithm first, then found to still be open on the **default**
+`x-wing` path — a differently-scoped gap in each case, found and closed
+separately once asked about. The matrices record both dates. A seventh row,
+F203-12 (approved RBG), also left `NONCONFORMING` — but only by
+reclassification to `INDETERMINATE`, not by a code fix, and the matrix is
+explicit that reclassification is not progress; it is not counted among the
+six above.
+
+**What is not claimed.**
+
+- **This is self-assessment, not CMVP validation.** Nothing in this
+  repository has been submitted to, or evaluated under, NIST's
+  Cryptographic Module Validation Program or Cryptographic Algorithm
+  Validation Program. ACVP known-answer vectors passing is assurance
+  evidence, not proof of every clause — the floating-point findings above
+  are the standing counterexample: those vectors passed for the entire
+  time the requirement was breached, because a known-answer test cannot see
+  _how_ a bit-identical result was computed.
+- **Most `INDETERMINATE` rows depend on the host platform's RBG and cannot
+  be closed from inside a library.** FIPS 203/204 require an approved RBG
+  under SP 800-90A/B/C with a minimum security strength — a property of
+  whatever runs `crypto.getRandomValues` on the deploying platform, which
+  this assessment has no visibility into and can no more prove unapproved
+  than approved. (One exception: F203-03, also `INDETERMINATE`, is a
+  different question — whether X-Wing's API surface is distinguishable from
+  actual FIPS 203 coverage — not an RBG matter.)
+- **SLH-DSA (FIPS 205) is deliberately unimplemented**, not an unexamined
+  gap — see the next section for why.
+
+None of the three matrices' row counts should be read as a score.
+`FIPS-203-MATRIX.md` §4.1 and `FIPS-204-MATRIX.md` §4.1 both say so
+explicitly, for the same reason the security status above does: an empty
+`NONCONFORMING` column is not a compliance claim, and the rows are not of
+equal weight.
+
 ## SLH-DSA (FIPS 205): not implemented, by scope decision
 
 **ML-DSA-65 is the recommended signature algorithm in this SDK.** SLH-DSA
