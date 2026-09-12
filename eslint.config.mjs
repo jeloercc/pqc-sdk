@@ -32,7 +32,10 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.{js,mjs,cjs}'],
+    // .mts/.cts included alongside plain JS: scripts/interop/generate-circl-vectors.mts
+    // (and other scripts/ tooling) sit outside packages/core/tsconfig.json's `include`,
+    // so typed linting has no project to resolve them against.
+    files: ['**/*.{js,mjs,cjs,mts,cts}'],
     ...tseslint.configs.disableTypeChecked,
   },
   prettier,
