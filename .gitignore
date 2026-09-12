@@ -31,3 +31,9 @@ keys/
 # CIRCL interop vectors (packages/core/scripts/interop/), never committed or
 # run in CI. go.mod/go.sum stay tracked so the CIRCL version is pinned.
 packages/core/scripts/interop/circl-helper/circl-helper
+
+# Same for the BouncyCastle interop helper: the jar is fetched and checksum-
+# verified by fetch-bcprov.sh (never committed), and the compiled .class is
+# a local build artifact — never run in CI either.
+packages/core/scripts/interop/bc-helper/*.jar
+packages/core/scripts/interop/bc-helper/*.class
