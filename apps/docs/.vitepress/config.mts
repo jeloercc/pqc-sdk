@@ -27,6 +27,7 @@ export default defineConfig({
       { text: 'Guide', link: '/guide/quickstart' },
       { text: 'API', link: '/api/' },
       { text: 'Compatibility', link: '/compatibility' },
+      { text: 'Compliance', link: '/compliance/' },
     ],
     sidebar: [
       {
@@ -49,6 +50,15 @@ export default defineConfig({
         text: 'Reference',
         items: [
           { text: 'Runtime compatibility', link: '/compatibility' },
+          {
+            text: 'FIPS compliance self-assessment',
+            link: '/compliance/',
+            items: [
+              { text: 'FIPS 203 (ML-KEM)', link: '/compliance/fips-203' },
+              { text: 'FIPS 204 (ML-DSA)', link: '/compliance/fips-204' },
+              { text: 'FIPS 205 (SLH-DSA)', link: '/compliance/fips-205' },
+            ],
+          },
           { text: '@pqc-sdk/core API', link: '/api/', items: typedocSidebar },
         ],
       },
