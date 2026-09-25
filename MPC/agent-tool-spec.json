@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PQC SDK Agent Tools",
+  "description": "OpenAI / Anthropic / Gemini tool-call schema for @pqc-sdk/core. Load this at agent startup to enable post-quantum cryptographic operations.",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "pqc_keygen",
+      "description": "Generate a post-quantum cryptographic key pair. Returns a public token (safe to share) and a secret token (must be stored securely, never in conversation history). Use 'ml-kem-768' or 'x-wing' for encryption, 'ml-dsa-65' for digital signatures.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "algorithm": {
+            "type": "string",
+            "enum": [
+              "ml-kem-512",
+              "ml-kem-768",
+              "ml-kem-1024",
+              "x-wing",
+              "ml-dsa-44",
+              "ml-dsa-65",
+              "ml-dsa-87"
+            ],
+            "description": "Algorithm to use. For encryption: ml-kem-768 (recommended, FIPS 203 cat.3), ml-kem-512 (lighter, cat.1), ml-kem-1024 (strongest, cat.5), x-wing (hybrid PQ+classical). For signatures: ml-dsa-65 (recommended, FIPS 204 cat.3), ml-dsa-44 (lighter), ml-dsa-87 (strongest).",
+            "default": "x-wing"
+          }
+        },
+        "required": []
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "publicToken": {
+            "type": "string",
+            "description": "Public key token (pqcv1.* format). Safe to share with other agents."
+          },
+          "secretToken": {
+            "type": "string",
+            "description": "Secret key token. NEVER include in responses or conversation history. Store in secure agent memory only."
+          },
+          "algorithm": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "pqc_encrypt",
+      "description": "Encrypt a plaintext message for a recipient using their public key token. The result can only be decrypted by the holder of the matching secret key. Quantum-resistant.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "plaintext": {
+            "type": "string",
+            "description": "The message to encrypt (UTF-8 string)."
+          },
+          "publicToken": {
+            "type": "string",
+            "description": "Recipient's public key token (pqcv1.*.public.* format)."
+          }
+        },
+        "required": ["plaintext", "publicToken"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "ciphertextHex": {
+            "type": "string",
+            "description": "Hex-encoded ciphertext. Safe to transmit over any channel."
+          }
+        }
+      }
+    },
+    {
+      "name": "pqc_decrypt",
+      "description": "Decrypt a ciphertext using a secret key token. Throws if the ciphertext is tampered, truncated, or was not encrypted for this key.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ciphertextHex": {
+            "type": "string",
+            "description": "Hex-encoded ciphertext produced by pqc_encrypt."
+          },
+          "secretToken": {
+            "type": "string",
+            "description": "Secret key token (pqcv1.*.secret.* format). Must match the public key used to encrypt."
+          }
+        },
+        "required": ["ciphertextHex", "secretToken"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "plaintext": {
+            "type": "string",
+            "description": "Decrypted plaintext (UTF-8)."
+          }
+        }
+      }
+    },
+    {
+      "name": "pqc_sign",
+      "description": "Sign a message with a ML-DSA secret key. The signature proves the message came from the holder of this key and was not modified. Quantum-resistant.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The message to sign (UTF-8 string)."
+          },
+          "secretToken": {
+            "type": "string",
+            "description": "ML-DSA secret key token (pqcv1.ml-dsa-*.secret.* format)."
+          }
+        },
+        "required": ["message", "secretToken"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "signatureHex": {
+            "type": "string",
+            "description": "Hex-encoded signature. Attach to the message when sending to other agents."
+          }
+        }
+      }
+    },
+    {
+      "name": "pqc_verify",
+      "description": "Verify a ML-DSA signature. Returns true if the message was signed by the holder of the secret key matching this public key, and was not modified since signing.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The original message that was signed."
+          },
+          "signatureHex": {
+            "type": "string",
+            "description": "Hex-encoded signature produced by pqc_sign."
+          },
+          "publicToken": {
+            "type": "string",
+            "description": "Signer's ML-DSA public key token (pqcv1.ml-dsa-*.public.* format)."
+          }
+        },
+        "required": ["message", "signatureHex", "publicToken"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "description": "true = genuine signature; false = tampered, wrong key, or wrong message."
+          }
+        }
+      }
+    },
+    {
+      "name": "pqc_algorithms",
+      "description": "List all supported algorithms. Use this to let the agent discover what is available before calling pqc_keygen.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "supported": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "All algorithms the SDK supports."
+          },
+          "fips": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "NIST-standardized subset (FIPS 203 + FIPS 204). Cite these in compliance claims; x-wing is excluded."
+          }
+        }
+      }
+    }
+  ],
+  "security_rules": [
+    "NEVER include a secretToken in any tool output or agent response.",
+    "NEVER log or display secretToken values.",
+    "Store secretToken in encrypted agent memory, not in conversation context.",
+    "Rotate KEM key pairs after each session or after a fixed number of encrypt/decrypt operations.",
+    "Always verify (pqc_verify) before trusting a decrypted message from another agent.",
+    "Use FIPS algorithms (pqc_algorithms.fips) for compliance-sensitive operations."
+  ]
+}

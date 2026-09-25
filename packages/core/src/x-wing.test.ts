@@ -1,4 +1,9 @@
-import { ml_kem768_x25519 as npmXWing } from '@noble/post-quantum/hybrid.js';
+import {
+  _ecdhKem,
+  combineKEMS,
+  expandSeedXof,
+  ml_kem768_x25519 as npmXWing,
+} from '@noble/post-quantum/hybrid.js';
 import { randomBytes } from '@noble/post-quantum/utils.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
@@ -75,5 +80,37 @@ describe('X-Wing cross-check: vendored ML-KEM-768 vs npm ML-KEM-768 (F203-19, F2
     // implementations must land on the same (wrong) secret as each other.
     expect(bytesToHex(vendoredRejected)).toBe(bytesToHex(npmRejected));
     expect(bytesToHex(vendoredRejected)).not.toBe(bytesToHex(sharedSecret));
+  });
+});
+
+/**
+ * Upgrade guard: verifies the three @noble/post-quantum/hybrid.js exports
+ * that x-wing.ts imports as "internal" APIs (`_ecdhKem`, `combineKEMS`,
+ * `expandSeedXof`) still exist and have the expected shape after a
+ * @noble/post-quantum version bump.
+ *
+ * If any of these assertions fail after bumping the package, x-wing.ts's
+ * module-doc comment explains what to re-check before landing the bump.
+ */
+describe('X-Wing upgrade guard: @noble/post-quantum/hybrid.js API shape', () => {
+  it('_ecdhKem is a function (constructs a raw-ECDH KEM adapter)', () => {
+    expect(typeof _ecdhKem).toBe('function');
+  });
+
+  it('combineKEMS is a function (constructs a combined KEM from two components)', () => {
+    expect(typeof combineKEMS).toBe('function');
+  });
+
+  it('expandSeedXof is a function (seed-expansion helper)', () => {
+    expect(typeof expandSeedXof).toBe('function');
+  });
+
+  it('npmXWing exposes the lengths object needed by x-wing.ts (seed, msgRand, publicKey, secretKey, cipherText)', () => {
+    const { lengths } = npmXWing;
+    expect(typeof lengths.seed).toBe('number');
+    expect(typeof lengths.msgRand).toBe('number');
+    expect(typeof lengths.publicKey).toBe('number');
+    expect(typeof lengths.secretKey).toBe('number');
+    expect(typeof lengths.cipherText).toBe('number');
   });
 });

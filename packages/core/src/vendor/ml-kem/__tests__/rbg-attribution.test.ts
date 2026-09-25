@@ -171,3 +171,65 @@ describe('F203-11 non-regression: the X-Wing degenerate-point mapping is unchang
     ).rejects.toMatchObject({ code: 'INVALID_KEY' });
   });
 });
+
+describe('F204-06 / F204-07: RBG failure surfaces as RBG_FAILURE on ML-DSA paths', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('pqc.keys.generate({ algorithm: "ml-dsa-65" }) reports RBG_FAILURE when entropy fails', async () => {
+    breakEntropy('throw');
+    await expect(pqc.keys.generate({ algorithm: 'ml-dsa-65' })).rejects.toMatchObject({
+      code: 'RBG_FAILURE',
+    });
+  });
+
+  it('pqc.keys.generate({ algorithm: "ml-dsa-44" }) reports RBG_FAILURE when entropy fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    breakEntropy('throw');
+    await expect(pqc.keys.generate({ algorithm: 'ml-dsa-44' })).rejects.toMatchObject({
+      code: 'RBG_FAILURE',
+    });
+  });
+
+  // Every failure mode, not only a throw: a host whose error wording mentions neither
+  // "entropy" nor "random", a missing API, and a short buffer must all map the same way.
+  it.each(['throw', 'absent', 'short'] as const)(
+    'pqc.sign() reports RBG_FAILURE when the RBG fails during hedged signing (%s)',
+    async (mode) => {
+      const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
+
+      breakEntropy(mode);
+
+      await expect(pqc.sign('message', pair.secretKey)).rejects.toMatchObject({
+        code: 'RBG_FAILURE',
+      });
+    },
+  );
+
+  it('pqc.sign() reports RBG_FAILURE whatever the host error message says', async () => {
+    const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
+
+    vi.stubGlobal('crypto', {
+      ...globalThis.crypto,
+      getRandomValues: () => {
+        throw new Error('QuotaExceededError');
+      },
+    });
+
+    await expect(pqc.sign('message', pair.secretKey)).rejects.toMatchObject({
+      code: 'RBG_FAILURE',
+    });
+  });
+
+  it('pqc.keys.generate({ algorithm: "ml-kem-768" }) still reports RBG_FAILURE (non-regression)', async () => {
+    const pair = await pqc.keys.generate({ algorithm: 'ml-kem-768' });
+
+    breakEntropy('throw');
+
+    await expect(pqc.encrypt('x', pair.publicKey)).rejects.toMatchObject({
+      code: 'RBG_FAILURE',
+    });
+  });
+});

@@ -7,9 +7,13 @@ import type {
   SignatureAlgorithm,
   SignatureOptions,
 } from './types.js';
+import { RbgFailureError, sampleRandomness } from './vendor/ml-kem/ml-kem.js';
 
 /** FIPS 204 §5.2 caps the signing context string at 255 bytes. */
 const MAX_CONTEXT_LENGTH = 255;
+
+/** FIPS 204 Algorithm 2 step 5: rnd ← B^32 for hedged signing. */
+const SIGNING_RND_LENGTH = 32;
 
 const utf8 = new TextEncoder();
 
@@ -89,7 +93,35 @@ export async function sign<A extends SignatureAlgorithm>(
   options?: SignatureOptions,
 ): Promise<Uint8Array> {
   const spec = requireKey(secretKey, 'signer', 'secret', 'sign');
-  return Promise.resolve(spec.signer.sign(toBytes(data), secretKey.bytes, toNobleOptions(options)));
+  const nobleOptions = toNobleOptions(options);
+  // F204-07 (consistency with F203-11): FIPS 204 §5.2 Alg.2 step 7 requires an error
+  // indication when rnd cannot be drawn. The vendored signer would call randomBytes
+  // itself and leak whatever the host threw, so the SDK draws rnd here through the same
+  // RBG boundary as ML-KEM encapsulation and key generation (`sampleRandomness`), which
+  // maps every failure mode — throw, missing API, short buffer — to RbgFailureError.
+  // Classifying the upstream error by its message instead would miss hosts whose
+  // wording differs. Signing stays hedged: rnd is fresh per call and never
+  // caller-supplied (F204-14/F204-15 unchanged).
+  let rnd: Uint8Array;
+  try {
+    rnd = sampleRandomness(SIGNING_RND_LENGTH);
+  } catch (cause) {
+    if (cause instanceof RbgFailureError) {
+      throw new PqcError(
+        'RBG_FAILURE',
+        `${secretKey.algorithm} signing aborted: the platform RBG failed to produce randomness`,
+      );
+    }
+    throw cause;
+  }
+  try {
+    return Promise.resolve(
+      spec.signer.sign(toBytes(data), secretKey.bytes, { ...nobleOptions, extraEntropy: rnd }),
+    );
+  } finally {
+    // The vendored signer only wipes entropy it generated itself (F204-09).
+    rnd.fill(0);
+  }
 }
 
 /**

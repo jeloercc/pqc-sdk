@@ -2,7 +2,7 @@ import { encrypt, decrypt } from './encrypt.js';
 import { deserialize, generate, serialize } from './keys.js';
 import { sign, verify } from './sign.js';
 import { decryptWebStream, encryptWebStream } from './stream-web.js';
-import { decryptStream, encryptStream } from './stream.js';
+import { collectDecryptStream, decryptStream, encryptStream } from './stream.js';
 
 export { PqcError, type PqcErrorCode } from './errors.js';
 export { KEM_NAMES } from './encrypt.js';
@@ -29,6 +29,7 @@ export {
   deserialize,
   encryptStream,
   decryptStream,
+  collectDecryptStream,
   encryptWebStream,
   decryptWebStream,
 };
@@ -143,6 +144,8 @@ export const pqc = {
   decrypt,
   encryptStream,
   decryptStream,
+  /** @see {@link collectDecryptStream} for the safe buffering variant. */
+  collectDecryptStream,
   encryptWebStream,
   decryptWebStream,
   sign,

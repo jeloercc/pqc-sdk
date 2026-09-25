@@ -58,7 +58,11 @@ export interface KemSpec extends AlgorithmSpec {
  */
 export interface NobleSigner {
   keygen(seed?: Uint8Array): { publicKey: Uint8Array; secretKey: Uint8Array };
-  sign(msg: Uint8Array, secretKey: Uint8Array, opts?: { context?: Uint8Array }): Uint8Array;
+  sign(
+    msg: Uint8Array,
+    secretKey: Uint8Array,
+    opts?: { context?: Uint8Array; extraEntropy?: Uint8Array },
+  ): Uint8Array;
   verify(
     sig: Uint8Array,
     msg: Uint8Array,

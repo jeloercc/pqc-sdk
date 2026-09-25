@@ -1,11 +1,22 @@
-import { randomBytes } from '@noble/post-quantum/utils.js';
-
 import { getAlgorithm, keyLengthFor } from './algorithms.js';
 import { fromBase64Url, toBase64Url } from './base64url.js';
 import { PqcError, truncateForError } from './errors.js';
 import type { Algorithm, KeyPair, KeyUse, PqcKey } from './types.js';
+import { sampleRandomness, RbgFailureError } from './vendor/ml-kem/ml-kem.js';
 
+// Key serialization format: `pqcv1.<algorithm>.<use>.<base64url>`.
+//
+// VERSIONING NOTE: `pqcv1` is a format-generation token, not a version
+// counter inside the token. If the encoding, the byte layout of a key
+// type, or the set of valid algorithms ever changes in a
+// backward-incompatible way, bump to `pqcv2` (a new SERIAL_PREFIX) so
+// deserialize() can detect and reject old tokens with INVALID_SERIALIZED_KEY
+// rather than silently misinterpreting them. Never reuse `pqcv1` for a
+// format-incompatible change.
 const SERIAL_PREFIX = 'pqcv1';
+
+/** Set after the first ml-dsa-44 key generation so the tier warning fires once per process. */
+let warnedMlDsa44 = false;
 
 /** Options for {@link generate}. */
 export interface GenerateOptions<A extends Algorithm = Algorithm> {
@@ -13,6 +24,12 @@ export interface GenerateOptions<A extends Algorithm = Algorithm> {
    * Algorithm of the pair. Default: `'x-wing'` (the X25519 + ML-KEM-768
    * hybrid KEM). Pass `'ml-kem-768'` for the pure post-quantum KEM, or
    * `'ml-dsa-65'` for signing.
+   *
+   * For signatures, the recommended choice is `'ml-dsa-65'` (NIST security
+   * category 3, roughly AES-192 equivalent). `'ml-dsa-44'` is category 2
+   * (AES-128 equivalent) and emits a console warning at key-generation time.
+   * `'ml-dsa-87'` is category 5 (AES-256 equivalent) and produces larger
+   * signatures (4627 bytes vs 3309 for ml-dsa-65).
    */
   readonly algorithm?: A;
 }
@@ -49,8 +66,37 @@ export async function generate<A extends Algorithm>(
 export async function generate(options?: GenerateOptions): Promise<KeyPair>;
 export async function generate(options?: GenerateOptions): Promise<KeyPair> {
   const algorithm = options?.algorithm ?? 'x-wing';
+  // ml-dsa-44 is NIST security category 2 (roughly AES-128 equivalent).
+  // The SDK default for signing is ml-dsa-65 (category 3). Warn once so
+  // callers who pass 'ml-dsa-44' by accident notice before deploying.
+  if (algorithm === 'ml-dsa-44' && !warnedMlDsa44) {
+    warnedMlDsa44 = true;
+    console.warn(
+      '[pqc-sdk] ml-dsa-44 is security category 2 (AES-128 equivalent). ' +
+        'Prefer ml-dsa-65 (category 3) unless size or speed are the deciding factor.',
+    );
+  }
   const spec = getAlgorithm(algorithm);
-  return Promise.resolve(generateKeyPairFromSeed(algorithm, randomBytes(spec.seedLength)));
+  // F204-06/F204-07 (consistency with F203-11): sample via sampleRandomness so that an
+  // RBG failure during key generation surfaces as PqcError('RBG_FAILURE') rather than
+  // a raw host Error. FIPS 204 §5.1 Alg.1 step 3 / §5.2 Alg.2 step 7 require an error
+  // indication; the raw throw satisfies that, but the SDK rule and consistency with the
+  // ML-KEM path both require a typed PqcError. The RbgFailureError is caught here rather
+  // than in generateKeyPairFromSeed because the seed is the randomness boundary — any
+  // generation using this seed is already deterministic after this point.
+  let seed: Uint8Array;
+  try {
+    seed = sampleRandomness(spec.seedLength);
+  } catch (cause) {
+    if (cause instanceof RbgFailureError) {
+      throw new PqcError(
+        'RBG_FAILURE',
+        `${algorithm} key generation aborted: the platform RBG failed to produce randomness`,
+      );
+    }
+    throw cause;
+  }
+  return Promise.resolve(generateKeyPairFromSeed(algorithm, seed));
 }
 
 /**
