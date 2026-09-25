@@ -61,7 +61,9 @@ export const version = __PQC_CORE_VERSION__;
  * ```
  */
 export const SUPPORTED_ALGORITHMS = [
+  'ml-kem-512',
   'ml-kem-768',
+  'ml-kem-1024',
   'ml-dsa-44',
   'ml-dsa-65',
   'ml-dsa-87',
@@ -69,6 +71,35 @@ export const SUPPORTED_ALGORITHMS = [
 ] as const;
 
 export type SupportedAlgorithm = (typeof SUPPORTED_ALGORITHMS)[number];
+
+/**
+ * Algorithms standardized by NIST (FIPS 203 and FIPS 204). These are the
+ * only entries that may be cited as FIPS-conformant in compliance claims.
+ *
+ * `x-wing` (X25519 + ML-KEM-768, draft-connolly-cfrg-xwing-kem-10) is a
+ * CFRG Internet-Draft construction, **not** a FIPS 203 algorithm. It is not
+ * listed here. Including ML-KEM-768 as one of its components does not give
+ * X-Wing FIPS 203 status — see FIPS 203 §3.3 and
+ * `docs/compliance/FIPS-203-MATRIX.md` §3.2.
+ *
+ * @example
+ * ```ts
+ * import { FIPS_ALGORITHMS } from '@pqc-sdk/core';
+ *
+ * FIPS_ALGORITHMS.includes('ml-kem-768'); // true
+ * FIPS_ALGORITHMS.includes('x-wing');    // false — draft algorithm
+ * ```
+ */
+export const FIPS_ALGORITHMS = [
+  'ml-kem-512',
+  'ml-kem-768',
+  'ml-kem-1024',
+  'ml-dsa-44',
+  'ml-dsa-65',
+  'ml-dsa-87',
+] as const;
+
+export type FipsAlgorithm = (typeof FIPS_ALGORITHMS)[number];
 
 /**
  * SDK entry point: post-quantum hybrid encryption and digital signatures

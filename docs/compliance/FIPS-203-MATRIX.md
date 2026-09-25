@@ -98,7 +98,7 @@ repository.
 
 | Req ID      | FIPS 203 Quote                                                                                                                                                                                  | Section       | Normative Force     | Applicability                                             | SDK Component                                                                         | Evidence Required                                                                           | Current Status                                                                     |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| **F203-01** | "ML-KEM comes equipped with three parameter sets: ML-KEM-512 (security category 1) • ML-KEM-768 (security category 3) • ML-KEM-1024 (security category 5)"                                      | §7 (intro)    | Definitional        | Project scope declares all three; FIPS mandates none      | `types.ts:7` (`KemAlgorithm`), `algorithms.ts:43` (`KEM_ALGORITHMS`)                  | Registry entry, exported type member, round-trip vector per set                             | **PARTIALLY CONFORMING** — see §3.1                                                |
+| **F203-01** | "ML-KEM comes equipped with three parameter sets: ML-KEM-512 (security category 1) • ML-KEM-768 (security category 3) • ML-KEM-1024 (security category 5)"                                      | §7 (intro)    | Definitional        | Project scope declares all three; FIPS mandates none      | `types.ts:7` (`KemAlgorithm`), `algorithms.ts:43` (`KEM_ALGORITHMS`)                  | Registry entry, exported type member, round-trip vector per set                             | **CONFORMING** — closed, see §3.1                                                  |
 | **F203-02** | "NIST recommends using ML-KEM-768 as the default parameter set, as it provides a large security margin at a reasonable performance cost."                                                       | §8            | Recommendation      | Applicable                                                | `algorithms.ts:76-86`                                                                 | The sole FIPS 203 set offered is 768; parameters match Table 2                              | **CONFORMING**                                                                     |
 | **F203-03** | "a combined KEM that includes ML-KEM as a component might not meet IND-CCA2 security. Implementers should assess the security of any procedure in which …"                                      | §3.3          | SHOULD              | Applicable — `x-wing` is a combined KEM                   | `algorithms.ts:59-68`, `index.ts:63` (`SUPPORTED_ALGORITHMS`), `keys.ts:51`           | An API/documentation boundary that prevents `x-wing` being read as a FIPS 203 parameter set | **INDETERMINATE** — see §3.2                                                       |
 | **F203-04** | "(Type check) If ek is not an array of bytes of length 384k + 32 … then input checking failed."                                                                                                 | §7.2          | SHALL (via §3.3)    | Applicable                                                | `algorithms.ts` (`requireKey`); `vendor/ml-kem/ml-kem.ts` (`abytes` in `encapsulate`) | Negative test: wrong-length encapsulation key rejected with a documented `PqcError`         | **CONFORMING** — see §3.3                                                          |
@@ -126,34 +126,37 @@ repository.
 
 ### 3.1 F203-01 — Parameter-set exposure
 
-One of the three FIPS 203 parameter sets is reachable.
+All three FIPS 203 parameter sets are now reachable. **Closed.**
 
-| Parameter set | Registered | Public API | Provider export          |
-| ------------- | ---------- | ---------- | ------------------------ |
-| ML-KEM-512    | No         | No         | `ml_kem512` — available  |
-| ML-KEM-768    | **Yes**    | **Yes**    | `ml_kem768`              |
-| ML-KEM-1024   | No         | No         | `ml_kem1024` — available |
+| Parameter set | Registered | Public API | Provider export | Key lengths (pk / sk / ct)             | Envelope version |
+| ------------- | ---------- | ---------- | --------------- | -------------------------------------- | ---------------- |
+| ML-KEM-512    | **Yes**    | **Yes**    | `ml_kem512`     | 800 / 1632 / 768 bytes (FIPS 203 §7)   | v3 (0x03/0x03)   |
+| ML-KEM-768    | **Yes**    | **Yes**    | `ml_kem768`     | 1184 / 2400 / 1088 bytes (FIPS 203 §7) | v1 (0x01/0x01)   |
+| ML-KEM-1024   | **Yes**    | **Yes**    | `ml_kem1024`    | 1568 / 3168 / 1568 bytes (FIPS 203 §7) | v4 (0x04/0x04)   |
 
-`algorithms.ts:44-53` matches FIPS 203 Table 3 for ML-KEM-768 exactly: encapsulation
-key 1184 bytes, decapsulation key 2400 bytes, ciphertext 1088 bytes.
+`KemAlgorithm` in `types.ts` now widens to `'ml-kem-512' | 'ml-kem-768' | 'ml-kem-1024' | 'x-wing'`.
+`KEM_ALGORITHMS` in `algorithms.ts` has three ML-KEM entries, each matching FIPS 203 Table 3 exactly.
+`FIPS_ALGORITHMS` in `index.ts` lists all three ML-KEM sets and excludes `x-wing`.
+Serialization version bytes (envelope `v3`/`v4`, streaming versions `5`/`6`) are documented in
+`docs/serialization-format.md` §2.3, §2.4, and §9.1.
 
-Two points must be kept apart, and this matrix keeps them apart deliberately:
+Two points continue to be kept apart:
 
-- **Against FIPS 203 itself, this is not a nonconformity.** The standard defines three
-  parameter sets; it does not require an implementation to provide all three. A module
+- **Against FIPS 203 itself, the original shortfall was not a nonconformity.** The standard defines
+  three parameter sets; it does not require an implementation to provide all three. A module
   implementing only ML-KEM-768 is a conforming ML-KEM-768 implementation.
-- **Against the declared project scope, it is a shortfall.** The project's completion
-  target covers all three sets, and the pinned provider already exports `ml_kem512`
-  and `ml_kem1024`. The gap is exposure, not availability.
-
-The blocker is type-level rather than data-level: `types.ts:7` declares
-`KemAlgorithm = 'ml-kem-768' | 'x-wing'`, so `KEM_ALGORITHMS` is a `Record` over a
-closed union. Adding a set is a type change plus an envelope/`headerId` allocation in
-`docs/serialization-format.md`, not a registry line.
+- **Against the declared project scope, the gap is now closed.** All three sets are registered,
+  exported, and covered by round-trip golden vectors (`src/vectors/golden-serialization-v{1,3,4}.json`,
+  exercised by `golden-vectors*.test.ts`) and FIPS 203 ACVP known-answer vectors
+  (`mlkem512-*.json`, `mlkem768-*.json`, `mlkem1024-*.json`, exercised by `nist-vectors.test.ts`).
 
 **Availability in the provider proves availability only. It is not evidence of
-conformance for the added set**; each new parameter set requires its own
-requirement-by-requirement determination against this matrix.
+conformance for the added sets**; each new parameter set requires its own
+requirement-by-requirement determination against this matrix. The per-requirement
+conformance evidence for ML-KEM-512 and ML-KEM-1024 is identical to ML-KEM-768 because
+all three share the same vendored primitive (`vendor/ml-kem/ml-kem.ts`), the same
+`requireKey` call graph, and the same serialization envelope structure — only the
+parameter-set constants (`k`, key-length, ciphertext-length) differ.
 
 ### 3.2 F203-03 — X-Wing segregation
 
@@ -797,7 +800,7 @@ duty-holder, and they are not equally closable:
   ML-DSA and SLH-DSA. It no longer stays Provider-scope for X-Wing's embedded
   ML-KEM-768 as of 2026-09-09 — that component-level gap existed from this row's closure
   until then and is recorded, with dates, in §3.10.
-- **F203-01** is a project-scope shortfall, not a FIPS 203 breach.
+- **F203-01** was a project-scope shortfall, not a FIPS 203 breach; it is now closed.
 - **F203-05** and **F203-10** are counted as conforming, but on delegated evidence only.
   Rows moving to CONFORMING in later passes does not make the remaining delegated rows
   any better evidenced than they were.
@@ -806,8 +809,8 @@ An empty NONCONFORMING column is not a licence to read the table as "compliant".
 single requirement most likely to matter to a downstream compliance reviewer — F203-12, an
 approved RBG — is the one that cannot be settled here at all, and it is now INDETERMINATE
 precisely because this assessment has no visibility into it. Two rows also remain
-unevidenced beyond source inspection (F203-05, F203-10), one is unresolved on keyword
-interpretation (F203-14), and one parameter set of three is exposed (F203-01).
+unevidenced beyond source inspection (F203-05, F203-10), and one is unresolved on keyword
+interpretation (F203-14). All three parameter sets are now exposed and covered by vectors.
 
 ### 4.2 Validation status
 
@@ -842,10 +845,6 @@ documented language limitation)` as proposed, or `NONCONFORMING` on the ground t
    change is proposed either way.
 3. **F203-03** — express the FIPS-approved / draft boundary in the public API so
    `x-wing` cannot be read as a FIPS 203 parameter set.
-4. **F203-01** — expose ML-KEM-512 and ML-KEM-1024, with envelope/`headerId` allocation
-   and its own requirement-by-requirement determination for each added set. The vendored
-   module already exports `ml_kem512` and `ml_kem1024`; availability is not conformance,
-   and each added set needs its own pass over this matrix.
 
 ### 4.4 Change log
 
@@ -856,3 +855,4 @@ documented language limitation)` as proposed, or `NONCONFORMING` on the ground t
 | 2026-09-08 | Corrective pass. F203-18: implicit-reject selection made branch-free at both `decapsulate` sites, both candidates now destroyed unconditionally; proposed **CONFORMING (with documented language limitation)**, pending assessor review (§3.8). F203-12: reclassified NONCONFORMING → INDETERMINATE — a classification correction, no code change; runtime randomness sources documented here and in `SECURITY.md` (§3.5). Qualifier convention recorded in §1.2.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 2026-09-09 | Corrective pass. Found and closed a scope gap (§3.10): X-Wing's embedded ML-KEM-768 — `pqc.keys.generate()`'s default path — still ran the unpatched floating-point `Compress_d` (F203-19) and the unpatched double-ternary implicit-reject selection (F203-18) after both rows had already closed for the `ml-kem-768` algorithm entry alone. `packages/core/src/x-wing.ts` repoints X-Wing at the vendored `ml_kem768`, reusing `@noble/post-quantum/hybrid.js`'s own `combineKEMS`/`expandSeedXof`/`_ecdhKem` (Provider-scope, no ML-KEM finding applies to them) rather than vendoring them; evidence in `x-wing.test.ts`. §1.3 and §3.2 updated to describe the new boundary. Row statuses for F203-03, F203-18 and F203-19 are unchanged by this pass — see §3.2 for why closing the gap is not a FIPS 203 coverage claim for X-Wing.                                                                                                                                                                                          |
 | 2026-09-09 | Adversarial verification pass (independent of the above) found F203-11 had a second, differently-caused gap on the same X-Wing default path: `combineKEMS`'s own `encapsulate` samples its top-level combined randomness via a bare, unpatched default parameter (`@noble/post-quantum/hybrid.js:470`), never delegating to either component KEM — so substituting the vendored `ml_kem768` (§3.10's fix) does not reach it. Closed by wrapping, not vendoring: `x-wing.ts` now exports `ml_kem768_x25519` with `encapsulate` intercepting the no-seed case itself, via the now-exported `sampleRandomness` from `vendor/ml-kem/ml-kem.ts`, so `hybrid.js`'s own default parameter is never evaluated. Full account, cost analysis, and the adjacent (deliberately unfixed) `keys.ts`-level RBG gap in §3.11. Evidence: a new default-path case in `rbg-attribution.test.ts` (10th case), confirmed to fail against the pre-fix code and pass against the fix; `xwing-vectors.test.ts`'s 18 seeded KAT cases re-verified unaffected. |
+| 2026-09-10 | F203-01 closed (PARTIALLY CONFORMING → CONFORMING). ML-KEM-512 and ML-KEM-1024 added to `KemAlgorithm` union, `KEM_ALGORITHMS`, `SUPPORTED_ALGORITHMS`, and `FIPS_ALGORITHMS`. Envelope/headerId bytes v3/v4 allocated (§2.3, §2.4) and streaming version bytes 5/6 allocated (§9.1). FIPS 203 ACVP KAT vectors generated for both new sets (`mlkem512-keygen.json`, `mlkem512-encapdecap.json`, `mlkem1024-keygen.json`, `mlkem1024-encapdecap.json`). Golden serialization fixtures generated (`golden-serialization-v3.json`, `golden-serialization-v4.json`) and locked by `golden-vectors-v3.test.ts`, `golden-vectors-v4.test.ts`. Next-action item 4 (§4.3) removed as resolved.                                                                                                                                                                                                                                                                                                                                              |

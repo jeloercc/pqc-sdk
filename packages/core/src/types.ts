@@ -3,8 +3,13 @@
  * hybrid KEM (X25519 + ML-KEM-768, draft-connolly-cfrg-xwing-kem); its
  * envelope format (`pqcenc.v2`) lands separately — see
  * `docs/proposals/hybrid-envelope.md`.
+ *
+ * All three FIPS 203 ML-KEM parameter sets are supported:
+ * - `ml-kem-512`  — security category 1 (≈ AES-128)
+ * - `ml-kem-768`  — security category 3 (≈ AES-192, recommended default)
+ * - `ml-kem-1024` — security category 5 (≈ AES-256)
  */
-export type KemAlgorithm = 'ml-kem-768' | 'x-wing';
+export type KemAlgorithm = 'ml-kem-512' | 'ml-kem-768' | 'ml-kem-1024' | 'x-wing';
 
 /** Digital signature algorithm. */
 export type SignatureAlgorithm = 'ml-dsa-44' | 'ml-dsa-65' | 'ml-dsa-87';

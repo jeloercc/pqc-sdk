@@ -37,25 +37,27 @@ pqcv1.<algorithm>.<use>.<base64url>
 Four segments joined by `.` (exactly 3 dots — the base64url alphabet cannot
 contain `.`):
 
-| Segment   | Values                                                                | Notes                                  |
-| --------- | --------------------------------------------------------------------- | -------------------------------------- |
-| version   | `pqcv1`                                                               | Literal prefix; the format's namespace |
-| algorithm | `ml-kem-768` \| `ml-dsa-44` \| `ml-dsa-65` \| `ml-dsa-87` \| `x-wing` | FIPS 203 / FIPS 204 / X-Wing draft     |
-| use       | `public` \| `secret`                                                  |                                        |
-| key bytes | base64url (see §5)                                                    | Raw key bytes, no framing              |
+| Segment   | Values                                                                                                 | Notes                                  |
+| --------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| version   | `pqcv1`                                                                                                | Literal prefix; the format's namespace |
+| algorithm | `ml-kem-512` \| `ml-kem-768` \| `ml-kem-1024` \| `ml-dsa-44` \| `ml-dsa-65` \| `ml-dsa-87` \| `x-wing` | FIPS 203 / FIPS 204 / X-Wing draft     |
+| use       | `public` \| `secret`                                                                                   |                                        |
+| key bytes | base64url (see §5)                                                                                     | Raw key bytes, no framing              |
 
 The `pqcv1` prefix names the _token_ format, not the envelope version — an
 `x-wing` key serializes as a `pqcv1` token and produces v2 envelopes.
 
 Exact decoded byte lengths (also enforced on deserialize):
 
-| Algorithm    | public | secret |
-| ------------ | ------ | ------ |
-| `ml-kem-768` | 1184   | 2400   |
-| `ml-dsa-44`  | 1312   | 2560   |
-| `ml-dsa-65`  | 1952   | 4032   |
-| `ml-dsa-87`  | 2592   | 4896   |
-| `x-wing`     | 1216   | 32     |
+| Algorithm     | public | secret |
+| ------------- | ------ | ------ |
+| `ml-kem-512`  | 800    | 1632   |
+| `ml-kem-768`  | 1184   | 2400   |
+| `ml-kem-1024` | 1568   | 3168   |
+| `ml-dsa-44`   | 1312   | 2560   |
+| `ml-dsa-65`   | 1952   | 4032   |
+| `ml-dsa-87`   | 2592   | 4896   |
+| `x-wing`      | 1216   | 32     |
 
 Key bytes are the FIPS 203/204 encodings as produced by `@noble/post-quantum`
 (`ek`/`dk` for ML-KEM, `pk`/`sk` for ML-DSA). `serialize(deserialize(t)) === t`
@@ -113,7 +115,38 @@ accepted side by side.
   authenticated data: tampering with it fails the GCM tag even if the values
   are individually valid.
 - Header id values are reserved per algorithm; `0x01` = ml-kem-768,
-  `0x02` = x-wing. New algorithms take new ids; ids are never reused.
+  `0x02` = x-wing, `0x03` = ml-kem-512, `0x04` = ml-kem-1024. New
+  algorithms take new ids; ids are never reused.
+
+### 2.3 Envelope v3 (`0x03`, ml-kem-512)
+
+| Offset | Length         | Field                                                     |
+| ------ | -------------- | --------------------------------------------------------- |
+| 0      | 1              | Format version byte, `0x03`                               |
+| 1      | 1              | Algorithm header id (`ml-kem-512` = `0x03`)               |
+| 2      | 768            | ML-KEM-512 ciphertext (FIPS 203 encapsulation)            |
+| 770    | 12             | AES-GCM nonce (random per message)                        |
+| 782    | plaintext + 16 | AES-256-GCM sealed payload (ciphertext ‖ 16-byte GCM tag) |
+
+- Total length = **798 + plaintext length**; anything shorter than 798 is
+  rejected as truncated.
+- The AES-256 key is the ML-KEM-512 shared secret used directly (uniform
+  per FIPS 203, no KDF), fresh per message.
+
+### 2.4 Envelope v4 (`0x04`, ml-kem-1024)
+
+| Offset | Length         | Field                                                     |
+| ------ | -------------- | --------------------------------------------------------- |
+| 0      | 1              | Format version byte, `0x04`                               |
+| 1      | 1              | Algorithm header id (`ml-kem-1024` = `0x04`)              |
+| 2      | 1568           | ML-KEM-1024 ciphertext (FIPS 203 encapsulation)           |
+| 1570   | 12             | AES-GCM nonce (random per message)                        |
+| 1582   | plaintext + 16 | AES-256-GCM sealed payload (ciphertext ‖ 16-byte GCM tag) |
+
+- Total length = **1598 + plaintext length**; anything shorter than 1598 is
+  rejected as truncated.
+- The AES-256 key is the ML-KEM-1024 shared secret used directly (uniform
+  per FIPS 203, no KDF), fresh per message.
 
 ## 3. Signature (binary)
 
@@ -237,10 +270,12 @@ accept these bytes, and vice versa; v1/v2 stay byte-identical forever.
 
 Same `pqcenc` version-byte space as §2, two new values:
 
-| Version byte | KEM          | Header id |
-| ------------ | ------------ | --------- |
-| `0x03`       | `ml-kem-768` | `0x01`    |
-| `0x04`       | `x-wing`     | `0x02`    |
+| Version byte | KEM           | Header id |
+| ------------ | ------------- | --------- |
+| `0x03`       | `ml-kem-768`  | `0x01`    |
+| `0x04`       | `x-wing`      | `0x02`    |
+| `0x05`       | `ml-kem-512`  | `0x03`    |
+| `0x06`       | `ml-kem-1024` | `0x04`    |
 
 **Recorded consequence of this choice** (2026-07-22 proposal review): coupling
 envelope-shape to KEM means every future KEM costs **two** version bytes, not

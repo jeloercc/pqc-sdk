@@ -26,7 +26,9 @@ import { asChunks, collect, single } from './stream-test-helpers.js';
 const utf8 = new TextEncoder();
 
 const KEM_CIPHERTEXT_LENGTH: Record<KemAlgorithm, number> = {
+  'ml-kem-512': 768,
   'ml-kem-768': 1088,
+  'ml-kem-1024': 1568,
   'x-wing': 1120,
 };
 const ALGORITHMS: readonly KemAlgorithm[] = ['ml-kem-768', 'x-wing'];
