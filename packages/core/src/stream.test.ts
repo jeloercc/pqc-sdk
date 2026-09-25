@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { KemAlgorithm } from './types.js';
 import { PqcError } from './errors.js';
 import { generate } from './keys.js';
-import { decryptStream, encryptStream } from './stream.js';
+import { collectDecryptStream, decryptStream, encryptStream } from './stream.js';
 import { asChunks, collect, single } from './stream-test-helpers.js';
 
 /**
@@ -204,5 +204,39 @@ describe('chunk nonce arithmetic: cross-check against age (via ciphertext struct
     nonce1[11] = 1; // final flag
     const expectedChunk1 = gcm(sharedSecret, nonce1, header).encrypt(utf8.encode('EF'));
     expect(chunk1Sealed).toEqual(expectedChunk1);
+  });
+});
+
+describe.each(['ml-kem-768', 'x-wing'] as const)('collectDecryptStream (%s)', (algorithm) => {
+  it('returns the full plaintext on a valid stream', async () => {
+    const pair = await generate({ algorithm });
+    const expected = new TextEncoder().encode('collect me safely');
+    const ciphertext = await collect(encryptStream(pair.publicKey, single(expected)));
+    const result = await collectDecryptStream(pair.secretKey, single(ciphertext));
+    expect(result).toEqual(expected);
+  });
+
+  it('throws DECRYPTION_FAILED and returns nothing on a tampered stream', async () => {
+    const pair = await generate({ algorithm });
+    const ciphertext = await collect(
+      encryptStream(pair.publicKey, single(new TextEncoder().encode('secret'))),
+    );
+    // Tamper a byte in the ciphertext body (after the header + KEM ciphertext).
+    const tampered = ciphertext.slice();
+    tampered[tampered.length - 1]! ^= 0xff;
+    await expect(collectDecryptStream(pair.secretKey, single(tampered))).rejects.toMatchObject({
+      code: 'DECRYPTION_FAILED',
+    });
+  });
+
+  it('throws DECRYPTION_FAILED on a truncated stream', async () => {
+    const pair = await generate({ algorithm });
+    const ciphertext = await collect(
+      encryptStream(pair.publicKey, single(new TextEncoder().encode('secret'))),
+    );
+    const truncated = ciphertext.slice(0, ciphertext.length - 4);
+    await expect(collectDecryptStream(pair.secretKey, single(truncated))).rejects.toSatisfy(
+      (e: unknown) => e instanceof PqcError,
+    );
   });
 });

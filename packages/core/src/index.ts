@@ -2,7 +2,7 @@ import { encrypt, decrypt } from './encrypt.js';
 import { deserialize, generate, serialize } from './keys.js';
 import { sign, verify } from './sign.js';
 import { decryptWebStream, encryptWebStream } from './stream-web.js';
-import { decryptStream, encryptStream } from './stream.js';
+import { collectDecryptStream, decryptStream, encryptStream } from './stream.js';
 
 export { PqcError, type PqcErrorCode } from './errors.js';
 export { KEM_NAMES } from './encrypt.js';
@@ -29,6 +29,7 @@ export {
   deserialize,
   encryptStream,
   decryptStream,
+  collectDecryptStream,
   encryptWebStream,
   decryptWebStream,
 };
@@ -69,6 +70,28 @@ export const SUPPORTED_ALGORITHMS = [
 ] as const;
 
 export type SupportedAlgorithm = (typeof SUPPORTED_ALGORITHMS)[number];
+
+/**
+ * Algorithms standardized by NIST (FIPS 203 and FIPS 204). These are the
+ * only entries that may be cited as FIPS-conformant in compliance claims.
+ *
+ * `x-wing` (X25519 + ML-KEM-768, draft-connolly-cfrg-xwing-kem-10) is a
+ * CFRG Internet-Draft construction, **not** a FIPS 203 algorithm. It is not
+ * listed here. Including ML-KEM-768 as one of its components does not give
+ * X-Wing FIPS 203 status — see FIPS 203 §3.3 and
+ * `docs/compliance/FIPS-203-MATRIX.md` §3.2.
+ *
+ * @example
+ * ```ts
+ * import { FIPS_ALGORITHMS } from '@pqc-sdk/core';
+ *
+ * FIPS_ALGORITHMS.includes('ml-kem-768'); // true
+ * FIPS_ALGORITHMS.includes('x-wing');    // false — draft algorithm
+ * ```
+ */
+export const FIPS_ALGORITHMS = ['ml-kem-768', 'ml-dsa-44', 'ml-dsa-65', 'ml-dsa-87'] as const;
+
+export type FipsAlgorithm = (typeof FIPS_ALGORITHMS)[number];
 
 /**
  * SDK entry point: post-quantum hybrid encryption and digital signatures
@@ -112,6 +135,8 @@ export const pqc = {
   decrypt,
   encryptStream,
   decryptStream,
+  /** @see {@link collectDecryptStream} for the safe buffering variant. */
+  collectDecryptStream,
   encryptWebStream,
   decryptWebStream,
   sign,
