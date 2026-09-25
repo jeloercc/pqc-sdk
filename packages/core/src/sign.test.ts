@@ -3,6 +3,23 @@ import { describe, expect, it } from 'vitest';
 import { pqc } from './index.js';
 
 describe('pqc.sign / pqc.verify', () => {
+  // F204-05 — FIPS 204 §3.4 hedged signing: the SDK always signs in hedged mode
+  // (randomized, never deterministic). Two signatures over the same message with the
+  // same key must differ with overwhelming probability. Identical signatures would mean
+  // the randomness source (rnd in Algorithm 2) is broken or deterministic.
+  it('produces non-equal signatures for the same message (hedged / randomized signing)', async () => {
+    const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
+    const message = 'the same document, signed twice';
+
+    const sig1 = await pqc.sign(message, pair.secretKey);
+    const sig2 = await pqc.sign(message, pair.secretKey);
+
+    // Overwhelmingly likely unless rnd is constant; both must still verify.
+    expect(Buffer.from(sig1).equals(Buffer.from(sig2))).toBe(false);
+    await expect(pqc.verify(message, sig1, pair.publicKey)).resolves.toBe(true);
+    await expect(pqc.verify(message, sig2, pair.publicKey)).resolves.toBe(true);
+  });
+
   it('roundtrips signing and verification', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-dsa-65' });
     const data = new TextEncoder().encode('important document');

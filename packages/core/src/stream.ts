@@ -419,3 +419,63 @@ export async function* decryptStream(
     return;
   }
 }
+
+/**
+ * Safe, buffering wrapper around {@link decryptStream} that resolves to the
+ * full plaintext only after the entire stream authenticates cleanly.
+ *
+ * {@link decryptStream} is an async generator that yields each plaintext chunk
+ * as soon as it individually authenticates. That incremental-release property
+ * means a truncated or tampered stream can yield genuine prefix chunks before
+ * throwing — the caller is responsible for not treating those provisional
+ * chunks as final output until the loop completes. Getting that contract right
+ * everywhere is error-prone.
+ *
+ * `collectDecryptStream` handles it correctly by design: it buffers all chunks
+ * internally and only concatenates and returns them once the generator
+ * finishes without error. If the stream is tampered, truncated, or uses the
+ * wrong key, it throws {@link PqcError} with code `DECRYPTION_FAILED` or
+ * `INVALID_CIPHERTEXT` — exactly the same codes as {@link decryptStream} —
+ * and no partial plaintext is ever returned.
+ *
+ * **Trade-off:** the whole plaintext is held in memory. Use
+ * {@link decryptStream} directly when the payload may be too large to buffer
+ * (e.g. large files), reading its documentation carefully to honour the
+ * incremental-release contract yourself.
+ *
+ * @example
+ * ```ts
+ * import { pqc } from '@pqc-sdk/core';
+ *
+ * const pair = await pqc.keys.generate();
+ * async function* source() {
+ *   yield new TextEncoder().encode('streamed data');
+ * }
+ * const ciphertextChunks: Uint8Array[] = [];
+ * for await (const chunk of pqc.encryptStream(pair.publicKey, source())) {
+ *   ciphertextChunks.push(chunk);
+ * }
+ * async function* replay() { yield* ciphertextChunks; }
+ *
+ * // Safe: throws on any tampering, never returns partial plaintext.
+ * const plaintext = await pqc.collectDecryptStream(pair.secretKey, replay());
+ * ```
+ */
+export async function collectDecryptStream(
+  secretKey: SecretKey<KemAlgorithm>,
+  ciphertext: AsyncIterable<Uint8Array>,
+): Promise<Uint8Array> {
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  for await (const chunk of decryptStream(secretKey, ciphertext)) {
+    parts.push(chunk);
+    total += chunk.length;
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}

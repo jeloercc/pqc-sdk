@@ -49,6 +49,14 @@ export async function encrypt(
   // recipient public key (draft-connolly-cfrg-xwing-kem-10 §5.3). Adding
   // another KDF on top would be exactly the home-grown secret-mixing the
   // never-invent rule forbids; the combiner is the derivation.
+  //
+  // NONCE SAFETY INVARIANT: a fresh encapsulation is called on every
+  // encrypt() invocation, producing a fresh, ephemeral shared secret each
+  // time. Because the AES-256 key is never reused across messages, a random
+  // 12-byte nonce is safe regardless of message volume — the (key, nonce)
+  // pair is unique by the key being unique, not by the nonce alone.
+  // This invariant MUST be preserved: do not cache or reuse sharedSecret
+  // across calls.
   const { cipherText, sharedSecret } = encapsulateTo(spec, publicKey.bytes, publicKey.algorithm);
   const nonce = randomBytes(NONCE_LENGTH);
 
