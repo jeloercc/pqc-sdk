@@ -10,21 +10,30 @@ import mldsa65Keygen from './vectors/mldsa65-keygen.json';
 import mldsa65Sigver from './vectors/mldsa65-sigver.json';
 import mldsa87Keygen from './vectors/mldsa87-keygen.json';
 import mldsa87Sigver from './vectors/mldsa87-sigver.json';
-import mlkemEncapDecap from './vectors/mlkem768-encapdecap.json';
-import mlkemKeygen from './vectors/mlkem768-keygen.json';
+import mlkem512EncapDecap from './vectors/mlkem512-encapdecap.json';
+import mlkem512Keygen from './vectors/mlkem512-keygen.json';
+import mlkem768EncapDecap from './vectors/mlkem768-encapdecap.json';
+import mlkem768Keygen from './vectors/mlkem768-keygen.json';
+import mlkem1024EncapDecap from './vectors/mlkem1024-encapdecap.json';
+import mlkem1024Keygen from './vectors/mlkem1024-keygen.json';
 
 const utf8 = new TextEncoder();
 
 /**
- * Builds an SDK hybrid ciphertext from a NIST-expected KEM ciphertext and
- * shared secret. If pqc.decrypt recovers the plaintext, our pipeline's
- * decapsulation produces exactly the vector's secret.
+ * Builds an SDK hybrid ciphertext from a KEM ciphertext and shared secret,
+ * using the given envelope version and header id (docs/serialization-format.md §2).
+ * If pqc.decrypt recovers the plaintext, our pipeline's decapsulation produces
+ * exactly the vector's shared secret.
  */
-function buildHybridCiphertext(kemCiphertext: Uint8Array, sharedSecret: Uint8Array) {
+function buildHybridCiphertext(
+  kemCiphertext: Uint8Array,
+  sharedSecret: Uint8Array,
+  envelopeVersion: number,
+  headerId: number,
+) {
   const plaintext = utf8.encode('vector check');
   const nonce = new Uint8Array(12).fill(7);
-  // The 2-byte header is bound as AES-GCM additional data, mirroring pqc.encrypt.
-  const header = new Uint8Array([1, 1]); // format version, ml-kem-768 header id
+  const header = new Uint8Array([envelopeVersion, headerId]);
   const sealed = gcm(sharedSecret, nonce, header).encrypt(plaintext);
   const out = new Uint8Array(2 + kemCiphertext.length + nonce.length + sealed.length);
   out.set(header, 0);
@@ -34,50 +43,88 @@ function buildHybridCiphertext(kemCiphertext: Uint8Array, sharedSecret: Uint8Arr
   return { ciphertext: out, plaintext };
 }
 
-describe('NIST ACVP ML-KEM-768 keyGen (FIPS 203)', () => {
-  it.each(mlkemKeygen.cases)(
-    'tcId $tcId: seed d||z produces the expected ek/dk',
-    ({ d, z, ek, dk }) => {
-      const seed = new Uint8Array([...hexToBytes(d), ...hexToBytes(z)]);
-      const pair = generateKeyPairFromSeed('ml-kem-768', seed);
+// All three FIPS 203 ML-KEM parameter sets, parametrized.
+// envelopeVersion and headerId per docs/serialization-format.md §2.
+const ML_KEM_SETS = [
+  {
+    algorithm: 'ml-kem-512' as const,
+    envelopeVersion: 3,
+    headerId: 3,
+    keygen: mlkem512Keygen,
+    encapDecap: mlkem512EncapDecap,
+  },
+  {
+    algorithm: 'ml-kem-768' as const,
+    envelopeVersion: 1,
+    headerId: 1,
+    keygen: mlkem768Keygen,
+    encapDecap: mlkem768EncapDecap,
+  },
+  {
+    algorithm: 'ml-kem-1024' as const,
+    envelopeVersion: 4,
+    headerId: 4,
+    keygen: mlkem1024Keygen,
+    encapDecap: mlkem1024EncapDecap,
+  },
+];
 
-      expect(Buffer.from(pair.publicKey.bytes).toString('hex')).toBe(ek.toLowerCase());
-      expect(Buffer.from(pair.secretKey.bytes).toString('hex')).toBe(dk.toLowerCase());
-    },
-  );
-});
+for (const { algorithm, envelopeVersion, headerId, keygen, encapDecap } of ML_KEM_SETS) {
+  describe(`FIPS 203 ${algorithm.toUpperCase()} keyGen`, () => {
+    it.each(keygen.cases)(
+      'tcId $tcId: seed d||z produces the expected ek/dk',
+      ({ d, z, ek, dk }) => {
+        const seed = new Uint8Array([...hexToBytes(d), ...hexToBytes(z)]);
+        const pair = generateKeyPairFromSeed(algorithm, seed);
 
-describe('NIST ACVP ML-KEM-768 encapDecap (FIPS 203)', () => {
-  it.each(mlkemEncapDecap.encapsulation)(
-    'encapsulation tcId $tcId: decrypt recovers the expected shared secret',
-    async ({ dk, c, k }) => {
-      const secretKey = pqc.keys.deserialize(
-        `pqcv1.ml-kem-768.secret.${Buffer.from(hexToBytes(dk)).toString('base64url')}`,
-        { algorithm: 'ml-kem-768', use: 'secret' },
-      );
-      const { ciphertext, plaintext } = buildHybridCiphertext(hexToBytes(c), hexToBytes(k));
+        expect(Buffer.from(pair.publicKey.bytes).toString('hex')).toBe(ek.toLowerCase());
+        expect(Buffer.from(pair.secretKey.bytes).toString('hex')).toBe(dk.toLowerCase());
+      },
+    );
+  });
 
-      const result = await pqc.decrypt(ciphertext, secretKey);
+  describe(`FIPS 203 ${algorithm.toUpperCase()} encapDecap`, () => {
+    it.each(encapDecap.encapsulation)(
+      'encapsulation tcId $tcId: decrypt recovers the expected shared secret',
+      async ({ dk, c, k }) => {
+        const secretKey = pqc.keys.deserialize(
+          `pqcv1.${algorithm}.secret.${Buffer.from(hexToBytes(dk)).toString('base64url')}`,
+          { algorithm, use: 'secret' },
+        );
+        const { ciphertext, plaintext } = buildHybridCiphertext(
+          hexToBytes(c),
+          hexToBytes(k),
+          envelopeVersion,
+          headerId,
+        );
 
-      expect(Buffer.from(result).equals(Buffer.from(plaintext))).toBe(true);
-    },
-  );
+        const result = await pqc.decrypt(ciphertext, secretKey);
 
-  it.each(mlkemEncapDecap.decapsulation)(
-    'decapsulation tcId $tcId: decrypt recovers the expected shared secret',
-    async ({ dk, c, k }) => {
-      const secretKey = pqc.keys.deserialize(
-        `pqcv1.ml-kem-768.secret.${Buffer.from(hexToBytes(dk)).toString('base64url')}`,
-        { algorithm: 'ml-kem-768', use: 'secret' },
-      );
-      const { ciphertext, plaintext } = buildHybridCiphertext(hexToBytes(c), hexToBytes(k));
+        expect(Buffer.from(result).equals(Buffer.from(plaintext))).toBe(true);
+      },
+    );
 
-      const result = await pqc.decrypt(ciphertext, secretKey);
+    it.each(encapDecap.decapsulation)(
+      'decapsulation tcId $tcId: decrypt recovers the expected shared secret',
+      async ({ dk, c, k }) => {
+        const secretKey = pqc.keys.deserialize(
+          `pqcv1.${algorithm}.secret.${Buffer.from(hexToBytes(dk)).toString('base64url')}`,
+          { algorithm, use: 'secret' },
+        );
+        const { ciphertext, plaintext } = buildHybridCiphertext(
+          hexToBytes(c),
+          hexToBytes(k),
+          envelopeVersion,
+          headerId,
+        );
 
-      expect(Buffer.from(result).equals(Buffer.from(plaintext))).toBe(true);
-    },
-  );
-});
+        const result = await pqc.decrypt(ciphertext, secretKey);
+
+        expect(Buffer.from(result).equals(Buffer.from(plaintext))).toBe(true);
+      },
+    );
+  });
+}
 
 // One block per FIPS 204 parameter set. All three vector files come from the
 // same NIST ACVP-Server source as the original ml-dsa-65 files (see each

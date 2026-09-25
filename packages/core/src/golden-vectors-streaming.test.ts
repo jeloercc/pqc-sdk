@@ -1,7 +1,6 @@
 import { hexToBytes } from '@noble/hashes/utils.js';
 import { describe, expect, it } from 'vitest';
 
-import type { KemAlgorithm } from './types.js';
 import { pqc } from './index.js';
 import { decryptStream, encryptStream } from './stream.js';
 import golden from './vectors/golden-serialization-streaming.json';
@@ -44,8 +43,13 @@ async function collect(chunks: AsyncIterable<Uint8Array>): Promise<Uint8Array> {
   return out;
 }
 
+// The streaming golden fixture covers only the original two KEM algorithms.
+// New parameter sets (ml-kem-512, ml-kem-1024) are locked by their own
+// dedicated golden-vectors-v3.test.ts / golden-vectors-v4.test.ts files.
+type StreamingFixtureAlgorithm = 'ml-kem-768' | 'x-wing';
+
 const cases: Array<{
-  algorithm: KemAlgorithm;
+  algorithm: StreamingFixtureAlgorithm;
   publicLength: number;
   secretLength: number;
   version: number;
