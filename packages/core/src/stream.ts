@@ -24,7 +24,9 @@ const DEFAULT_CHUNK_SIZE_EXPONENT = 16; // 64 KiB, matches age's STREAM default
  * §9.1) — independent of the one-shot version bytes in algorithms.ts.
  */
 const STREAM_ENVELOPE_VERSION: Record<KemAlgorithm, number> = {
+  'ml-kem-512': 5,
   'ml-kem-768': 3,
+  'ml-kem-1024': 6,
   'x-wing': 4,
 };
 

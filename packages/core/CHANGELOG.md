@@ -1,5 +1,65 @@
 # @pqc-sdk/core
 
+## 0.10.0
+
+### Minor Changes
+
+- a5d00d9: Expose all three FIPS 203 ML-KEM parameter sets: ML-KEM-512 (security category 1) and
+  ML-KEM-1024 (security category 5) are now fully supported alongside the existing ML-KEM-768.
+
+  **New algorithms:**
+
+  - `'ml-kem-512'` — FIPS 203 security category 1 (≈ AES-128). Key pair: 800-byte encapsulation key, 1632-byte decapsulation key. Ciphertext: 768 bytes. Serialized as envelope v3 (header `0x03 0x03`); streaming version byte `5`.
+  - `'ml-kem-1024'` — FIPS 203 security category 5 (≈ AES-256). Key pair: 1568-byte encapsulation key, 3168-byte decapsulation key. Ciphertext: 1568 bytes. Serialized as envelope v4 (header `0x04 0x04`); streaming version byte `6`.
+
+  **API changes (additive only — no breaking changes):**
+
+  - `KemAlgorithm` type widened to `'ml-kem-512' | 'ml-kem-768' | 'ml-kem-1024' | 'x-wing'`.
+  - `SUPPORTED_ALGORITHMS` now includes `'ml-kem-512'` and `'ml-kem-1024'`.
+  - `FIPS_ALGORITHMS` lists all three ML-KEM sets (`'ml-kem-512'`, `'ml-kem-768'`, `'ml-kem-1024'`) and excludes `'x-wing'`.
+  - All existing v1/v2 serialized artifacts remain byte-identical and deserialize correctly.
+
+  **Compliance:**
+
+  - Closes compliance finding F203-01 (PARTIALLY CONFORMING → CONFORMING) in `docs/compliance/FIPS-203-MATRIX.md`.
+  - FIPS 203 ACVP known-answer vectors added for both new parameter sets (`mlkem512-keygen.json`, `mlkem512-encapdecap.json`, `mlkem1024-keygen.json`, `mlkem1024-encapdecap.json`).
+  - Golden serialization fixtures locked by `golden-vectors-v3.test.ts` and `golden-vectors-v4.test.ts`.
+  - Both new parameter sets use the same vendored primitive (`vendor/ml-kem/ml-kem.ts`) as ML-KEM-768, inheriting all FIPS 203 corrections (F203-11, F203-18, F203-19).
+
+## 0.9.2
+
+### Patch Changes
+
+- 273ae36: Fixed three findings from an adversarial audit of the CIRCL interop work (the previous two patches):
+
+  - **The important one:** `interop-circl.test.ts` never called `sign()` or `encapsulate()` — a mutation test proved a garbage signer passed all 10 tests, since the suite only re-verified/re-decapsulated bytes committed at generation time. Added round-trip assertions that call `pqc.sign()`/`encapsulate()` fresh on every CI run, using the same key material CIRCL already cross-checked, and confirm the fresh output verifies/decapsulates correctly. Re-ran the same mutation afterward to confirm it now fails loudly (3 new tests go red) instead of passing silently. The test file's header states plainly what this does and doesn't prove — it's a self-consistency guard, not a repeated cross-implementation check (Go still never runs in CI).
+  - **Determinism:** `generate-circl-vectors.mts` used fresh random seeds for every keygen, sign, and encapsulate call, so two regenerations never matched — undermining the ability to diff a fresh run against the committed vectors. Fixed all of it: literal fixed seeds for keygen (ML-DSA/X-Wing/ML-KEM), `extraEntropy: false` for ML-DSA signing, explicit fixed encapsulation seeds on both the SDK and CIRCL side (the Go helper's request shape gained a `seedHex` field, replacing its own `crypto/rand` call). Verified by running the generator twice and diffing: byte-identical except `meta.generatedAt`.
+  - **Asymmetry:** documented, not "fixed" as literally requested — routing the generator's Direction A (SDK signs, CIRCL verifies) through the public `pqc.sign()` turned out to be incompatible with the determinism fix above, since `pqc.sign()` deliberately never exposes `extraEntropy` (F204-14). Direction A stays on the vendored primitive for reproducibility; the new round-trip test now exercises `pqc.sign()` live on every CI run instead, which covers the same underlying concern (the real public entry point actually getting exercised).
+
+  Test + generator + docs only — no `packages/*` runtime behavior changed.
+
+- ff9d895: Added a monthly (`workflow_dispatch`-able) scheduled check for drift on the CIRCL interop vectors added in the previous patch: `.github/workflows/circl-interop-drift-check.yml` and `packages/core/scripts/check-circl-drift.mjs`, mirroring the existing `@noble/post-quantum` vendor-drift check (`vendor-drift-check.yml` / `check-vendor-drift.mjs`).
+
+  Detects whether a newer `github.com/cloudflare/circl` release is published than the version recorded in the three interop vector files' own `meta.counterpartVersion`. Detect-and-notify only: opens or updates a single tracking issue naming the recorded/latest versions, the affected vector files, and the exact `regenerateCommand` already stored in their `meta` — it never regenerates the vectors and never opens a PR. Regenerating still requires Go, the CIRCL helper, and a human reading the cross-check results; the issue body states plainly that a mismatch found after regenerating is a finding to investigate, not a test to fix.
+
+  No Go in CI: the check reads the Go module proxy over plain HTTPS (`https://proxy.golang.org/github.com/cloudflare/circl/@latest`), never the `go` binary.
+
+  Includes test coverage (`packages/core/scripts/__tests__/check-circl-drift.test.mjs`, 5 cases, no network calls — the version lookup is stubbed) for the same reason PR #81 added it for the vendor check: an untested scheduled script fails silently, and nobody notices until the day it mattered.
+
+  CI config + test only — no `packages/*` runtime behavior changed.
+
+- 2a355a8: Added cross-implementation interop vectors against Cloudflare's CIRCL (Go) — an independent codebase from the `@noble/post-quantum` family this SDK is built on. ACVP proves this SDK's primitives match NIST's published expected output; it says nothing about whether a second, independently-authored implementation agrees, which is what these vectors actually check.
+
+  Three cross-checks, generated once locally (`packages/core/scripts/interop/generate-circl-vectors.mts` + a small Go helper, never run in CI) and committed under `packages/core/src/vectors/interop/`, re-verified against this SDK's own code on every CI run (`src/interop-circl.test.ts`):
+
+  - ML-DSA-44/65/87: this SDK signs and CIRCL verifies the raw bytes; CIRCL signs and `pqc.verify` accepts the raw bytes. This closes the real gap ACVP left open — the SDK's own signature _generation_ had never been checked outside the `@noble` family.
+  - X-Wing: bidirectional shared-secret cross-check (SDK encapsulates → CIRCL decapsulates, and the reverse). X-Wing has no ACVP coverage at all (it's a CFRG draft, not a NIST standard), so this is the first independent evidence for it.
+  - ML-KEM-768: the same bidirectional check, lowest marginal value since ACVP already covers this algorithm, but cheap once the generator exists.
+
+  Also adds a paragraph to `docs/serialization-format.md` stating plainly that the `pqcv1` token and `pqcenc` envelope are this SDK's own encodings, not a wire-interop protocol — only the standard-defined payload inside them (raw key/ciphertext/signature bytes) is interoperable, and that boundary is what these new tests actually check.
+
+  Test + docs only — no `packages/*` runtime behavior changed. Adds `tsx` as a devDependency of `@pqc-sdk/core` (needed to run the generator against internal `.ts` source; never part of the published build).
+
 ## 0.9.1
 
 ### Patch Changes

@@ -18,7 +18,7 @@ import { PqcError, truncateForError } from './errors.js';
 // packages/core/src/vendor/ml-kem/NOTICE.md for provenance and the re-vendoring procedure,
 // and docs/compliance/FIPS-203-MATRIX.md §1.3 / FIPS-204-MATRIX.md §1.3 for why it matters.
 import { ml_dsa44, ml_dsa65, ml_dsa87 } from './vendor/ml-dsa/ml-dsa.js';
-import { ml_kem768, RbgFailureError } from './vendor/ml-kem/ml-kem.js';
+import { ml_kem512, ml_kem768, ml_kem1024, RbgFailureError } from './vendor/ml-kem/ml-kem.js';
 import { ml_kem768_x25519 } from './x-wing.js';
 import type { Algorithm, KemAlgorithm, KeyUse, PqcKey, SignatureAlgorithm } from './types.js';
 
@@ -78,6 +78,18 @@ export interface SignerSpec extends AlgorithmSpec {
 }
 
 export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
+  // ML-KEM-512: FIPS 203 security category 1 (≈ AES-128, RBG strength ≥ 128 bits).
+  // envelopeVersion 3 / headerId 3 (docs/serialization-format.md §2.3).
+  'ml-kem-512': {
+    kind: 'kem',
+    envelopeVersion: 3,
+    headerId: 3,
+    kem: ml_kem512,
+    seedLength: 64,
+    publicKeyLength: 800,
+    secretKeyLength: 1632,
+    ciphertextLength: 768,
+  },
   'ml-kem-768': {
     kind: 'kem',
     envelopeVersion: 1,
@@ -87,6 +99,18 @@ export const KEM_ALGORITHMS: Record<KemAlgorithm, KemSpec> = {
     publicKeyLength: 1184,
     secretKeyLength: 2400,
     ciphertextLength: 1088,
+  },
+  // ML-KEM-1024: FIPS 203 security category 5 (≈ AES-256, RBG strength ≥ 256 bits).
+  // envelopeVersion 4 / headerId 4 (docs/serialization-format.md §2.4).
+  'ml-kem-1024': {
+    kind: 'kem',
+    envelopeVersion: 4,
+    headerId: 4,
+    kem: ml_kem1024,
+    seedLength: 64,
+    publicKeyLength: 1568,
+    secretKeyLength: 3168,
+    ciphertextLength: 1568,
   },
   // X-Wing (draft-connolly-cfrg-xwing-kem-10): X25519 + ML-KEM-768 hybrid.
   // The secret key is the 32-byte seed (draft §5.2); the public key is

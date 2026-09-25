@@ -62,7 +62,9 @@ export const version = __PQC_CORE_VERSION__;
  * ```
  */
 export const SUPPORTED_ALGORITHMS = [
+  'ml-kem-512',
   'ml-kem-768',
+  'ml-kem-1024',
   'ml-dsa-44',
   'ml-dsa-65',
   'ml-dsa-87',
@@ -89,7 +91,14 @@ export type SupportedAlgorithm = (typeof SUPPORTED_ALGORITHMS)[number];
  * FIPS_ALGORITHMS.includes('x-wing');    // false — draft algorithm
  * ```
  */
-export const FIPS_ALGORITHMS = ['ml-kem-768', 'ml-dsa-44', 'ml-dsa-65', 'ml-dsa-87'] as const;
+export const FIPS_ALGORITHMS = [
+  'ml-kem-512',
+  'ml-kem-768',
+  'ml-kem-1024',
+  'ml-dsa-44',
+  'ml-dsa-65',
+  'ml-dsa-87',
+] as const;
 
 export type FipsAlgorithm = (typeof FIPS_ALGORITHMS)[number];
 

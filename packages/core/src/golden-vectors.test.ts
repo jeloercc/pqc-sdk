@@ -113,7 +113,8 @@ describe('forward-compatibility contract: unknown versions fail closed', () => {
   });
 
   it('rejects a token with an unknown algorithm segment with UNSUPPORTED_ALGORITHM', () => {
-    const unknownAlgorithm = kemPublicToken.replace('.ml-kem-768.', '.ml-kem-1024.');
+    // ml-kem-1024 is now a known algorithm; use a genuinely unknown one.
+    const unknownAlgorithm = kemPublicToken.replace('.ml-kem-768.', '.ml-kem-99999.');
     expectPqcCode(() => pqc.keys.deserialize(unknownAlgorithm), 'UNSUPPORTED_ALGORITHM');
   });
 
