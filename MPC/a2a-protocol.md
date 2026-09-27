@@ -24,6 +24,11 @@ Agent identity = {
 The registry is a JSON file, MCP resource, or in-memory store accessible
 to all agents in the mesh.
 
+The matching secret keys never enter an agent's model context. Each agent
+refers to its own secret keys only by `keyId` (`kemKeyId`, `dsaKeyId` below);
+the keys stay in the MCP server's keystore or in the application storage that
+backs the LangChain tools.
+
 ---
 
 ## 2. Handshake — first contact between Agent A and Agent B
@@ -40,8 +45,8 @@ Agent A                                           Agent B
    │  3. A encrypts payload with B.kemPublicToken     │
    │     ciphertext = pqc_encrypt(payload, B.kem)    │
    │                                                 │
-   │  4. A signs the ciphertext with A.dsaSecret      │
-   │     sig = pqc_sign(ciphertextHex, A.dsa)        │
+   │  4. A signs the ciphertext with its DSA key      │
+   │     sig = pqc_sign(ciphertextHex, A.dsaKeyId)   │
    │                                                 │
    │──── { from: A.id, ciphertextHex, sigHex } ─────►│
    │                                                 │
@@ -54,7 +59,8 @@ Agent A                                           Agent B
    │             → must be true before decrypting    │
    │                                                 │
    │          7. B decrypts:                         │
-   │             pqc_decrypt(ciphertextHex, B.kem)   │
+   │             pqc_decrypt(ciphertextHex,          │
+   │                         B.kemKeyId)             │
    │             → plaintext payload                 │
 ```
 
@@ -114,12 +120,14 @@ simultaneous channels with all peers using the same identity keypair.
 ## 6. Implementation checklist
 
 ```
+[ ] Enable signing: PQC_MCP_ENABLE_SIGN=1 (MCP) or enableSign: true (LangChain)
 [ ] Agent startup: pqc_keygen(ml-kem-768) + pqc_keygen(ml-dsa-65)
+    → keep the returned keyIds; the secret keys stay server-side
 [ ] Publish { id, kemPublicToken, dsaPublicToken } to registry
 [ ] Send: pqc_encrypt → pqc_sign → wrap in envelope JSON
 [ ] Receive: parse envelope → pqc_verify (MUST pass) → pqc_decrypt
 [ ] Rotate KEM keypair at session end
-[ ] Never store secretToken in conversation history or logs
+[ ] Refer to own keys only by keyId — secret keys never enter the model context
 ```
 
 ---

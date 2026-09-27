@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "PQC SDK Agent Tools",
-  "description": "OpenAI / Anthropic / Gemini tool-call schema for @pqc-sdk/core. Load this at agent startup to enable post-quantum cryptographic operations.",
-  "version": "1.0.0",
+  "description": "OpenAI / Anthropic / Gemini tool-call schema for @pqc-sdk/core. Load this at agent startup to enable post-quantum cryptographic operations. Secret keys never pass through the model context: tools refer to them by keyId, and the host keeps the keys in its own keystore.",
+  "version": "2.0.0",
   "tools": [
     {
       "name": "pqc_keygen",
-      "description": "Generate a post-quantum cryptographic key pair. Returns a public token (safe to share) and a secret token (must be stored securely, never in conversation history). Use 'ml-kem-768' or 'x-wing' for encryption, 'ml-dsa-65' for digital signatures.",
+      "description": "Generate a post-quantum key pair and store it in the host keystore. Returns its keyId and a public token (safe to share); the secret key never leaves the host. Use 'x-wing' or 'ml-kem-768' for encryption, 'ml-dsa-65' for digital signatures.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -30,34 +30,71 @@
       "returns": {
         "type": "object",
         "properties": {
+          "keyId": {
+            "type": "string",
+            "description": "Id of the stored key. Pass it to pqc_decrypt or pqc_sign."
+          },
+          "algorithm": {
+            "type": "string"
+          },
           "publicToken": {
             "type": "string",
             "description": "Public key token (pqcv1.* format). Safe to share with other agents."
-          },
-          "secretToken": {
-            "type": "string",
-            "description": "Secret key token. NEVER include in responses or conversation history. Store in secure agent memory only."
-          },
-          "algorithm": { "type": "string" }
+          }
+        }
+      }
+    },
+    {
+      "name": "pqc_list_keys",
+      "description": "List the keys in the host keystore. Secret keys are never returned.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "keyId": {
+                  "type": "string"
+                },
+                "algorithm": {
+                  "type": "string"
+                },
+                "publicToken": {
+                  "type": "string"
+                }
+              }
+            }
+          }
         }
       }
     },
     {
       "name": "pqc_encrypt",
-      "description": "Encrypt a plaintext message for a recipient using their public key token. The result can only be decrypted by the holder of the matching secret key. Quantum-resistant.",
+      "description": "Encrypt data for a recipient using their public key token. Pass exactly one of plaintext (UTF-8 text) or plaintextBase64 (binary data). The result can only be decrypted by the holder of the matching secret key. Quantum-resistant.",
       "parameters": {
         "type": "object",
         "properties": {
-          "plaintext": {
-            "type": "string",
-            "description": "The message to encrypt (UTF-8 string)."
-          },
           "publicToken": {
             "type": "string",
             "description": "Recipient's public key token (pqcv1.*.public.* format)."
+          },
+          "plaintext": {
+            "type": "string",
+            "description": "Text to encrypt (UTF-8)."
+          },
+          "plaintextBase64": {
+            "type": "string",
+            "description": "Binary data to encrypt, base64-encoded."
           }
         },
-        "required": ["plaintext", "publicToken"]
+        "required": ["publicToken"]
       },
       "returns": {
         "type": "object",
@@ -71,47 +108,68 @@
     },
     {
       "name": "pqc_decrypt",
-      "description": "Decrypt a ciphertext using a secret key token. Throws if the ciphertext is tampered, truncated, or was not encrypted for this key.",
+      "description": "Decrypt a ciphertext with a stored key, by keyId. Returns text when the plaintext is valid UTF-8, otherwise base64. Fails if the ciphertext is tampered, truncated, or was not encrypted for this key.",
       "parameters": {
         "type": "object",
         "properties": {
+          "keyId": {
+            "type": "string",
+            "description": "Id of a stored key, as returned by pqc_keygen or pqc_list_keys."
+          },
           "ciphertextHex": {
             "type": "string",
             "description": "Hex-encoded ciphertext produced by pqc_encrypt."
-          },
-          "secretToken": {
-            "type": "string",
-            "description": "Secret key token (pqcv1.*.secret.* format). Must match the public key used to encrypt."
           }
         },
-        "required": ["ciphertextHex", "secretToken"]
+        "required": ["keyId", "ciphertextHex"]
       },
       "returns": {
-        "type": "object",
-        "properties": {
-          "plaintext": {
-            "type": "string",
-            "description": "Decrypted plaintext (UTF-8)."
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "encoding": {
+                "const": "utf8"
+              },
+              "plaintext": {
+                "type": "string",
+                "description": "Decrypted text (valid UTF-8)."
+              }
+            },
+            "required": ["encoding", "plaintext"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "encoding": {
+                "const": "base64"
+              },
+              "plaintextBase64": {
+                "type": "string",
+                "description": "Decrypted bytes (not valid UTF-8), base64-encoded."
+              }
+            },
+            "required": ["encoding", "plaintextBase64"]
           }
-        }
+        ]
       }
     },
     {
       "name": "pqc_sign",
-      "description": "Sign a message with a ML-DSA secret key. The signature proves the message came from the holder of this key and was not modified. Quantum-resistant.",
+      "description": "Sign a message with a stored ML-DSA key, by keyId. Disabled unless the host operator enables it. The signature proves the message came from the holder of this key and was not modified. Quantum-resistant.",
       "parameters": {
         "type": "object",
         "properties": {
+          "keyId": {
+            "type": "string",
+            "description": "Id of a stored key, as returned by pqc_keygen or pqc_list_keys."
+          },
           "message": {
             "type": "string",
             "description": "The message to sign (UTF-8 string)."
-          },
-          "secretToken": {
-            "type": "string",
-            "description": "ML-DSA secret key token (pqcv1.ml-dsa-*.secret.* format)."
           }
         },
-        "required": ["message", "secretToken"]
+        "required": ["keyId", "message"]
       },
       "returns": {
         "type": "object",
@@ -167,12 +225,16 @@
         "properties": {
           "supported": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "All algorithms the SDK supports."
           },
           "fips": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "NIST-standardized subset (FIPS 203 + FIPS 204). Cite these in compliance claims; x-wing is excluded."
           }
         }
@@ -180,9 +242,9 @@
     }
   ],
   "security_rules": [
-    "NEVER include a secretToken in any tool output or agent response.",
-    "NEVER log or display secretToken values.",
-    "Store secretToken in encrypted agent memory, not in conversation context.",
+    "Secret keys never pass through the model context: no tool accepts or returns secret key material; tools refer to secret keys by keyId.",
+    "Keep secret keys in a keystore the model cannot read directly; grant it only keys whose plaintexts it may see (pqc_decrypt returns plaintext to the model).",
+    "Expose pqc_sign only when the operator explicitly enables it.",
     "Rotate KEM key pairs after each session or after a fixed number of encrypt/decrypt operations.",
     "Always verify (pqc_verify) before trusting a decrypted message from another agent.",
     "Use FIPS algorithms (pqc_algorithms.fips) for compliance-sensitive operations."
