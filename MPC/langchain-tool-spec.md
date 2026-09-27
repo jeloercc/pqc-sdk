@@ -1,7 +1,17 @@
 # LangChain / LangGraph Tool Wrappers — `@pqc-sdk/langchain`
 
-> Drop-in Zod-typed tools for LangChain agents, LangGraph nodes, and any
-> framework built on `@langchain/core`.
+> Zod-typed tools for LangChain agents, LangGraph nodes, and any framework
+> built on `@langchain/core`.
+
+---
+
+## Core rule: secret keys never pass through the model context
+
+No tool accepts or returns secret key material. Tools refer to secret keys by
+`keyId`; the keys themselves move only through two callbacks the application
+provides. The package performs no I/O — where keys are stored (a secrets
+manager, a KMS-wrapped database, an encrypted file) is the application's
+decision.
 
 ---
 
@@ -13,137 +23,54 @@ npm install @pqc-sdk/langchain @pqc-sdk/core @langchain/core zod
 
 ---
 
-## Complete implementation
+## API
+
+Implementation: `packages/langchain/src/index.ts`.
 
 ```typescript
-// packages/langchain/src/index.ts
-import { tool } from '@langchain/core/tools';
-import { pqc, SUPPORTED_ALGORITHMS, FIPS_ALGORITHMS } from '@pqc-sdk/core';
-import { hexToBytes } from '@noble/hashes/utils.js';
-import { z } from 'zod';
+interface CreatePqcToolsOptions {
+  /** Returns the secret key stored under keyId (called on every decrypt/sign). */
+  resolveSecretKey: (keyId: string) => Promise<SecretKey>;
+  /** Receives each generated secret key. If omitted, pqc_keygen is not included. */
+  onSecretKey?: (keyId: string, secretKey: SecretKey) => void | Promise<void>;
+  /** Include pqc_sign. Default: false. */
+  enableSign?: boolean;
+}
 
-// ── pqcKeygenTool ──────────────────────────────────────────────────────────
-export const pqcKeygenTool = tool(
-  async ({ algorithm }) => {
-    const pair = await pqc.keys.generate({ algorithm: algorithm as any });
-    return JSON.stringify({
-      publicToken: pqc.keys.serialize(pair.publicKey),
-      secretToken: pqc.keys.serialize(pair.secretKey),
-      algorithm,
-    });
-  },
-  {
-    name: 'pqc_keygen',
-    description:
-      'Generate a post-quantum key pair. Use ml-kem-768 or x-wing for encryption, ' +
-      'ml-dsa-65 for signatures. Returns publicToken (shareable) and secretToken ' +
-      '(store securely — never expose in responses).',
-    schema: z.object({
-      algorithm: z
-        .enum([
-          'ml-kem-512',
-          'ml-kem-768',
-          'ml-kem-1024',
-          'x-wing',
-          'ml-dsa-44',
-          'ml-dsa-65',
-          'ml-dsa-87',
-        ])
-        .default('x-wing')
-        .describe('Algorithm to use.'),
-    }),
-  },
-);
+function createPqcTools(options: CreatePqcToolsOptions): StructuredToolInterface[];
 
-// ── pqcEncryptTool ─────────────────────────────────────────────────────────
-export const pqcEncryptTool = tool(
-  async ({ plaintext, publicToken }) => {
-    const key = pqc.keys.deserialize(publicToken);
-    const ct = await pqc.encrypt(plaintext, key);
-    return JSON.stringify({ ciphertextHex: Buffer.from(ct).toString('hex') });
-  },
-  {
-    name: 'pqc_encrypt',
-    description: 'Encrypt a message for a recipient using their public key token.',
-    schema: z.object({
-      plaintext: z.string().describe('Message to encrypt (UTF-8).'),
-      publicToken: z.string().describe("Recipient's public key token (pqcv1.*.public.*)."),
-    }),
-  },
-);
-
-// ── pqcDecryptTool ─────────────────────────────────────────────────────────
-export const pqcDecryptTool = tool(
-  async ({ ciphertextHex, secretToken }) => {
-    const key = pqc.keys.deserialize(secretToken);
-    const pt = await pqc.decrypt(hexToBytes(ciphertextHex), key);
-    return JSON.stringify({ plaintext: new TextDecoder().decode(pt) });
-  },
-  {
-    name: 'pqc_decrypt',
-    description: 'Decrypt a ciphertext using a secret key token.',
-    schema: z.object({
-      ciphertextHex: z.string().describe('Hex-encoded ciphertext from pqc_encrypt.'),
-      secretToken: z.string().describe('Secret key token (pqcv1.*.secret.*).'),
-    }),
-  },
-);
-
-// ── pqcSignTool ────────────────────────────────────────────────────────────
-export const pqcSignTool = tool(
-  async ({ message, secretToken }) => {
-    const key = pqc.keys.deserialize(secretToken);
-    const sig = await pqc.sign(message, key);
-    return JSON.stringify({ signatureHex: Buffer.from(sig).toString('hex') });
-  },
-  {
-    name: 'pqc_sign',
-    description: 'Sign a message with a ML-DSA secret key.',
-    schema: z.object({
-      message: z.string().describe('Message to sign.'),
-      secretToken: z.string().describe('ML-DSA secret key token.'),
-    }),
-  },
-);
-
-// ── pqcVerifyTool ──────────────────────────────────────────────────────────
-export const pqcVerifyTool = tool(
-  async ({ message, signatureHex, publicToken }) => {
-    const key = pqc.keys.deserialize(publicToken);
-    const verified = await pqc.verify(message, hexToBytes(signatureHex), key);
-    return JSON.stringify({ verified });
-  },
-  {
-    name: 'pqc_verify',
-    description: 'Verify a ML-DSA signature. Returns { verified: boolean }.',
-    schema: z.object({
-      message: z.string().describe('Original message.'),
-      signatureHex: z.string().describe('Hex-encoded signature from pqc_sign.'),
-      publicToken: z.string().describe("Signer's ML-DSA public key token."),
-    }),
-  },
-);
-
-// ── pqcAlgorithmsTool ──────────────────────────────────────────────────────
-export const pqcAlgorithmsTool = tool(
-  async () => JSON.stringify({ supported: SUPPORTED_ALGORITHMS, fips: FIPS_ALGORITHMS }),
-  {
-    name: 'pqc_algorithms',
-    description: 'List all supported algorithms and the FIPS-standardized subset.',
-    schema: z.object({}),
-  },
-);
-
-/** All six tools as an array — pass directly to createReactAgent or a graph node. */
-export const pqcTools = [
-  pqcKeygenTool,
-  pqcEncryptTool,
-  pqcDecryptTool,
-  pqcSignTool,
-  pqcVerifyTool,
-  pqcAlgorithmsTool,
-] as const;
+// Stateless tools, also included by createPqcTools:
+const pqcEncryptTool: StructuredToolInterface;
+const pqcVerifyTool: StructuredToolInterface;
+const pqcAlgorithmsTool: StructuredToolInterface;
+const KEY_ID_PATTERN: RegExp; // /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 ```
+
+| Tool             | Input                                                          | Output                                                                         |
+| ---------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `pqc_keygen`     | `algorithm` (default `x-wing`) — only with `onSecretKey`       | `{ keyId, algorithm, publicToken }`                                            |
+| `pqc_encrypt`    | `publicToken` + exactly one of `plaintext` / `plaintextBase64` | `{ ciphertextHex }`                                                            |
+| `pqc_decrypt`    | `keyId`, `ciphertextHex`                                       | `{ encoding: "utf8", plaintext }` or `{ encoding: "base64", plaintextBase64 }` |
+| `pqc_sign`       | `keyId`, `message` — only with `enableSign: true`              | `{ signatureHex }`                                                             |
+| `pqc_verify`     | `message`, `signatureHex`, `publicToken`                       | `{ verified }`                                                                 |
+| `pqc_algorithms` | —                                                              | `{ supported, fips }`                                                          |
+
+Behavior:
+
+- `pqc_keygen` generates the pair and a `keyId` (`<algorithm>-<12 hex>`),
+  awaits `onSecretKey(keyId, secretKey)`, and only then returns the public
+  key. If the callback throws, the tool fails with `KEY_STORAGE_FAILED` and
+  the model receives no key.
+- `keyId` is checked against `KEY_ID_PATTERN` before `resolveSecretKey` runs,
+  so the callback never sees path separators or `..`. A resolver failure maps
+  to `KEY_NOT_FOUND` without the application's error message (it stays on the
+  error's `cause`).
+- `pqc_decrypt` decodes strictly and falls back to base64 — binary plaintext
+  is never silently corrupted.
+- Errors are thrown as `PqcError[CODE]: message`, so the agent can branch on
+  the code.
+- Published type declarations reference only `@langchain/core` and
+  `@pqc-sdk/core` types (the Zod v3/v4 interop types stay internal).
 
 ---
 
@@ -151,57 +78,40 @@ export const pqcTools = [
 
 ```typescript
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
-import { ChatAnthropic } from '@langchain/anthropic';
-import { pqcTools } from '@pqc-sdk/langchain';
+import type { SecretKey } from '@pqc-sdk/core';
+import { createPqcTools } from '@pqc-sdk/langchain';
 
-const agent = createReactAgent({
-  llm: new ChatAnthropic({ model: 'claude-opus-4-5' }),
-  tools: [...pqcTools],
+// Replace with a real secrets manager.
+const vault = new Map<string, SecretKey>();
+
+const tools = createPqcTools({
+  resolveSecretKey: async (keyId) => {
+    const key = vault.get(keyId);
+    if (!key) throw new Error(`unknown key ${keyId}`);
+    return key;
+  },
+  onSecretKey: (keyId, secretKey) => {
+    vault.set(keyId, secretKey);
+  },
 });
 
-const result = await agent.invoke({
-  messages: [{ role: 'user', content: 'Generate a key pair and encrypt "hello agent" for me.' }],
-});
+const agent = createReactAgent({ llm, tools });
 ```
-
----
 
 ## Usage in a LangGraph node
 
 ```typescript
-import { StateGraph, MessagesAnnotation } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { pqcTools } from '@pqc-sdk/langchain';
 
-const toolNode = new ToolNode(pqcTools);
-
-const graph = new StateGraph(MessagesAnnotation)
-  .addNode('crypto', toolNode)
-  // ... rest of graph
-  .compile();
+const toolNode = new ToolNode(createPqcTools({ resolveSecretKey, onSecretKey }));
 ```
 
 ---
 
-## Package scaffold
+## Honest limits
 
-```
-packages/langchain/
-  src/
-    index.ts        ← all tools + pqcTools array
-  package.json      ← name: @pqc-sdk/langchain
-  tsup.config.ts
-  tsconfig.json
-```
-
-`package.json` peer dependencies:
-
-```json
-{
-  "peerDependencies": {
-    "@langchain/core": ">=0.3.0",
-    "@pqc-sdk/core": "workspace:*",
-    "zod": ">=3.0.0"
-  }
-}
-```
+- **Decryption oracle.** `pqc_decrypt` returns plaintext to the model. The
+  callbacks keep the _key_ out of the context, not the data it decrypts. Only
+  resolve keys whose plaintexts the model is allowed to see.
+- **Signing.** `pqc_sign` produces statements under the key owner's identity;
+  it is excluded unless `enableSign: true`.

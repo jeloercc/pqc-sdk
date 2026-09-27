@@ -54,27 +54,35 @@ operation without human plumbing.
 
 **Operations to expose:**
 
-| Tool name        | Input                                                            | Output                                    |
-| ---------------- | ---------------------------------------------------------------- | ----------------------------------------- |
-| `pqc_keygen`     | `{ algorithm: KemAlgorithm \| SignatureAlgorithm }`              | `{ publicToken, secretToken }`            |
-| `pqc_encrypt`    | `{ plaintext: string, publicToken: string }`                     | `{ ciphertextHex: string }`               |
-| `pqc_decrypt`    | `{ ciphertextHex: string, secretToken: string }`                 | `{ plaintext: string }`                   |
-| `pqc_sign`       | `{ message: string, secretToken: string }`                       | `{ signatureHex: string }`                |
-| `pqc_verify`     | `{ message: string, signatureHex: string, publicToken: string }` | `{ verified: boolean }`                   |
-| `pqc_algorithms` | `{}`                                                             | `{ supported: string[], fips: string[] }` |
+| Tool name        | Input                                                                   | Output                                                                         |
+| ---------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `pqc_keygen`     | `{ algorithm?: KemAlgorithm \| SignatureAlgorithm }`                    | `{ keyId, algorithm, publicToken }`                                            |
+| `pqc_list_keys`  | `{}` (MCP only)                                                         | `{ keys: { keyId, algorithm, publicToken }[] }`                                |
+| `pqc_encrypt`    | `{ publicToken: string, plaintext?: string, plaintextBase64?: string }` | `{ ciphertextHex: string }`                                                    |
+| `pqc_decrypt`    | `{ keyId: string, ciphertextHex: string }`                              | `{ encoding: 'utf8', plaintext }` \| `{ encoding: 'base64', plaintextBase64 }` |
+| `pqc_sign`       | `{ keyId: string, message: string }` (opt-in)                           | `{ signatureHex: string }`                                                     |
+| `pqc_verify`     | `{ message: string, signatureHex: string, publicToken: string }`        | `{ verified: boolean }`                                                        |
+| `pqc_algorithms` | `{}`                                                                    | `{ supported: string[], fips: string[] }`                                      |
 
 Key design rules:
 
-- **All key material travels as `pqcv1.*` token strings** — the SDK's own
-  format. Never raw bytes over tool calls (injection risk).
-- **secretToken never appears in tool output** — only in input. Agents
-  store it in their secure memory / secrets store, not in conversation history.
-- Errors map to `PqcErrorCode` strings so agents can branch on them.
+- **Secret keys never pass through the model context.** No tool accepts or
+  returns secret key material; tools refer to secret keys by `keyId`, and the
+  keys stay in a keystore (MCP) or in application storage reached through
+  callbacks (LangChain). Tool arguments and results are part of the
+  conversation, so key material must not appear in either.
+- **Public keys travel as `pqcv1.*` token strings** — the SDK's own format.
+  Never raw bytes over tool calls.
+- **Signing is opt-in.** `pqc_sign` is off unless the operator enables it.
+- **Decryption is lossless.** Plaintext that is not valid UTF-8 comes back as
+  base64 rather than being silently altered.
+- Errors map to `PqcErrorCode` strings (plus tool-level codes such as
+  `INVALID_ARGUMENT` and `KEY_NOT_FOUND`) so agents can branch on them.
 
 ### 3.2 MCP server
 
-Create `packages/mcp-server/` — a Node.js MCP server (stdio + SSE transport)
-that registers the six tools above. Any MCP-compatible host (Claude Desktop,
+Create `packages/mcp-server/` — a Node.js MCP server (stdio transport)
+that registers the tools above. Any MCP-compatible host (Claude Desktop,
 Cursor, Bob) can mount it with one config entry.
 
 ```json
@@ -92,8 +100,10 @@ Cursor, Bob) can mount it with one config entry.
 
 The server:
 
-- Has **no persistent state** — every call is stateless
-- Never logs key material
+- Keeps secret keys in a **persistent on-disk keystore** (`PQC_KEYSTORE_DIR`,
+  CLI key-file format, `0700`/`0600`), read on every call so keys survive
+  restarts — see `MPC/mcp-server-spec.md`
+- Never logs key material; all logs go to stderr
 - Returns `isError: true` with a `PqcErrorCode` on failure
 - Supports the `pqc_algorithms` tool so agents can self-discover what's available
 
@@ -104,8 +114,9 @@ Create `packages/langchain/` — thin wrappers around each SDK operation using
 LangChain agent or graph node.
 
 ```typescript
-import { pqcEncryptTool, pqcDecryptTool } from '@pqc-sdk/langchain';
-const agent = createReactAgent({ tools: [pqcEncryptTool, pqcDecryptTool] });
+import { createPqcTools } from '@pqc-sdk/langchain';
+const tools = createPqcTools({ resolveSecretKey, onSecretKey });
+const agent = createReactAgent({ llm, tools });
 ```
 
 ---
@@ -130,7 +141,7 @@ Agent A                                    Agent B
   │                                           │
   │◄─── B.kemPublicToken + B.dsaPublicToken ──│ (B publishes identity)
   │                                           │
-  │  pqc_sign(B.kemPublicToken, A.dsaSecret)  │ (A verifies B's KEM key)
+  │  pqc_sign(B.kemPublicToken, A.dsaKeyId)   │ (A vouches for B's KEM key)
   │  pqc_encrypt(message, B.kemPublic)       │
   │── ciphertextHex + signatureHex ─────────►│
   │                                           │
@@ -158,13 +169,12 @@ with no trusted third party — just the shared registry.
 
 ## 5. Phase 3 — Production hardening (ongoing)
 
-| Item                        | Why                                                                       |
-| --------------------------- | ------------------------------------------------------------------------- |
-| Secret-token TTL / rotation | Agent sessions should rotate KEM keys every N messages                    |
-| Key pinning in agent memory | Store `secretToken` in encrypted agent memory, not conversation context   |
-| Rate-limit tool calls       | Prevent prompt-injection attacks that force mass key generation           |
-| Audit log tool              | `pqc_audit_log` tool that returns which operations were called in session |
-| WASM build                  | Enables browser-based agent frameworks (Vercel AI SDK, etc.)              |
+| Item                  | Why                                                                       |
+| --------------------- | ------------------------------------------------------------------------- |
+| Key TTL / rotation    | Agent sessions should rotate KEM keys every N messages                    |
+| Rate-limit tool calls | Prevent prompt-injection attacks that force mass key generation           |
+| Audit log tool        | `pqc_audit_log` tool that returns which operations were called in session |
+| WASM build            | Enables browser-based agent frameworks (Vercel AI SDK, etc.)              |
 
 ---
 

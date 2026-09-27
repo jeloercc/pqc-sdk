@@ -83,8 +83,14 @@ set. **SLH-DSA (FIPS 205) is deliberately not implemented** — see
 ## AI agent integration — start here if you use LLMs
 
 This SDK ships first-class support for AI agents. Both integrations expose the
-same six operations: list algorithms, generate keys, encrypt, decrypt, sign,
+same operations: list algorithms, generate keys, encrypt, decrypt, sign,
 verify.
+
+**Secret keys never pass through the model context.** Tool arguments and
+results become part of the conversation, so no tool accepts or returns secret
+key material: the model refers to secret keys by `keyId`, and the keys stay in
+a keystore (MCP) or in your own storage (LangChain). Signing is off unless you
+enable it.
 
 ### Option A — MCP server (Claude, Cursor, Continue, any MCP host)
 
@@ -102,7 +108,8 @@ npm install -g @pqc-sdk/mcp-server
 {
   "mcpServers": {
     "pqc": {
-      "command": "pqc-mcp"
+      "command": "pqc-mcp",
+      "env": { "PQC_KEYSTORE_DIR": "/Users/me/.local/share/my-agent/pqc-keys" }
     }
   }
 }
@@ -110,38 +117,40 @@ npm install -g @pqc-sdk/mcp-server
 
 **Cursor / Continue** — add the same block to your editor's MCP config.
 
+`PQC_KEYSTORE_DIR` must be a directory dedicated to the agent: the model can
+use every key in it. Details, permissions and key import:
+[`packages/mcp-server`](./packages/mcp-server/README.md).
+
 Once connected, the model can call:
 
 ```
-Tool call: pqc_algorithms
-→ { "supported": ["x-wing","ml-kem-768",...], "fips": ["ml-kem-768",...] }
-
 Tool call: pqc_keygen { "algorithm": "x-wing" }
-→ { "algorithm": "x-wing", "publicToken": "pqc1pub...", "secretToken": "pqc1sec..." }
+→ { "keyId": "x-wing-3f9a1c2b7d4e", "algorithm": "x-wing", "publicToken": "pqcv1.x-wing.public.…" }
 
-Tool call: pqc_encrypt { "plaintext": "hello", "publicToken": "pqc1pub..." }
-→ { "ciphertextHex": "03f7a2..." }
+Tool call: pqc_encrypt { "publicToken": "pqcv1.x-wing.public.…", "plaintext": "hello" }
+→ { "ciphertextHex": "0202…" }
 
-Tool call: pqc_decrypt { "ciphertextHex": "03f7a2...", "secretToken": "pqc1sec..." }
-→ { "plaintext": "hello" }
+Tool call: pqc_decrypt { "keyId": "x-wing-3f9a1c2b7d4e", "ciphertextHex": "0202…" }
+→ { "encoding": "utf8", "plaintext": "hello" }
 
-Tool call: pqc_sign { "message": "doc", "secretToken": "pqc1sec..." }
-→ { "signatureHex": "b9e1..." }
-
-Tool call: pqc_verify { "message": "doc", "signatureHex": "b9e1...", "publicToken": "pqc1pub..." }
+Tool call: pqc_verify { "message": "doc", "signatureHex": "b9e1…", "publicToken": "pqcv1.ml-dsa-65.public.…" }
 → { "verified": true }
 ```
 
 **Tool inventory:**
 
-| Tool             | Input                                    | Output                         |
-| ---------------- | ---------------------------------------- | ------------------------------ |
-| `pqc_algorithms` | _(none)_                                 | `{ supported[], fips[] }`      |
-| `pqc_keygen`     | `algorithm` (optional, default `x-wing`) | `{ publicToken, secretToken }` |
-| `pqc_encrypt`    | `plaintext`, `publicToken`               | `{ ciphertextHex }`            |
-| `pqc_decrypt`    | `ciphertextHex`, `secretToken`           | `{ plaintext }`                |
-| `pqc_sign`       | `message`, `secretToken`                 | `{ signatureHex }`             |
-| `pqc_verify`     | `message`, `signatureHex`, `publicToken` | `{ verified }`                 |
+| Tool             | Input                                                          | Output                                                                         |
+| ---------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `pqc_algorithms` | _(none)_                                                       | `{ supported[], fips[] }`                                                      |
+| `pqc_keygen`     | `algorithm` (optional, default `x-wing`)                       | `{ keyId, algorithm, publicToken }`                                            |
+| `pqc_list_keys`  | _(none)_ — MCP only                                            | `{ keys[] }` — `keyId`, `algorithm`, `publicToken` each                        |
+| `pqc_encrypt`    | `publicToken` + exactly one of `plaintext` / `plaintextBase64` | `{ ciphertextHex }`                                                            |
+| `pqc_decrypt`    | `keyId`, `ciphertextHex`                                       | `{ encoding: "utf8", plaintext }` or `{ encoding: "base64", plaintextBase64 }` |
+| `pqc_sign`       | `keyId`, `message` — only when signing is enabled              | `{ signatureHex }`                                                             |
+| `pqc_verify`     | `message`, `signatureHex`, `publicToken`                       | `{ verified }`                                                                 |
+
+`pqc_decrypt` returns plaintext to the model: whatever it decrypts, it reads.
+Give the agent only keys whose data it may see.
 
 ### Option B — LangChain / LangGraph tools
 
@@ -150,26 +159,29 @@ npm install @pqc-sdk/langchain @pqc-sdk/core
 ```
 
 ```ts
-import { pqcTools } from '@pqc-sdk/langchain';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import type { SecretKey } from '@pqc-sdk/core';
+import { createPqcTools } from '@pqc-sdk/langchain';
 
-// Drop the entire PQC suite into any agent
-const agent = createReactAgent({ llm: model, tools: pqcTools });
+const vault = new Map<string, SecretKey>(); // replace with your secrets manager
 
-// Or pick individual tools
-import {
-  pqcAlgorithmsTool,
-  pqcKeygenTool,
-  pqcEncryptTool,
-  pqcDecryptTool,
-  pqcSignTool,
-  pqcVerifyTool,
-} from '@pqc-sdk/langchain';
+const tools = createPqcTools({
+  resolveSecretKey: async (keyId) => {
+    const key = vault.get(keyId);
+    if (!key) throw new Error(`unknown key ${keyId}`);
+    return key;
+  },
+  onSecretKey: (keyId, secretKey) => {
+    vault.set(keyId, secretKey);
+  },
+});
+
+const agent = createReactAgent({ llm: model, tools });
 ```
 
-Each tool is a standard LangChain `StructuredTool` with a Zod input schema,
-a description, and a name that matches the MCP server above — the same six
-operations work identically in both integration paths.
+The tools carry the same names and contracts as the MCP server above; the
+package performs no I/O, so key storage stays under your control. Details:
+[`packages/langchain`](./packages/langchain/README.md).
 
 ### Agent-to-Agent secure channel (A2A)
 
@@ -225,8 +237,8 @@ npx @pqc-sdk/cli init
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----- |
 | [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK — encryption, signatures, key handling, streaming. Node 20+, Deno, Workers, RN.  | 416   |
 | [`@pqc-sdk/cli`](https://www.npmjs.com/package/@pqc-sdk/cli)   | `pqc init / keygen / encrypt / decrypt / audit` — dev scaffolding and file-level crypto. | 54    |
-| [`@pqc-sdk/mcp-server`](./packages/mcp-server/)                | MCP stdio server — 6 PQC tools callable by any MCP-compatible AI host.                   | 13    |
-| [`@pqc-sdk/langchain`](./packages/langchain/)                  | LangChain / LangGraph `StructuredTool` wrappers + `pqcTools` bundle.                     | 14    |
+| [`@pqc-sdk/mcp-server`](./packages/mcp-server/)                | MCP stdio server — PQC tools for any MCP host; secret keys stay in a local keystore.     | 13    |
+| [`@pqc-sdk/langchain`](./packages/langchain/)                  | LangChain / LangGraph tools via `createPqcTools`; keys stay in your own storage.         | 14    |
 
 **497 tests · all passing · 90 %+ coverage on core**
 

@@ -204,32 +204,45 @@ fixtures to match new output without the acknowledgment above.
 
 ## MCP server specifics (`packages/mcp-server`)
 
-- Entry point: `src/index.ts` — starts the MCP stdio transport
-- Handlers: `src/handlers.ts` — all tool logic, exported as `handleToolForTest()`
-- Use `handleToolForTest()` in tests instead of starting the transport
-- The six tools match `MPC/agent-tool-spec.json` exactly
+- Entry point: `src/index.ts` — reads config, starts the MCP stdio transport
+- Handlers: `src/handlers.ts` — `handleTool(name, args, context)`, the
+  production handler `index.ts` wires to the transport. Tests call it directly
+  (with a `FileKeyStore` in a temp dir) instead of starting stdio;
+  `src/stdio.test.ts` covers the real transport against `dist/index.js`.
+- Tool definitions: `src/tools.ts` (`listTools({ enableSign })`), matching
+  `MPC/agent-tool-spec.json`
+- Keystore: `src/keystore.ts` (`FileKeyStore`) — CLI key-file format in
+  `PQC_KEYSTORE_DIR`, read on every call. **Secret keys never pass through the
+  model context**: no schema or tool result may contain secret key material;
+  tools take a `keyId`. `handlers.test.ts` enforces this — keep it passing.
+- `pqc_sign` is off unless `PQC_MCP_ENABLE_SIGN=1`, and hidden from `ListTools`
+- stdout is the protocol channel: log only to stderr, never key material
 - Build output: `dist/index.js` (ESM only), available as `pqc-mcp` binary
 
 ## LangChain package specifics (`packages/langchain`)
 
 - All tools use `from 'zod/v3'` (not `'zod'`) — see interop quirks above
-- `dts: false` in `tsup.config.ts` — DTS generation is disabled intentionally
-  due to Zod v3/v4 type incompatibility in generated `.d.ts` files
-- Individual tool exports + `pqcTools` array bundle
+- `dts: true` — every exported tool is typed `StructuredToolInterface` (via
+  `asStructuredTool()`), so no Zod type reaches `dist/index.d.ts`.
+  `src/types.test.ts` type-checks a strict `nodenext` consumer against the
+  built package; keep it passing
+- `createPqcTools({ resolveSecretKey, onSecretKey?, enableSign? })` plus the
+  stateless `pqcEncryptTool` / `pqcVerifyTool` / `pqcAlgorithmsTool`. No I/O;
+  secret keys move only through the callbacks, never through the model
 - Tests use `tool.invoke()` — the LangChain invocation path, not raw functions
 
 ---
 
 ## Agent integration design docs (`MPC/`)
 
-| File                         | Contents                                                      |
-| ---------------------------- | ------------------------------------------------------------- |
-| `MPC/PLAN.md`                | 3-phase integration roadmap, compatibility matrix, verdicts   |
-| `MPC/agent-tool-spec.json`   | OpenAI/Anthropic/Gemini tool-call schema for all 6 operations |
-| `MPC/mcp-server-spec.md`     | MCP server design — transport, secrets, error handling        |
-| `MPC/langchain-tool-spec.md` | LangChain StructuredTool wrapper spec                         |
-| `MPC/a2a-protocol.md`        | Agent-to-Agent secure channel protocol (ML-KEM + ML-DSA)      |
-| `MPC/pr-bodies.md`           | Ready-to-paste GitHub PR bodies                               |
+| File                         | Contents                                                    |
+| ---------------------------- | ----------------------------------------------------------- |
+| `MPC/PLAN.md`                | 3-phase integration roadmap, compatibility matrix, verdicts |
+| `MPC/agent-tool-spec.json`   | OpenAI/Anthropic/Gemini tool-call schema for all operations |
+| `MPC/mcp-server-spec.md`     | MCP server design — transport, secrets, error handling      |
+| `MPC/langchain-tool-spec.md` | LangChain StructuredTool wrapper spec                       |
+| `MPC/a2a-protocol.md`        | Agent-to-Agent secure channel protocol (ML-KEM + ML-DSA)    |
+| `MPC/pr-bodies.md`           | Ready-to-paste GitHub PR bodies                             |
 
 ---
 
