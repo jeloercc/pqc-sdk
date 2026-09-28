@@ -1,4 +1,4 @@
-import { getAlgorithm, keyLengthFor } from './algorithms.js';
+import { getAlgorithm, keyLengthFor, requireKeyShape } from './algorithms.js';
 import { fromBase64Url, toBase64Url } from './base64url.js';
 import { PqcError, truncateForError } from './errors.js';
 import type { Algorithm, KeyPair, KeyUse, PqcKey } from './types.js';
@@ -135,6 +135,7 @@ export function generateKeyPairFromSeed<A extends Algorithm>(
  * ```
  */
 export function serialize(key: PqcKey): string {
+  requireKeyShape(key, 'serialize');
   const spec = getAlgorithm(key.algorithm);
   if (key.bytes.length !== keyLengthFor(spec, key.use)) {
     throw new PqcError('INVALID_KEY', `${key.algorithm} ${key.use} key has invalid length`);

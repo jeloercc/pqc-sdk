@@ -1,3 +1,5 @@
+import { isBytes } from '@noble/hashes/utils.js';
+
 import { PqcError, truncateForError } from './errors.js';
 // ML-KEM and ML-DSA resolve to vendored copies of @noble/post-quantum 0.7.1, not to the npm
 // package. Four FIPS corrections live inside the primitives, and the published `dist`
@@ -177,13 +179,46 @@ export function keyLengthFor(spec: KemSpec | SignerSpec, use: KeyUse): number {
   return use === 'public' ? spec.publicKeyLength : spec.secretKeyLength;
 }
 
-/** Validates a key's algorithm, use and length before operating with it. */
+/**
+ * Whether `value` has the runtime shape of a {@link PqcKey}: an object with a
+ * string `algorithm`, a string `use` and `Uint8Array` `bytes`. The types
+ * already require this, but plain JavaScript callers and hand-built keys reach
+ * the runtime without that guarantee.
+ *
+ * `bytes` is checked with `@noble/hashes`' `isBytes`, not `instanceof
+ * Uint8Array`: a Uint8Array from another realm (node:vm, iframes, Jest with
+ * jsdom) fails `instanceof` but is a valid key buffer, and the primitives
+ * accept it.
+ */
+export function isKeyShaped(value: unknown): value is PqcKey {
+  if (typeof value !== 'object' || value === null) return false;
+  const key = value as Record<string, unknown>;
+  return (
+    typeof key['algorithm'] === 'string' && typeof key['use'] === 'string' && isBytes(key['bytes'])
+  );
+}
+
+/**
+ * Throws `INVALID_KEY` unless `value` is shaped like a key, so a malformed
+ * argument fails with a documented error instead of a raw `TypeError`.
+ */
+export function requireKeyShape(value: unknown, operation: string): asserts value is PqcKey {
+  if (!isKeyShaped(value)) {
+    throw new PqcError(
+      'INVALID_KEY',
+      `${operation} requires a key object with algorithm, use and bytes (Uint8Array)`,
+    );
+  }
+}
+
+/** Validates a key's shape, algorithm, use and length before operating with it. */
 export function requireKey<K extends 'kem' | 'signer'>(
   key: PqcKey,
   kind: K,
   use: KeyUse,
   operation: string,
 ): K extends 'kem' ? KemSpec : SignerSpec {
+  requireKeyShape(key, operation);
   const spec = getAlgorithm(key.algorithm);
   if (spec.kind !== kind) {
     throw new PqcError(

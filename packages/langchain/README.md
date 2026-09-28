@@ -25,7 +25,9 @@ import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import type { SecretKey } from '@pqc-sdk/core';
 import { createPqcTools } from '@pqc-sdk/langchain';
 
-// Replace with your secrets manager; a Map is enough for a demo.
+// Demo only: an in-memory Map loses every key when the process restarts, and
+// anything encrypted to those keys can then never be decrypted. Use durable
+// storage (a secrets manager, a KMS-wrapped database) in real deployments.
 const vault = new Map<string, SecretKey>();
 
 const tools = createPqcTools({

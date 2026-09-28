@@ -6,9 +6,11 @@
 [![license](https://img.shields.io/npm/l/%40pqc-sdk%2Fcore)](./LICENSE)
 
 Post-quantum cryptography for JS/TS with safe defaults and zero configuration.
-**ML-KEM-768** (FIPS 203) + AES-256-GCM for hybrid encryption, **ML-DSA-65**
-(FIPS 204) for signatures. Validated against the official NIST ACVP test
-vectors.
+**X-Wing** (X25519 + ML-KEM-768) + AES-256-GCM for hybrid encryption by
+default, with pure **ML-KEM-512/768/1024** (FIPS 203) available by opt-in;
+**ML-DSA-44/65/87** (FIPS 204) for signatures. Tested against the official
+NIST ACVP known-answer vectors. **Not FIPS 140-3 / CMVP validated** —
+conformance is a published self-assessment.
 
 ```bash
 npm install @pqc-sdk/core
@@ -72,17 +74,20 @@ Full documentation at **[jeloercc.github.io/pqc-sdk](https://jeloercc.github.io/
 
 ## Security
 
-- We never implement primitives: ML-KEM/ML-DSA come from
-  `@noble/post-quantum` and AES-GCM from `@noble/ciphers`. The risk that is
-  ours to carry is the layer around them — envelope format, key
-  serialization, nonce derivation, fail-closed parsing — and
+- We never implement primitives from scratch: ML-KEM/ML-DSA are
+  `@noble/post-quantum` 0.7.1 vendored into this package with documented FIPS
+  203/204 corrections, and AES-GCM is `@noble/ciphers` as published. The risk
+  that is ours to carry is those corrections plus the layer around the
+  primitives — envelope format, key serialization, nonce derivation,
+  fail-closed parsing — and
   [**How this is verified**](https://github.com/jeloercc/pqc-sdk#how-this-is-verified)
   lists the suite covering each: NIST ACVP vectors, golden serialization
   vectors, parser fuzzing, `fast-check` property tests and the streaming
   mutation matrix.
-- **No memory zeroization**: shared secrets, decrypted plaintext and
-  secret-key bytes are not wiped after use. JavaScript offers no reliable
-  primitive for it and `@noble` does not zeroize either.
+- **Partial memory zeroization only**: the vendored ML-KEM/ML-DSA code wipes
+  its internal intermediates, but the shared secret, decrypted plaintext and
+  secret-key bytes you hold are not wiped — JavaScript offers no reliable
+  primitive for it. Details in [SECURITY.md](https://github.com/jeloercc/pqc-sdk/blob/main/SECURITY.md).
 - `@noble/post-quantum` has no independent audit yet (self-audit 04/2026).
   As with all JS, there are no strict constant-time guarantees. The reviews in
   `docs/` are internal and AI-assisted — not an independent third-party audit.

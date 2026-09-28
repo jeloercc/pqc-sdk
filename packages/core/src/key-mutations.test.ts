@@ -1,11 +1,14 @@
+import { runInNewContext } from 'node:vm';
+
 import { describe, expect, it } from 'vitest';
 
 import type { KemAlgorithm } from './types.js';
 import { PqcError } from './errors.js';
 import { decrypt, encrypt } from './encrypt.js';
-import { generate } from './keys.js';
+import { generate, serialize } from './keys.js';
+import { sign, verify } from './sign.js';
 import { collect, single } from './stream-test-helpers.js';
-import { encryptStream } from './stream.js';
+import { collectDecryptStream, encryptStream } from './stream.js';
 
 /**
  * Mutation matrix for the *public key* — the one input region the existing
@@ -170,4 +173,122 @@ describe('ciphertext mutation matrix: degenerate X-Wing ct_X on decapsulation', 
       expect((error as PqcError).code).toBe('DECRYPTION_FAILED');
     });
   }
+});
+
+/**
+ * Malformed key *objects* — the shape, not the content. TypeScript rejects
+ * these at compile time, but plain JavaScript callers, agents, and code that
+ * builds keys by hand reach the runtime with them. Before the fix each one
+ * escaped as a raw `TypeError` (e.g. "Cannot read properties of undefined
+ * (reading 'length')") instead of a documented `PqcError`.
+ */
+describe('malformed key objects fail with a PqcError, never a raw TypeError', () => {
+  const MALFORMED: readonly (readonly [string, unknown])[] = [
+    ['undefined', undefined],
+    ['null', null],
+    ['a string', 'pqcv1.x-wing.public.AAAA'],
+    ['a number', 42],
+    ['an empty object', {}],
+    ['a key without bytes', { algorithm: 'x-wing', use: 'public' }],
+    ['a key with non-byte bytes', { algorithm: 'x-wing', use: 'public', bytes: [1, 2, 3] }],
+    [
+      'a key with a non-string algorithm',
+      { algorithm: 42, use: 'public', bytes: new Uint8Array(1216) },
+    ],
+    ['a key with a non-string use', { algorithm: 'x-wing', use: 1, bytes: new Uint8Array(1216) }],
+  ];
+
+  // Each entry points the malformed value at one key-taking entry point.
+  const OPERATIONS: readonly (readonly [string, (key: never) => Promise<unknown>])[] = [
+    ['encrypt', (key) => encrypt(PLAINTEXT, key)],
+    ['decrypt', (key) => decrypt(new Uint8Array(1200), key)],
+    ['encryptStream', (key) => collect(encryptStream(key, single(PLAINTEXT)))],
+    ['collectDecryptStream', (key) => collectDecryptStream(key, single(new Uint8Array(1200)))],
+    ['sign', (key) => sign(PLAINTEXT, key)],
+    ['verify', (key) => verify(PLAINTEXT, new Uint8Array(3309), key)],
+    ['serialize', (key) => Promise.resolve().then(() => serialize(key))],
+  ];
+
+  for (const [operation, run] of OPERATIONS) {
+    for (const [label, value] of MALFORMED) {
+      it(`${operation} rejects ${label} with INVALID_KEY`, async () => {
+        const error = await run(value as never).then(
+          () => undefined,
+          (caught: unknown) => caught,
+        );
+
+        expect(error).toBeInstanceOf(PqcError);
+        expect((error as PqcError).code).toBe('INVALID_KEY');
+      });
+    }
+  }
+
+  it('a well-shaped key with an unknown algorithm still reports UNSUPPORTED_ALGORITHM', async () => {
+    const key = { algorithm: 'ml-kem-9999', use: 'public', bytes: new Uint8Array(1184) };
+    const error = await encrypt(PLAINTEXT, key as never).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    );
+    expect((error as PqcError).code).toBe('UNSUPPORTED_ALGORITHM');
+  });
+
+  it('a non-string algorithm name reports UNSUPPORTED_ALGORITHM, not a TypeError', async () => {
+    // getAlgorithm echoes the name through truncateForError, which used to
+    // call .length/.slice on whatever it was given.
+    const error = await generate({ algorithm: 42 as never }).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(PqcError);
+    expect((error as PqcError).code).toBe('UNSUPPORTED_ALGORITHM');
+  });
+
+  it('accepts key bytes that are a Uint8Array from another realm', async () => {
+    // Jest+jsdom, iframes and node:vm hand out Uint8Arrays whose constructor
+    // is not this realm's, so `instanceof Uint8Array` is false for them.
+    // 0.11.0 accepted such keys; the shape check must keep accepting them.
+    const pair = await generate({ algorithm: 'x-wing' });
+    const foreign = runInNewContext('new Uint8Array(length)', {
+      length: pair.publicKey.bytes.length,
+    }) as Uint8Array;
+    foreign.set(pair.publicKey.bytes);
+    expect(foreign instanceof Uint8Array).toBe(false);
+
+    const ciphertext = await encrypt(PLAINTEXT, { ...pair.publicKey, bytes: foreign });
+    expect(await decrypt(ciphertext, pair.secretKey)).toEqual(PLAINTEXT);
+
+    const signer = await generate({ algorithm: 'ml-dsa-65' });
+    const signature = await sign(PLAINTEXT, signer.secretKey);
+    const foreignPk = runInNewContext('new Uint8Array(length)', {
+      length: signer.publicKey.bytes.length,
+    }) as Uint8Array;
+    foreignPk.set(signer.publicKey.bytes);
+    expect(await verify(PLAINTEXT, signature, { ...signer.publicKey, bytes: foreignPk })).toBe(
+      true,
+    );
+  });
+
+  it('still rejects byte-like values that are not Uint8Arrays', async () => {
+    for (const bytes of [
+      new Uint16Array(608), // an ArrayBuffer view, but not bytes
+      { constructor: { name: 'Uint8Array' }, length: 1216 }, // not a view at all
+    ]) {
+      const error = await encrypt(PLAINTEXT, {
+        algorithm: 'x-wing',
+        use: 'public',
+        bytes,
+      } as never).then(
+        () => undefined,
+        (caught: unknown) => caught,
+      );
+      expect((error as PqcError).code).toBe('INVALID_KEY');
+    }
+  });
+
+  it('verify still returns false for a wrong-length ML-DSA public key (F204-08)', async () => {
+    const signer = await generate({ algorithm: 'ml-dsa-65' });
+    const signature = await sign(PLAINTEXT, signer.secretKey);
+    const truncated = { ...signer.publicKey, bytes: signer.publicKey.bytes.subarray(1) };
+    expect(await verify(PLAINTEXT, signature, truncated)).toBe(false);
+  });
 });

@@ -168,25 +168,25 @@ code. The fix lands in a separate PR that references the finding ID.
 When adding a new test, check that it belongs to one of these existing suites
 or explain why a new suite is needed:
 
-| File                                                   | What it guards                                              |
-| ------------------------------------------------------ | ----------------------------------------------------------- |
-| `nist-vectors.test.ts`                                 | NIST ACVP KATs — ML-KEM-512/768/1024, ML-DSA-44/65/87       |
-| `xwing-vectors.test.ts`                                | X-Wing draft-10 Appendix C vectors                          |
-| `interop-circl.test.ts`                                | Cross-check with CIRCL (Go) for ML-DSA and X-Wing           |
-| `golden-vectors.test.ts`                               | Wire format stability — envelope v1                         |
-| `golden-vectors-v2.test.ts`                            | Wire format stability — envelope v2 (pqcenc.v2)             |
-| `golden-vectors-streaming.test.ts`                     | Wire format stability — streaming envelope                  |
-| `properties.test.ts`                                   | Property-based: roundtrip + single-byte tamper (fast-check) |
-| `stream-mutations.test.ts`                             | Streaming mutation matrix — every region                    |
-| `deserialize-fuzz.test.ts`                             | Parser fuzzing — hostile/arbitrary input                    |
-| `key-mutations.test.ts`                                | Key mutation matrix — degenerate and tampered keys          |
-| `vendor/ml-kem/__tests__/compress-equivalence.test.ts` | F203-19 regression                                          |
-| `vendor/ml-kem/__tests__/implicit-reject.test.ts`      | F203-18 regression                                          |
-| `vendor/ml-kem/__tests__/rbg-attribution.test.ts`      | F203-11 regression                                          |
-| `vendor/ml-kem/__tests__/fips203-input-checks.test.ts` | F203-05, F203-10 regressions                                |
-| `vendor/ml-dsa/__tests__/rounding-equivalence.test.ts` | F204-13 regression                                          |
-| `vendor/ml-dsa/__tests__/verify-zeroization.test.ts`   | F204-10 regression                                          |
-| `vendor/ml-dsa/__tests__/provider-tripwires.test.ts`   | F204-09, F204-21 regressions                                |
+| File                                                   | What it guards                                                |
+| ------------------------------------------------------ | ------------------------------------------------------------- |
+| `nist-vectors.test.ts`                                 | NIST ACVP KATs — ML-KEM-512/768/1024, ML-DSA-44/65/87         |
+| `xwing-vectors.test.ts`                                | X-Wing draft-10 Appendix C vectors                            |
+| `interop-circl.test.ts`                                | Cross-check with CIRCL (Go) for ML-DSA and X-Wing             |
+| `golden-vectors.test.ts`                               | Wire format stability — envelope v1                           |
+| `golden-vectors-v2.test.ts`                            | Wire format stability — envelope v2 (pqcenc.v2)               |
+| `golden-vectors-streaming.test.ts`                     | Wire format stability — streaming envelope                    |
+| `properties.test.ts`                                   | Property-based: roundtrip + single-byte tamper (fast-check)   |
+| `stream-mutations.test.ts`                             | Streaming mutation matrix — every region                      |
+| `deserialize-fuzz.test.ts`                             | Parser fuzzing — hostile/arbitrary input                      |
+| `key-mutations.test.ts`                                | Key mutation matrix — degenerate, tampered and malformed keys |
+| `vendor/ml-kem/__tests__/compress-equivalence.test.ts` | F203-19 regression                                            |
+| `vendor/ml-kem/__tests__/implicit-reject.test.ts`      | F203-18 regression                                            |
+| `vendor/ml-kem/__tests__/rbg-attribution.test.ts`      | F203-11 regression                                            |
+| `vendor/ml-kem/__tests__/fips203-input-checks.test.ts` | F203-05, F203-10 regressions                                  |
+| `vendor/ml-dsa/__tests__/rounding-equivalence.test.ts` | F204-13 regression                                            |
+| `vendor/ml-dsa/__tests__/verify-zeroization.test.ts`   | F204-10 regression                                            |
+| `vendor/ml-dsa/__tests__/provider-tripwires.test.ts`   | F204-09, F204-21 regressions                                  |
 
 ---
 
