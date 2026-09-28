@@ -23,7 +23,8 @@ What to expect:
 | Older        | ❌ Update to the latest version |
 
 While the project is on `0.x`, security fixes land only on the latest
-published version of `@pqc-sdk/core` and `@pqc-sdk/cli`.
+published version of each package: `@pqc-sdk/core`, `@pqc-sdk/cli`,
+`@pqc-sdk/mcp-server` and `@pqc-sdk/langchain`.
 
 ## Scope
 

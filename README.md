@@ -243,12 +243,12 @@ npx @pqc-sdk/cli init
 
 ## Packages
 
-| Package                                                        | What it does                                                                             | Tests |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----- |
-| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK — encryption, signatures, key handling, streaming. Node 20+, Deno, Workers, RN.  | 530   |
-| [`@pqc-sdk/cli`](https://www.npmjs.com/package/@pqc-sdk/cli)   | `pqc init / keygen / encrypt / decrypt / audit` — dev scaffolding and file-level crypto. | 54    |
-| [`@pqc-sdk/mcp-server`](./packages/mcp-server/)                | MCP stdio server — PQC tools for any MCP host; secret keys stay in a local keystore.     | 67    |
-| [`@pqc-sdk/langchain`](./packages/langchain/)                  | LangChain / LangGraph tools via `createPqcTools`; keys stay in your own storage.         | 26    |
+| Package                                                        | What it does                                                                             |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK — encryption, signatures, key handling, streaming. Node 20+, Deno, Workers, RN.  |
+| [`@pqc-sdk/cli`](https://www.npmjs.com/package/@pqc-sdk/cli)   | `pqc init / keygen / encrypt / decrypt / audit` — dev scaffolding and file-level crypto. |
+| [`@pqc-sdk/mcp-server`](./packages/mcp-server/)                | MCP stdio server — PQC tools for any MCP host; secret keys stay in a local keystore.     |
+| [`@pqc-sdk/langchain`](./packages/langchain/)                  | LangChain / LangGraph tools via `createPqcTools`; keys stay in your own storage.         |
 
 **All passing in CI · 90 %+ coverage on core**
 
