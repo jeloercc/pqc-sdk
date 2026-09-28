@@ -218,6 +218,13 @@ fixtures to match new output without the acknowledgment above.
   `PQC_KEYSTORE_DIR`, read on every call. **Secret keys never pass through the
   model context**: no schema or tool result may contain secret key material;
   tools take a `keyId`. `handlers.test.ts` enforces this — keep it passing.
+- Keystore policy (POSIX, every call) lives in pure functions over stat data
+  (`keystoreDirectoryProblem`, `ancestorDirectoryProblem`, `publicFileProblem`,
+  `directoryChainProblem`) so owner/root cases are testable with synthetic
+  stats. The sticky-bit exception for ancestors is safe only because the
+  keystore directory itself must be owned by the server user — keep both.
+- `PQC_MCP_MAX_KEYS` (default 100) caps keys; `generate()` is serialized so the
+  cap holds under concurrent calls. Invalid config stops the server at startup.
 - `pqc_sign` is off unless `PQC_MCP_ENABLE_SIGN=1`, and hidden from `ListTools`
 - stdout is the protocol channel: log only to stderr, never key material
 - Build output: `dist/index.js` (ESM only), available as `pqc-mcp` binary
