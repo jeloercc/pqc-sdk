@@ -6,8 +6,10 @@
 [![license](https://img.shields.io/npm/l/%40pqc-sdk%2Fcore)](./LICENSE)
 
 > Post-quantum cryptography for JS/TS — hybrid encryption, digital signatures,
-> streaming, and now **native AI-agent tool support** via MCP and LangChain.
-> 497 tests. FIPS 203/204 self-assessed. Safe defaults. Zero configuration.
+> streaming, and **native AI-agent tool support** via MCP and LangChain.
+> Implements ML-KEM (FIPS 203) and ML-DSA (FIPS 204), tested against NIST ACVP
+> vectors. **Not FIPS 140-3 / CMVP validated** — conformance is a published
+> self-assessment. Safe defaults. Zero configuration.
 
 ---
 
@@ -31,8 +33,8 @@ NIST finalised three post-quantum standards in 2024:
 
 This SDK implements FIPS 203 and FIPS 204 in pure TypeScript, with a
 clause-by-clause self-assessment against both standards, 6 closed
-`NONCONFORMING` findings, and validated NIST ACVP vectors for every parameter
-set. **SLH-DSA (FIPS 205) is deliberately not implemented** — see
+`NONCONFORMING` findings, and tests against NIST ACVP known-answer vectors for
+every parameter set. **SLH-DSA (FIPS 205) is deliberately not implemented** — see
 [SLH-DSA scope decision](#slh-dsa-fips-205-not-implemented-by-scope-decision).
 
 ---
@@ -163,7 +165,10 @@ import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import type { SecretKey } from '@pqc-sdk/core';
 import { createPqcTools } from '@pqc-sdk/langchain';
 
-const vault = new Map<string, SecretKey>(); // replace with your secrets manager
+// Demo only: an in-memory Map loses every key when the process restarts, and
+// anything encrypted to those keys can then never be decrypted. Use durable
+// storage (a secrets manager, a KMS-wrapped database) in real deployments.
+const vault = new Map<string, SecretKey>();
 
 const tools = createPqcTools({
   resolveSecretKey: async (keyId) => {
@@ -180,7 +185,9 @@ const agent = createReactAgent({ llm: model, tools });
 ```
 
 The tools carry the same names and contracts as the MCP server above; the
-package performs no I/O, so key storage stays under your control. Details:
+package performs no I/O, so key storage stays under your control — and so does
+durability: keys kept only in memory are gone after a restart, along with the
+ability to decrypt anything encrypted to them. Details:
 [`packages/langchain`](./packages/langchain/README.md).
 
 ### Agent-to-Agent secure channel (A2A)
@@ -199,6 +206,8 @@ npm install @pqc-sdk/core
 ```
 
 ```ts
+import { createReadStream } from 'node:fs';
+
 import { pqc } from '@pqc-sdk/core';
 
 // ── Hybrid encryption (X-Wing default) ────────────────────────────────────
@@ -214,10 +223,11 @@ const valid = await pqc.verify('document', signature, signer.publicKey);
 // ── Pure FIPS 203 (ML-KEM-768), when FIPS scope dominates ─────────────────
 const fipsPair = await pqc.keys.generate({ algorithm: 'ml-kem-768' });
 
-// ── Streaming encryption (large files) ────────────────────────────────────
-import { encryptStream, collectDecryptStream } from '@pqc-sdk/core/stream';
-const encrypted = encryptStream(readableStream, pair.publicKey);
-const decrypted = await collectDecryptStream(encrypted, pair.secretKey);
+// ── Streaming encryption (large files) — key first, then the source ───────
+const encrypted = pqc.encryptStream(pair.publicKey, createReadStream('large-file.bin'));
+// collectDecryptStream buffers the whole plaintext and throws on any tampering;
+// see the streaming guide for incremental decryptStream on huge payloads.
+const decrypted = await pqc.collectDecryptStream(pair.secretKey, encrypted);
 ```
 
 Or bootstrap a whole project with the CLI:
@@ -235,12 +245,12 @@ npx @pqc-sdk/cli init
 
 | Package                                                        | What it does                                                                             | Tests |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----- |
-| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK — encryption, signatures, key handling, streaming. Node 20+, Deno, Workers, RN.  | 416   |
+| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK — encryption, signatures, key handling, streaming. Node 20+, Deno, Workers, RN.  | 464   |
 | [`@pqc-sdk/cli`](https://www.npmjs.com/package/@pqc-sdk/cli)   | `pqc init / keygen / encrypt / decrypt / audit` — dev scaffolding and file-level crypto. | 54    |
-| [`@pqc-sdk/mcp-server`](./packages/mcp-server/)                | MCP stdio server — PQC tools for any MCP host; secret keys stay in a local keystore.     | 13    |
-| [`@pqc-sdk/langchain`](./packages/langchain/)                  | LangChain / LangGraph tools via `createPqcTools`; keys stay in your own storage.         | 14    |
+| [`@pqc-sdk/mcp-server`](./packages/mcp-server/)                | MCP stdio server — PQC tools for any MCP host; secret keys stay in a local keystore.     | 67    |
+| [`@pqc-sdk/langchain`](./packages/langchain/)                  | LangChain / LangGraph tools via `createPqcTools`; keys stay in your own storage.         | 26    |
 
-**497 tests · all passing · 90 %+ coverage on core**
+**611 tests · all passing · 90 %+ coverage on core**
 
 ---
 
