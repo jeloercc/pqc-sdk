@@ -10,7 +10,12 @@ Malformed key arguments now fail with a documented `PqcError` instead of a raw
   key is an object with a string `algorithm`, a string `use` and `Uint8Array`
   `bytes`, and throw `PqcError('INVALID_KEY')` otherwise (for example when a
   JavaScript caller passes `undefined` or swaps the key and data arguments).
-  `verify` still returns `false` for a wrong-length ML-DSA public key.
+- **Behavior change in `verify`:** a malformed public key now always
+  throws `PqcError('INVALID_KEY')`. Before, depending on
+  the shape, `verify` either returned `false` (for example `bytes` given as a
+  plain array) or threw a raw `TypeError` (for example `undefined`). A
+  correctly shaped ML-DSA public key of the wrong length still returns
+  `false`, as FIPS 204 requires.
 - An algorithm name that is not a string (e.g. `generate({ algorithm: 42 })`)
   now reports `UNSUPPORTED_ALGORITHM` instead of throwing a `TypeError` while
   building the error message.
