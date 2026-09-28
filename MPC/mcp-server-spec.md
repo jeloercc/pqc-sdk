@@ -29,15 +29,17 @@ stdout carries the MCP protocol; every log line goes to stderr.
 
 Implemented in `packages/mcp-server/src/keystore.ts` (`FileKeyStore`).
 
-| Aspect      | Behavior                                                                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Location    | `PQC_KEYSTORE_DIR`; if unset, `${XDG_DATA_HOME:-~/.local/share}/pqc-sdk/agent-keys` (`%LOCALAPPDATA%\pqc-sdk\agent-keys` on Windows). Never the CLI's `./keys`.           |
-| Format      | The CLI key-file format (`packages/cli/src/keyfiles.ts`): `<keyId>.public.pqc` + `<keyId>.secret.pqc`, one serialized token per file. No new serialized layout.           |
-| Key ids     | `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`. Generated ids are `<algorithm>-<12 hex>`. Files whose name does not match are ignored by `pqc_list_keys`, with one stderr warning.    |
-| Persistence | Every call reads from disk; nothing is cached. Keys survive restarts, and operator changes apply on the next call.                                                        |
-| Writes      | Directory created `0700`, files `0600`. Atomic and non-clobbering: temp file (`wx`, fsync) hard-linked into place, so an existing key is never replaced.                  |
-| Reads       | POSIX: refuse a secret file that is a symlink, not owned by the server user, or accessible by group/others; refuse a directory writable by group/others (`mode & 0o022`). |
-| Import      | Operator keys are loaded without the model: `pqc keygen --name <keyId> --out "$PQC_KEYSTORE_DIR"`.                                                                        |
+| Aspect      | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Location    | `PQC_KEYSTORE_DIR`; if unset, `${XDG_DATA_HOME:-~/.local/share}/pqc-sdk/agent-keys` (`%LOCALAPPDATA%\pqc-sdk\agent-keys` on Windows). Never the CLI's `./keys`.                                                                                                                                                                                                                                                                               |
+| Format      | The CLI key-file format (`packages/cli/src/keyfiles.ts`): `<keyId>.public.pqc` + `<keyId>.secret.pqc`, one serialized token per file. No new serialized layout.                                                                                                                                                                                                                                                                               |
+| Key ids     | `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`. Generated ids are `<algorithm>-<12 hex>`. Files whose name does not match are ignored by `pqc_list_keys`, with one stderr warning.                                                                                                                                                                                                                                                                        |
+| Persistence | Every call reads from disk; nothing is cached. Keys survive restarts, and operator changes apply on the next call.                                                                                                                                                                                                                                                                                                                            |
+| Writes      | Directory created `0700`, files `0600`. Atomic and non-clobbering: temp file (`wx`, fsync) hard-linked into place, so an existing key is never replaced.                                                                                                                                                                                                                                                                                      |
+| Limit       | `PQC_MCP_MAX_KEYS` (default 100) caps the secret key files in the keystore; `pqc_keygen` then fails with `KEYSTORE_FULL`. Generation is serialized in-process; several servers sharing one directory may overshoot slightly. An invalid value stops the server at startup.                                                                                                                                                                    |
+| Orphans     | If the public file of a new key fails to write, its secret file is removed; `pqc_list_keys` warns (stderr) about any secret file without a public file.                                                                                                                                                                                                                                                                                       |
+| Reads       | POSIX, every call: refuse a symlinked keystore path, a keystore directory not owned by the server user or writable by group/others, and any ancestor (up to `/`) not owned by root or the server user or writable by group/others without the sticky bit. Refuse secret files that are symlinks, foreign-owned or group/other-accessible; skip (with a stderr warning) public files that are symlinks, foreign-owned or group/other-writable. |
+| Import      | Operator keys are loaded without the model: `pqc keygen --name <keyId> --out "$PQC_KEYSTORE_DIR"`.                                                                                                                                                                                                                                                                                                                                            |
 
 The model can use **any** key in the directory, so `PQC_KEYSTORE_DIR` must be
 a directory dedicated to the agent — never a personal key folder.
@@ -78,6 +80,7 @@ Every failure is an `isError: true` result carrying `{ error, message }`:
 | `INVALID_CIPHERTEXT`                                              | `ciphertextHex` is not hex                                  |
 | `KEY_NOT_FOUND`                                                   | No key file for that `keyId`                                |
 | `KEYSTORE_INSECURE`                                               | Permission, ownership or symlink check failed               |
+| `KEYSTORE_FULL`                                                   | `pqc_keygen` with the keystore at `PQC_MCP_MAX_KEYS`        |
 | `INVALID_KEY_FILE`                                                | The secret file does not hold a valid secret key            |
 | `TOOL_DISABLED`                                                   | `pqc_sign` called while signing is disabled                 |
 | `INTERNAL_ERROR`                                                  | Unexpected failure; detail goes to stderr, not to the model |
@@ -95,8 +98,9 @@ material or filesystem paths.
   model is allowed to see.
 - **Windows.** POSIX permission and ownership checks are skipped on Windows;
   protect the directory with NTFS ACLs.
-- **Rate limiting.** Production deployments should limit `pqc_keygen` calls per
-  session on resource-constrained hosts.
+- **Key limit, not rate limit.** `PQC_MCP_MAX_KEYS` bounds how many keys can
+  accumulate; it does not rate-limit calls. Hosts that need per-session limits
+  must enforce them themselves.
 
 ---
 

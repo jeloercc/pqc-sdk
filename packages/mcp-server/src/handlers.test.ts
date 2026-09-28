@@ -129,6 +129,19 @@ describe('pqc_keygen', () => {
   });
 });
 
+describe('pqc_keygen cap', () => {
+  it('returns KEYSTORE_FULL once the keystore holds maxKeys keys', async () => {
+    const capped: HandlerContext = {
+      keyStore: new FileKeyStore(join(root, 'capped'), { warn: () => undefined, maxKeys: 1 }),
+      enableSign: false,
+    };
+    expect((await call('pqc_keygen', {}, capped)).isError).toBe(false);
+    const { isError, data } = await call('pqc_keygen', {}, capped);
+    expect(isError).toBe(true);
+    expect(data['error']).toBe('KEYSTORE_FULL');
+  });
+});
+
 describe('pqc_list_keys', () => {
   it('lists generated keys with their public tokens', async () => {
     const a = await keygen('x-wing');

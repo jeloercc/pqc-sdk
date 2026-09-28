@@ -4,6 +4,7 @@
  * stderr, and that keys survive a server restart.
  */
 
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -61,6 +62,7 @@ describe('stdio server', () => {
     expect(tools.map((tool) => tool.name)).toContain('pqc_list_keys');
     expect(stderr()).toContain(`keystore ${keyDir}`);
     expect(stderr()).toContain('pqc_sign disabled');
+    expect(stderr()).toContain('max 100 keys');
   });
 
   it('exposes pqc_sign when PQC_MCP_ENABLE_SIGN=1', async () => {
@@ -84,4 +86,16 @@ describe('stdio server', () => {
       plaintext: 'across restarts',
     });
   }, 30_000);
+
+  it('refuses to start with an invalid PQC_MCP_MAX_KEYS', () => {
+    const result = spawnSync(process.execPath, [SERVER], {
+      env: { PATH: process.env['PATH'] ?? '', PQC_KEYSTORE_DIR: keyDir, PQC_MCP_MAX_KEYS: 'abc' },
+      input: '',
+      encoding: 'utf8',
+      timeout: 15_000,
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('PQC_MCP_MAX_KEYS must be a positive integer');
+    expect(result.stdout).toBe('');
+  });
 });

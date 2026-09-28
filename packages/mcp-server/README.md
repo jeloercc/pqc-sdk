@@ -36,13 +36,18 @@ Add it to your host's MCP config (Claude Desktop:
 > Point `PQC_KEYSTORE_DIR` at a directory **dedicated to this agent** — never
 > at your personal key folder or a project's `keys/` directory.
 
-| Setting               | Value                                                                                                                                                                                                             |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PQC_KEYSTORE_DIR`    | Keystore directory. If unset, the server uses its own default: `${XDG_DATA_HOME:-~/.local/share}/pqc-sdk/agent-keys` (`%LOCALAPPDATA%\pqc-sdk\agent-keys` on Windows). It never falls back to the CLI's `./keys`. |
-| `PQC_MCP_ENABLE_SIGN` | Set to `1` to expose `pqc_sign`. Off by default.                                                                                                                                                                  |
+| Setting               | Value                                                                                                                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PQC_KEYSTORE_DIR`    | Keystore directory. If unset, the server uses its own default: `${XDG_DATA_HOME:-~/.local/share}/pqc-sdk/agent-keys` (`%LOCALAPPDATA%\pqc-sdk\agent-keys` on Windows). It never falls back to the CLI's `./keys`.        |
+| `PQC_MCP_ENABLE_SIGN` | Set to `1` to expose `pqc_sign`. Off by default.                                                                                                                                                                         |
+| `PQC_MCP_MAX_KEYS`    | Maximum number of keys in the keystore (default `100`). Once reached, `pqc_keygen` fails with `KEYSTORE_FULL`; listing, decrypting and signing keep working. Must be a positive integer, or the server refuses to start. |
 
-The server prints its keystore path and signing state to stderr at startup.
-stdout is reserved for the MCP protocol.
+The server prints its keystore path, key limit and signing state to stderr at
+startup. stdout is reserved for the MCP protocol.
+
+The key limit counts every secret key file in the keystore, including keys you
+imported with the CLI. It stops a model that calls `pqc_keygen` in a loop from
+filling the disk; raise it if you intend to hold more keys.
 
 **Files and permissions.** Each key is a pair of files in the
 [`pqc keygen`](https://www.npmjs.com/package/@pqc-sdk/cli) format:
@@ -52,10 +57,22 @@ stdout is reserved for the MCP protocol.
   atomically; an existing key is never overwritten.
 - Every call reads from disk, so keys survive restarts and files you add or
   remove take effect on the next call.
-- On macOS and Linux the server **refuses** to use a secret key file that is
-  readable or writable by group/others, is a symlink, or is owned by another
-  user, and refuses a keystore directory writable by group/others. The error
-  names the `chmod` that fixes it.
+- On macOS and Linux the server checks, on every call, that no other user
+  can read your secret keys or substitute keys of their own (the same idea as
+  OpenSSH's `StrictModes`). It **refuses** to work when:
+  - `PQC_KEYSTORE_DIR` is a symlink — configure the real path instead;
+  - the keystore directory is not owned by the server's user, or is writable
+    by group/others;
+  - any parent directory, up to `/`, is owned by someone other than root or
+    the server's user, or is writable by group/others without the sticky bit
+    (`/tmp`-style `1777` directories are fine);
+  - a secret key file is a symlink, is owned by another user, or is readable
+    or writable by group/others.
+- A public key file that is a symlink, is owned by another user, or is
+  writable by group/others is **skipped** by `pqc_list_keys`, with a warning on
+  stderr; the other keys are still listed.
+- Errors returned to the model never contain paths; the offending path is
+  written to stderr so you can fix it.
 - On Windows these permission checks are skipped; protect the directory with
   NTFS ACLs.
 
@@ -91,7 +108,8 @@ When signing is disabled, `pqc_sign` is not listed at all.
 Errors come back as `isError` results with `{ error, message }`. Codes:
 the `@pqc-sdk/core` error codes (e.g. `DECRYPTION_FAILED`, `WRONG_ALGORITHM`),
 plus `INVALID_ARGUMENT`, `INVALID_CIPHERTEXT`, `KEY_NOT_FOUND`,
-`KEYSTORE_INSECURE`, `INVALID_KEY_FILE`, `TOOL_DISABLED` and `INTERNAL_ERROR`.
+`KEYSTORE_INSECURE`, `KEYSTORE_FULL`, `INVALID_KEY_FILE`, `TOOL_DISABLED` and
+`INTERNAL_ERROR`.
 
 ## What this does not protect
 
@@ -100,6 +118,20 @@ _key_ out of the model context, but whatever the model decrypts, it reads. Only
 put keys in the keystore whose plaintexts the model is allowed to see. The
 same reasoning is why `pqc_sign` is off by default: a signature is a statement
 made under the key owner's identity, and enabling it is your decision.
+
+## Upgrading from 0.3.x
+
+0.4.0 does not change the tool contract, but it checks the keystore more
+strictly, so **a keystore that 0.3.x accepted may now be refused** with
+`KEYSTORE_INSECURE`. Check stderr for the offending path. The usual causes:
+
+- `PQC_KEYSTORE_DIR` points at a symlink → set it to the real path.
+- A parent directory is group-writable (e.g. a shared project directory, or a
+  home directory with mode `775`) → `chmod g-w` it, or move the keystore.
+- A public key file is group-writable or owned by another user → that key is
+  now skipped by `pqc_list_keys` until you fix its permissions or owner.
+
+`pqc_keygen` also stops at 100 keys by default (`PQC_MCP_MAX_KEYS`).
 
 ## Migrating from 0.2.x
 
