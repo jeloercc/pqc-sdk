@@ -18,9 +18,14 @@
       "outputs": ["api/**", "compatibility.md", ".vitepress/dist/**"]
     },
     "lint": {
-      "dependsOn": ["^build", "//#format:check"]
+      "dependsOn": ["^build", "//#format:check", "//#check:readme"]
     },
     "//#format:check": {
+      "outputs": []
+    },
+    "//#check:readme": {
+      "dependsOn": ["@pqc-sdk/core#build", "@pqc-sdk/langchain#build"],
+      "inputs": ["README.md", "scripts/check-readme-snippets.mjs"],
       "outputs": []
     },
     "dev": {
