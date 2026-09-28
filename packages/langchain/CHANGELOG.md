@@ -1,5 +1,15 @@
 # @pqc-sdk/langchain
 
+## 0.3.1
+
+### Patch Changes
+
+- 5e4707a: README: the usage example now warns that an in-memory `Map` loses every key
+  when the process restarts, and that anything encrypted to those keys can then
+  never be decrypted; use durable storage in real deployments.
+- Updated dependencies [5e4707a]
+  - @pqc-sdk/core@0.11.1
+
 ## 0.3.0
 
 ### Minor Changes
