@@ -54,8 +54,12 @@ export class PqcError extends Error {
  *
  * truncateForError('ml-kem-768'); // 'ml-kem-768'
  * truncateForError('x'.repeat(100)); // first 32 chars followed by '…'
+ * truncateForError(42); // '42' — non-strings are coerced, never thrown on
  * ```
  */
-export function truncateForError(value: string, maxLength = 32): string {
-  return value.length <= maxLength ? value : `${value.slice(0, maxLength)}…`;
+export function truncateForError(value: unknown, maxLength = 32): string {
+  // Callers pass untrusted runtime values (a hand-built key's algorithm field
+  // can be anything), so coerce instead of assuming a string.
+  const text = String(value);
+  return text.length <= maxLength ? text : `${text.slice(0, maxLength)}…`;
 }

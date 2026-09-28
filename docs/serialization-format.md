@@ -69,8 +69,10 @@ decapsulation key.
 ## 2. Hybrid ciphertext (binary)
 
 Output of `pqc.encrypt`, a single `Uint8Array`. The envelope version is
-selected by the public key's algorithm (`ml-kem-768` → v1, `x-wing` → v2);
-`pqc.decrypt` discriminates on the leading version byte. **v1 remains valid
+selected by the public key's algorithm (`ml-kem-768` → v1, `x-wing` → v2,
+`ml-kem-512` → v3, `ml-kem-1024` → v4); `pqc.decrypt` discriminates on the
+leading version byte. The streaming envelope (§9) reuses some of these version
+byte values — see §7 for how the two formats are told apart. **v1 remains valid
 forever** — v2 does not replace it, and both versions are produced and
 accepted side by side.
 
@@ -201,9 +203,32 @@ upstream error and never wrong plaintext.
 
 ## 7. Forward compatibility
 
-`pqcv1` tokens and envelope version bytes `0x01`/`0x02` are the only formats
-this parser understands. The contract, already exercised once by the v1 → v2
-addition:
+`pqcv1` tokens, the one-shot envelope versions `0x01`–`0x04` (§2) and the
+streaming envelope versions `0x03`–`0x06` (§9) are the only formats this
+parser understands.
+
+**The one-shot and streaming version-byte ranges overlap**: `0x03` and `0x04`
+each denote one one-shot and one streaming format. The **first two bytes —
+version and header id — together identify the format**; the pair is unique
+across all eight formats, while the version byte alone is not:
+
+| Format    | KEM           | Byte 0 (version) | Byte 1 (header id) |
+| --------- | ------------- | ---------------- | ------------------ |
+| One-shot  | `ml-kem-768`  | `0x01`           | `0x01`             |
+| One-shot  | `x-wing`      | `0x02`           | `0x02`             |
+| One-shot  | `ml-kem-512`  | `0x03`           | `0x03`             |
+| One-shot  | `ml-kem-1024` | `0x04`           | `0x04`             |
+| Streaming | `ml-kem-768`  | `0x03`           | `0x01`             |
+| Streaming | `x-wing`      | `0x04`           | `0x02`             |
+| Streaming | `ml-kem-512`  | `0x05`           | `0x03`             |
+| Streaming | `ml-kem-1024` | `0x06`           | `0x04`             |
+
+`pqc.decrypt` and `pqc.decryptStream` each accept only their own format and
+reject the other fail-closed with `INVALID_CIPHERTEXT`. An independent parser
+that accepts both MUST dispatch on the (version, header id) pair — or know in
+advance which format it is reading — never on the version byte alone.
+
+The contract, already exercised once by the v1 → v2 addition:
 
 - **v1 artifacts remain valid forever.** The v2-capable parser keeps
   accepting every v1 envelope and token (the golden vectors enforce this
@@ -268,7 +293,11 @@ accept these bytes, and vice versa; v1/v2 stay byte-identical forever.
 
 ### 9.1 Version bytes
 
-Same `pqcenc` version-byte space as §2, two new values:
+One version byte per KEM. These values are **not disjoint from §2's**:
+`0x03` and `0x04` are also the one-shot versions of `ml-kem-512` and
+`ml-kem-1024`. Formats are distinguished by the first two bytes (version,
+header id), which are unique across all eight formats — see §7 for the full
+table.
 
 | Version byte | KEM           | Header id |
 | ------------ | ------------- | --------- |
@@ -286,6 +315,13 @@ version byte with the KEM carried only in the header id, as the header id
 already does today for one-shot). Documented now as a recorded decision with
 a known scaling limit, not something a future contributor rediscovers by
 accident.
+
+**Known limit — overlapping version bytes** (recorded 2026-09-28): when
+`ml-kem-512` and `ml-kem-1024` were added, their one-shot versions took
+`0x03`/`0x04`, which streaming already used. The bytes are frozen by the
+golden vectors, so the overlap stays; the (version, header id) pair remains
+unique, and that pair — not the version byte alone — is the format
+discriminator (§7).
 
 ### 9.2 Header (fixed, once per stream)
 

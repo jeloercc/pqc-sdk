@@ -1,4 +1,4 @@
-import { requireKey, SIGNATURE_ALGORITHMS, type SignerSpec } from './algorithms.js';
+import { isKeyShaped, requireKey, SIGNATURE_ALGORITHMS, type SignerSpec } from './algorithms.js';
 import { PqcError } from './errors.js';
 import type {
   PqcKey,
@@ -63,7 +63,11 @@ function toNobleOptions(options?: SignatureOptions): { context: Uint8Array } | u
 function hasWrongVerificationKeyLength(publicKey: PqcKey): boolean {
   // Widened on purpose: `publicKey.algorithm` is typed, but a hand-built or deserialized
   // object can carry anything at runtime, and an unknown algorithm is requireKey's to
-  // report — not a length mismatch to swallow.
+  // report — not a length mismatch to swallow. A malformed object is likewise
+  // left to requireKey, which reports it as INVALID_KEY.
+  if (!isKeyShaped(publicKey)) {
+    return false;
+  }
   const spec = (SIGNATURE_ALGORITHMS as Record<string, SignerSpec | undefined>)[
     publicKey.algorithm
   ];
