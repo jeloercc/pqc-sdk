@@ -70,7 +70,7 @@ every parameter set. **SLH-DSA (FIPS 205) is deliberately not implemented** — 
 │  │  + X-Wing hybrid   │  │                   │                     │
 │  └────────────────────┘  └───────────────────┘                     │
 │                                                                     │
-│  Primitives: @noble/post-quantum + @noble/ciphers (never ours)     │
+│  Primitives: vendored @noble/post-quantum 0.7.1 + @noble/ciphers   │
 └────────────────────────────────────────────────────────────────────┘
               │
 ┌─────────────▼─────────────────┐
@@ -245,12 +245,12 @@ npx @pqc-sdk/cli init
 
 | Package                                                        | What it does                                                                             | Tests |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----- |
-| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK — encryption, signatures, key handling, streaming. Node 20+, Deno, Workers, RN.  | 464   |
+| [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) | The SDK — encryption, signatures, key handling, streaming. Node 20+, Deno, Workers, RN.  | 530   |
 | [`@pqc-sdk/cli`](https://www.npmjs.com/package/@pqc-sdk/cli)   | `pqc init / keygen / encrypt / decrypt / audit` — dev scaffolding and file-level crypto. | 54    |
 | [`@pqc-sdk/mcp-server`](./packages/mcp-server/)                | MCP stdio server — PQC tools for any MCP host; secret keys stay in a local keystore.     | 67    |
 | [`@pqc-sdk/langchain`](./packages/langchain/)                  | LangChain / LangGraph tools via `createPqcTools`; keys stay in your own storage.         | 26    |
 
-**611 tests · all passing · 90 %+ coverage on core**
+**All passing in CI · 90 %+ coverage on core**
 
 ---
 
@@ -283,11 +283,14 @@ binary size dominate.
 
 > Read this before evaluating whether to trust this SDK.
 
-We never implement cryptographic primitives: ML-KEM/ML-DSA come from
-[`@noble/post-quantum`](https://github.com/paulmillr/noble-post-quantum) and
-AES-GCM from [`@noble/ciphers`](https://github.com/paulmillr/noble-ciphers).
-The risk we carry is the layer _around_ them: envelope format, key
-serialization, nonce derivation, fail-closed parsing.
+We never implement cryptographic primitives from scratch. ML-KEM and ML-DSA
+are [`@noble/post-quantum`](https://github.com/paulmillr/noble-post-quantum)
+0.7.1, vendored into `packages/core/src/vendor/` with documented FIPS 203/204
+corrections (each listed in the file header and tested by its own regression
+suite); AES-GCM is [`@noble/ciphers`](https://github.com/paulmillr/noble-ciphers),
+used as published. The risk we carry is those corrections plus the layer
+_around_ the primitives: envelope format, key serialization, nonce derivation,
+fail-closed parsing.
 
 | Layer                 | How it is verified                                                                                                                                                                                   |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

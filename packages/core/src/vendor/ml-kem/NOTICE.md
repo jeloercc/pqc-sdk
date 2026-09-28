@@ -32,8 +32,9 @@ Those digests let a reviewer reproduce the starting point exactly:
 shasum -a 256 node_modules/@noble/post-quantum/src/{ml-kem,_crystals,utils}.ts
 ```
 
-`falcon.ts`, `ml-dsa.ts`, `slh-dsa.ts`, `hybrid.ts`, `webcrypto.ts` and `index.ts` are
-**not** vendored. `@noble/hashes` and `@noble/curves` are **not** vendored either; they
+`ml-dsa.ts` is vendored separately, into `../ml-dsa/ml-dsa.ts` (same version and license;
+provenance and modifications in that file's header). `falcon.ts`, `slh-dsa.ts`,
+`hybrid.ts`, `webcrypto.ts` and `index.ts` are **not** vendored. `@noble/hashes` and `@noble/curves` are **not** vendored either; they
 remain ordinary external dependencies.
 
 ## Why this code is vendored

@@ -33,9 +33,10 @@ const STREAM_ENVELOPE_VERSION: Record<KemAlgorithm, number> = {
 /** Options for {@link encryptStream}. */
 export interface StreamOptions {
   /**
-   * Plaintext bytes per chunk. Must be a power of two between 2^10 (1 KiB)
-   * and 2^24 (16 MiB). Default: 2^16 (64 KiB, matching age's STREAM
-   * default) — most callers should not set this.
+   * Plaintext bytes per chunk. Must be a power of two between 2^0 (1 byte)
+   * and 2^24 (16 MiB) — see docs/serialization-format.md §9.2. Default: 2^16
+   * (64 KiB, matching age's STREAM default) — most callers should not set
+   * this.
    */
   chunkSize?: number;
 }
