@@ -82,6 +82,9 @@ pnpm format
 The gate (`lint test build --force`) includes:
 
 - `format:check` (Prettier) — folded into the `lint` turbo task via `//#format:check`
+- `check:readme` — type-checks every ```ts block in `README.md` against the
+  built `@pqc-sdk/core` / `@pqc-sdk/langchain` declarations; folded into `lint`
+  via `//#check:readme` (`scripts/check-readme-snippets.mjs`)
 - `eslint . && tsc --noEmit` — per package
 - Vitest with coverage
 - `tsup` build

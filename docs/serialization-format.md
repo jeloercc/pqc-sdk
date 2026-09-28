@@ -289,12 +289,12 @@ accident.
 
 ### 9.2 Header (fixed, once per stream)
 
-| Offset | Length       | Field                                                     |
-| ------ | ------------ | --------------------------------------------------------- |
-| 0      | 1            | Version byte: `0x03` or `0x04` (§9.1)                     |
-| 1      | 1            | Algorithm header id: `0x01`/`0x02`, same values as §2     |
-| 2      | 1            | Chunk-size exponent `e`: chunk size = 2^e plaintext bytes |
-| 3      | 1088 or 1120 | KEM ciphertext, same encoding as the one-shot envelope    |
+| Offset | Length                   | Field                                                                                                   |
+| ------ | ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| 0      | 1                        | Version byte: `0x03`–`0x06` (§9.1)                                                                      |
+| 1      | 1                        | Algorithm header id: `0x01`–`0x04`, same values as §2 and §9.1                                          |
+| 2      | 1                        | Chunk-size exponent `e`: chunk size = 2^e plaintext bytes                                               |
+| 3      | 768 / 1088 / 1568 / 1120 | KEM ciphertext (ml-kem-512 / ml-kem-768 / ml-kem-1024 / x-wing), same encoding as the one-shot envelope |
 
 `e` MUST be in `0..=24` inclusive (1 byte..16 MiB plaintext per chunk); `e`
 outside that range is rejected as `INVALID_CIPHERTEXT` before any
