@@ -25,7 +25,7 @@
  *     "mcpServers": {
  *       "pqc": {
  *         "command": "pqc-mcp",
- *         "env": { "PQC_KEYSTORE_DIR": "/path/to/a/dedicated/agent-keys" }
+ *         "env": { "PQC_KEYSTORE_DIR": "/path/to/a/dedicated/agent-keys", "PQC_MCP_MAX_KEYS": "100" }
  *       }
  *     }
  *   }
@@ -44,11 +44,22 @@ const VERSION: string = typeof __PQC_MCP_VERSION__ !== 'undefined' ? __PQC_MCP_V
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-const keyStore = FileKeyStore.fromEnv(process.env);
+function loadKeyStore(): FileKeyStore {
+  try {
+    return FileKeyStore.fromEnv(process.env);
+  } catch (cause) {
+    // Configuration errors stop the server instead of falling back silently.
+    const message = cause instanceof Error ? cause.message : String(cause);
+    process.stderr.write(`pqc-mcp: invalid configuration: ${message}\n`);
+    process.exit(1);
+  }
+}
+
+const keyStore = loadKeyStore();
 const enableSign = process.env['PQC_MCP_ENABLE_SIGN'] === '1';
 
 process.stderr.write(
-  `pqc-mcp ${VERSION}: keystore ${keyStore.directory}; pqc_sign ${enableSign ? 'enabled' : 'disabled'}\n`,
+  `pqc-mcp ${VERSION}: keystore ${keyStore.directory} (max ${keyStore.maxKeys} keys); pqc_sign ${enableSign ? 'enabled' : 'disabled'}\n`,
 );
 
 // ─── Server setup ─────────────────────────────────────────────────────────────
