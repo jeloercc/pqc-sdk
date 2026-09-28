@@ -1,3 +1,5 @@
+import { isBytes } from '@noble/hashes/utils.js';
+
 import { PqcError, truncateForError } from './errors.js';
 // ML-KEM and ML-DSA resolve to vendored copies of @noble/post-quantum 0.7.1, not to the npm
 // package. Four FIPS corrections live inside the primitives, and the published `dist`
@@ -182,14 +184,17 @@ export function keyLengthFor(spec: KemSpec | SignerSpec, use: KeyUse): number {
  * string `algorithm`, a string `use` and `Uint8Array` `bytes`. The types
  * already require this, but plain JavaScript callers and hand-built keys reach
  * the runtime without that guarantee.
+ *
+ * `bytes` is checked with `@noble/hashes`' `isBytes`, not `instanceof
+ * Uint8Array`: a Uint8Array from another realm (node:vm, iframes, Jest with
+ * jsdom) fails `instanceof` but is a valid key buffer, and the primitives
+ * accept it.
  */
 export function isKeyShaped(value: unknown): value is PqcKey {
   if (typeof value !== 'object' || value === null) return false;
   const key = value as Record<string, unknown>;
   return (
-    typeof key['algorithm'] === 'string' &&
-    typeof key['use'] === 'string' &&
-    key['bytes'] instanceof Uint8Array
+    typeof key['algorithm'] === 'string' && typeof key['use'] === 'string' && isBytes(key['bytes'])
   );
 }
 

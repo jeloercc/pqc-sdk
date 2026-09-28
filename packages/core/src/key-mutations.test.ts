@@ -1,3 +1,5 @@
+import { runInNewContext } from 'node:vm';
+
 import { describe, expect, it } from 'vitest';
 
 import type { KemAlgorithm } from './types.js';
@@ -239,6 +241,48 @@ describe('malformed key objects fail with a PqcError, never a raw TypeError', ()
     );
     expect(error).toBeInstanceOf(PqcError);
     expect((error as PqcError).code).toBe('UNSUPPORTED_ALGORITHM');
+  });
+
+  it('accepts key bytes that are a Uint8Array from another realm', async () => {
+    // Jest+jsdom, iframes and node:vm hand out Uint8Arrays whose constructor
+    // is not this realm's, so `instanceof Uint8Array` is false for them.
+    // 0.11.0 accepted such keys; the shape check must keep accepting them.
+    const pair = await generate({ algorithm: 'x-wing' });
+    const foreign = runInNewContext('new Uint8Array(length)', {
+      length: pair.publicKey.bytes.length,
+    }) as Uint8Array;
+    foreign.set(pair.publicKey.bytes);
+    expect(foreign instanceof Uint8Array).toBe(false);
+
+    const ciphertext = await encrypt(PLAINTEXT, { ...pair.publicKey, bytes: foreign });
+    expect(await decrypt(ciphertext, pair.secretKey)).toEqual(PLAINTEXT);
+
+    const signer = await generate({ algorithm: 'ml-dsa-65' });
+    const signature = await sign(PLAINTEXT, signer.secretKey);
+    const foreignPk = runInNewContext('new Uint8Array(length)', {
+      length: signer.publicKey.bytes.length,
+    }) as Uint8Array;
+    foreignPk.set(signer.publicKey.bytes);
+    expect(await verify(PLAINTEXT, signature, { ...signer.publicKey, bytes: foreignPk })).toBe(
+      true,
+    );
+  });
+
+  it('still rejects byte-like values that are not Uint8Arrays', async () => {
+    for (const bytes of [
+      new Uint16Array(608), // an ArrayBuffer view, but not bytes
+      { constructor: { name: 'Uint8Array' }, length: 1216 }, // not a view at all
+    ]) {
+      const error = await encrypt(PLAINTEXT, {
+        algorithm: 'x-wing',
+        use: 'public',
+        bytes,
+      } as never).then(
+        () => undefined,
+        (caught: unknown) => caught,
+      );
+      expect((error as PqcError).code).toBe('INVALID_KEY');
+    }
   });
 
   it('verify still returns false for a wrong-length ML-DSA public key (F204-08)', async () => {

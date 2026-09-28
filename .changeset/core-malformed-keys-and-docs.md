@@ -10,6 +10,9 @@ Malformed key arguments now fail with a documented `PqcError` instead of a raw
   key is an object with a string `algorithm`, a string `use` and `Uint8Array`
   `bytes`, and throw `PqcError('INVALID_KEY')` otherwise (for example when a
   JavaScript caller passes `undefined` or swaps the key and data arguments).
+  `bytes` is checked the way `@noble/hashes` does (`isBytes`), so a
+  `Uint8Array` from another realm (`node:vm`, iframes, Jest with jsdom) is
+  still accepted, as it was in 0.11.0.
 - **Behavior change in `verify`:** a malformed public key now always
   throws `PqcError('INVALID_KEY')`. Before, depending on
   the shape, `verify` either returned `false` (for example `bytes` given as a
