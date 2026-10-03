@@ -64,6 +64,9 @@ function mldsaSignerFor(set: string) {
 
 const hexToBytes = (hex: string) => new Uint8Array(Buffer.from(hex, 'hex'));
 
+// CPU-bound (keygen/sign per case). Under a loaded gate, where turbo runs
+// several packages' suites at once, this can exceed vitest's 5 s default
+// with nothing wrong; only the time budget is raised (trailing argument).
 describe('CIRCL interop: ML-DSA-44/65/87 signature generation', () => {
   it.each(circlMldsa.cases)(
     'ML-DSA-$set: the SDK still accepts both its own and CIRCL-produced signature',
@@ -121,7 +124,7 @@ describe('CIRCL interop: ML-DSA-44/65/87 signature generation', () => {
       await expect(pqc.verify(message, freshSignature, publicKeyFromToken)).resolves.toBe(true);
     },
   );
-});
+}, 30_000);
 
 describe('CIRCL interop: X-Wing bidirectional shared-secret cross-check', () => {
   const {

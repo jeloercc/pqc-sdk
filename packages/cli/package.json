@@ -16,7 +16,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "eslint . && tsc --noEmit",
-    "test": "pnpm run build && vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@pqc-sdk/core": "workspace:*",

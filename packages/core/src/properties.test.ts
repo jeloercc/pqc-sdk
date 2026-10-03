@@ -41,6 +41,9 @@ describe('property: base64url', () => {
   });
 });
 
+// CPU-bound (keygen/sign per case). Under a loaded gate, where turbo runs
+// several packages' suites at once, this can exceed vitest's 5 s default
+// with nothing wrong; only the time budget is raised (trailing argument).
 describe('property: key serialization', () => {
   it('deserialize(serialize(k)) equals k for any generated key', () => {
     fc.assert(
@@ -63,7 +66,7 @@ describe('property: key serialization', () => {
       kem,
     );
   });
-});
+}, 30_000);
 
 // Both envelope versions must satisfy the same invariants: v1 (ml-kem-768)
 // and v2 (x-wing) differ only in KEM and layout offsets, never in the

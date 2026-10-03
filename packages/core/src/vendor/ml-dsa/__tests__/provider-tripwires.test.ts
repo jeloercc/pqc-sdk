@@ -81,6 +81,9 @@ describe('F204-21: SHAKE256/SHAKE128 are FIPS 202 functions (provider tripwire)'
   });
 });
 
+// CPU-bound (keygen/sign per case). Under a loaded gate, where turbo runs
+// several packages' suites at once, this can exceed vitest's 5 s default
+// with nothing wrong; only the time budget is raised (trailing argument).
 describe('F204-09: keygen and sign do not reuse or expose intermediate values across calls', () => {
   for (const [name, dsa] of [
     ['ml-dsa-44', ml_dsa44],
@@ -118,4 +121,4 @@ describe('F204-09: keygen and sign do not reuse or expose intermediate values ac
       expect(publicKey[0]).toBe(pkCopy[0]);
     });
   }
-});
+}, 30_000);

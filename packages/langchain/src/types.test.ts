@@ -2,7 +2,8 @@
  * Consumer-side type check of the published declarations: compiles a strict
  * `nodenext` project that imports the built package by name, the way a
  * downstream TypeScript user does. Guards against shipping a `types` entry
- * with no declaration file behind it. `pnpm test` builds dist/ first.
+ * with no declaration file behind it. Reads dist/: turbo runs this package's
+ * `build` before `test` (see turbo.json).
  */
 
 import { execFileSync } from 'node:child_process';
