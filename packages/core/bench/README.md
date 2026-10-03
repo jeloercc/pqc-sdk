@@ -23,9 +23,15 @@ pnpm bench:check  # compare results against bench/baseline.json (the CI gate)
 
 ## Updating the baseline
 
-The baseline is only meaningful when measured on the CI runner. **Never
-regenerate it locally** — means from other hardware are not comparable, and
-`bench-gate.mjs` refuses to compare against nothing for the same reason.
+The baseline is only meaningful when measured on the CI runner. All
+workflows pin that runner to `ubuntu-24.04` (the image `baseline.json` was
+measured on, `"runner": "ubuntu24"`) rather than `ubuntu-latest`, so a
+GitHub image migration cannot silently change it. Moving to a newer image
+must be a deliberate PR that changes the pin and, in the same PR, refreshes
+the baseline by running the "Bench baseline" workflow on that image (steps
+below). **Never regenerate it locally** — means from other hardware are not
+comparable, and `bench-gate.mjs` refuses to compare against nothing for the
+same reason.
 
 When a PR legitimately shifts performance (algorithm change, `@noble/*`
 bump, new benchmark):
