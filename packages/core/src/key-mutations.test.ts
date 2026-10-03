@@ -182,6 +182,9 @@ describe('ciphertext mutation matrix: degenerate X-Wing ct_X on decapsulation', 
  * escaped as a raw `TypeError` (e.g. "Cannot read properties of undefined
  * (reading 'length')") instead of a documented `PqcError`.
  */
+// CPU-bound (keygen/sign per case). Under a loaded gate, where turbo runs
+// several packages' suites at once, this can exceed vitest's 5 s default
+// with nothing wrong; only the time budget is raised (trailing argument).
 describe('malformed key objects fail with a PqcError, never a raw TypeError', () => {
   const MALFORMED: readonly (readonly [string, unknown])[] = [
     ['undefined', undefined],
@@ -291,4 +294,4 @@ describe('malformed key objects fail with a PqcError, never a raw TypeError', ()
     const truncated = { ...signer.publicKey, bytes: signer.publicKey.bytes.subarray(1) };
     expect(await verify(PLAINTEXT, signature, truncated)).toBe(false);
   });
-});
+}, 30_000);
