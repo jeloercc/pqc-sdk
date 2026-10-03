@@ -1,6 +1,6 @@
 /**
  * End-to-end over the real stdio transport: spawns the built server
- * (dist/index.js — `pnpm test` builds first), checks that logs stay on
+ * (dist/index.js — turbo runs `build` before `test`), checks that logs stay on
  * stderr, and that keys survive a server restart.
  */
 
