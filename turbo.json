@@ -6,11 +6,15 @@
       "outputs": ["dist/**"]
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build"],
       "outputs": ["coverage/**"]
     },
     "@pqc-sdk/cli#test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "build"],
+      "outputs": []
+    },
+    "@pqc-sdk/eval-open-models#test": {
+      "dependsOn": ["^build", "build"],
       "outputs": []
     },
     "@pqc-sdk/docs#build": {

@@ -67,10 +67,10 @@ Goal: a developer adds PQC encryption to their app in 30 minutes.
 # Full quality gate — run before declaring ANYTHING done
 pnpm turbo run lint test build --force
 
-# Individual packages
-pnpm --filter @pqc-sdk/core test
-pnpm --filter @pqc-sdk/mcp-server lint
-pnpm --filter @pqc-sdk/langchain test
+# Individual packages (turbo builds the package and its deps first)
+pnpm turbo run test --filter=@pqc-sdk/core
+pnpm turbo run lint --filter=@pqc-sdk/mcp-server
+pnpm turbo run test --filter=@pqc-sdk/langchain
 
 # Add a changeset
 pnpm changeset
