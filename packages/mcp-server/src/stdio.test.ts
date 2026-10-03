@@ -16,6 +16,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const SERVER = fileURLToPath(new URL('../dist/index.js', import.meta.url));
 
+// Every test here starts a real server process. Under a loaded gate (turbo runs
+// several packages' suites at once) a cold Node start can exceed vitest's 5 s
+// default, so each test gets the budget the spawns themselves are allowed.
+const SPAWN_TEST_TIMEOUT_MS = 30_000;
+
 let keyDir: string;
 let clients: Client[];
 
@@ -54,7 +59,7 @@ async function callJson(client: Client, name: string, args: Record<string, unkno
   return JSON.parse(content[0]?.text ?? 'null') as Record<string, unknown>;
 }
 
-describe('stdio server', () => {
+describe('stdio server', { timeout: SPAWN_TEST_TIMEOUT_MS }, () => {
   it('logs its configuration to stderr and hides pqc_sign by default', async () => {
     const { client, stderr } = await start();
     const { tools } = await client.listTools();
@@ -85,7 +90,7 @@ describe('stdio server', () => {
       encoding: 'utf8',
       plaintext: 'across restarts',
     });
-  }, 30_000);
+  });
 
   it('refuses to start with an invalid PQC_MCP_MAX_KEYS', () => {
     const result = spawnSync(process.execPath, [SERVER], {
