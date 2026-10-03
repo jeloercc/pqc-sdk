@@ -22,10 +22,16 @@
 ## Publishing & verification
 
 - Publish is `pnpm release`: build `packages/*` →
-  `pnpm publish -r --no-git-checks` → `changeset tag`, with npm provenance
-  (`NPM_CONFIG_PROVENANCE=true` + OIDC `id-token: write`).
+  `pnpm publish -r --no-git-checks` → `changeset tag`.
+- Authentication is npm **trusted publishing (OIDC)**: each of the 4
+  packages trusts `jeloercc/pqc-sdk`, workflow `release.yml`, no
+  environment. The job needs `id-token: write` and npm >= 11.5.1 on PATH
+  (`pnpm publish` shells out to `npm`), which `release.yml` installs on
+  Node 24. Provenance stays on via `NPM_CONFIG_PROVENANCE=true`.
+- There is no npm token. Do not add `NODE_AUTH_TOKEN`/`NPM_TOKEN` back to
+  the workflow; if publishing fails with an auth error, check the Trusted
+  Publisher settings on npmjs.com (repo, workflow filename) and the npm
+  version logged by the release job.
 - After every release, verify it actually landed:
   `npm view @pqc-sdk/core version` and `npm view @pqc-sdk/cli version`
   must match the merged version PR.
-- The npm token lives only in the `NPM_TOKEN` repo secret. Never echo,
-  log, or copy it into files or session output.
