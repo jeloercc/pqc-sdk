@@ -79,6 +79,20 @@ same caveat: a passing exit means these heuristics matched nothing, not that
 the codebase is clean. Output uses colors only when there is a TTY: readable
 in logs and pipes.
 
+## Supply chain
+
+- Releases are published only from GitHub Actions, by the
+  [`release.yml`](https://github.com/jeloercc/pqc-sdk/blob/main/.github/workflows/release.yml)
+  workflow in `jeloercc/pqc-sdk`.
+- Starting with `0.11.2`, that workflow publishes through npm
+  [trusted publishing](https://docs.npmjs.com/trusted-publishers) (OIDC): each
+  run gets a short-lived credential, and no long-lived npm token is used.
+  Earlier versions were published by the same workflow with an npm token.
+- Every published version carries an npm
+  [provenance attestation](https://docs.npmjs.com/generating-provenance-statements)
+  that links it to the source commit and the workflow run that built it.
+- To check the packages in your project, run `npm audit signatures`.
+
 ## License
 
 [MIT](./LICENSE)
