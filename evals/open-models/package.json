@@ -1,0 +1,29 @@
+{
+  "name": "@pqc-sdk/eval-open-models",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Evaluation harness for @pqc-sdk/langchain against open models behind an OpenAI-compatible endpoint",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "eval": "tsx src/cli.ts",
+    "lint": "eslint . && tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langchain/core": "1.2.12",
+    "@langchain/langgraph": "^1.4.18",
+    "@langchain/openai": "1.5.13",
+    "@pqc-sdk/core": "workspace:*",
+    "@pqc-sdk/langchain": "workspace:*",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "tsx": "^4.23.13",
+    "typescript": "5.8.3",
+    "vitest": "^3.2.6"
+  }
+}
