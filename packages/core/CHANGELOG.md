@@ -1,5 +1,11 @@
 # @pqc-sdk/core
 
+## 0.11.2
+
+### Patch Changes
+
+- 1f8b98a: Document the release supply chain in the README: packages are published only from the `release.yml` GitHub Actions workflow, through npm trusted publishing (OIDC) from this version on, and every version carries an npm provenance attestation that `npm audit signatures` verifies.
+
 ## 0.11.1
 
 ### Patch Changes
