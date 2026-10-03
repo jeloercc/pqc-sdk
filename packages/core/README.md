@@ -94,6 +94,20 @@ Full documentation at **[jeloercc.github.io/pqc-sdk](https://jeloercc.github.io/
 - Security reports: see [SECURITY.md](https://github.com/jeloercc/pqc-sdk/blob/main/SECURITY.md) —
   please do not open public issues.
 
+## Supply chain
+
+- Releases are published only from GitHub Actions, by the
+  [`release.yml`](https://github.com/jeloercc/pqc-sdk/blob/main/.github/workflows/release.yml)
+  workflow in `jeloercc/pqc-sdk`.
+- Starting with `0.11.2`, that workflow publishes through npm
+  [trusted publishing](https://docs.npmjs.com/trusted-publishers) (OIDC): each
+  run gets a short-lived credential, and no long-lived npm token is used.
+  Earlier versions were published by the same workflow with an npm token.
+- Every published version carries an npm
+  [provenance attestation](https://docs.npmjs.com/generating-provenance-statements)
+  that links it to the source commit and the workflow run that built it.
+- To check the packages in your project, run `npm audit signatures`.
+
 ## License
 
 [MIT](./LICENSE)
