@@ -1,5 +1,12 @@
 # @pqc-sdk/mcp-server
 
+## 0.4.2
+
+### Patch Changes
+
+- Updated dependencies [f3f1d28]
+  - @pqc-sdk/core@0.11.3
+
 ## 0.4.1
 
 ### Patch Changes

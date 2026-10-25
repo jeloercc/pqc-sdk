@@ -1,5 +1,12 @@
 # @pqc-sdk/langchain
 
+## 0.3.3
+
+### Patch Changes
+
+- Updated dependencies [f3f1d28]
+  - @pqc-sdk/core@0.11.3
+
 ## 0.3.2
 
 ### Patch Changes
