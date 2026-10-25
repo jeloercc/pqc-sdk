@@ -146,14 +146,21 @@ excluding `*.test.ts`. Test code: cli 778, mcp-server 742, langchain 336.
 ## 5. Known items to look at
 
 Found while preparing this document. Items 2 and 3 are documentation
-errors fixed in the same PR as this document; the others are reported for
-the audit and left unchanged.
+errors fixed in the same PR as this document. Item 1 was fixed in a later
+commit, after the audited release (details in the item); the others are
+reported for the audit and left unchanged.
 
-1. **`RBG_FAILURE` is not uniform.** Key generation, encapsulation and
-   signing map a platform RNG failure to `PqcError('RBG_FAILURE')`; the
+1. **`RBG_FAILURE` is not uniform — resolved after the audited release in
+   [#113](https://github.com/jeloercc/pqc-sdk/pull/113).** In 0.11.2, key generation, encapsulation and signing
+   map a platform RNG failure to `PqcError('RBG_FAILURE')`, but the
    one-shot AES-GCM nonce in `encrypt.ts` (`randomBytes(NONCE_LENGTH)`, from
    `@noble/post-quantum/utils.js`) does not, so a failure there propagates
-   the host's raw error. It still fails closed.
+   the host's raw error; it still fails closed. [#113](https://github.com/jeloercc/pqc-sdk/pull/113) draws the
+   nonce through `sampleRandomness` and maps the failure to `RBG_FAILURE`,
+   with the same single 12-byte draw after encapsulation, so ciphertext
+   bytes are unchanged. It ships in the next `@pqc-sdk/core` patch release;
+   the audited 0.11.2 still has the old behavior. Regression tests:
+   `vendor/ml-kem/__tests__/rbg-attribution.test.ts`.
 2. **Error-contract table — resolved in the same PR as this document.**
    `docs/serialization-format.md` §6 listed valid version/header bytes as
    `{0x01, 0x02}` and had no streaming rows. It now lists all four one-shot
