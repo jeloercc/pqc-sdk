@@ -119,10 +119,13 @@ reported here rather than fixed before the audit.
    one-shot AES-GCM nonce in `encrypt.ts` (`randomBytes(NONCE_LENGTH)`, from
    `@noble/post-quantum/utils.js`) does not, so a failure there propagates
    the host's raw error. It still fails closed.
-2. **Stale error-contract table.** `docs/serialization-format.md` §6 lists
-   valid version/header bytes as `{0x01, 0x02}`; envelopes v3 (`0x03`,
-   ml-kem-512) and v4 (`0x04`, ml-kem-1024) exist (§2.3–§2.4 of the same
-   document).
+2. **Error-contract table — resolved in the same PR as this document.**
+   `docs/serialization-format.md` §6 listed valid version/header bytes as
+   `{0x01, 0x02}` and had no streaming rows. It now lists all four one-shot
+   pairs `(0x01..0x04, 0x01..0x04)` and all four streaming pairs
+   `(0x03..0x06, 0x01..0x04)`, taken from `algorithms.ts`
+   (`envelopeVersion` / `headerId`) and `stream.ts`
+   (`STREAM_ENVELOPE_VERSION`).
 3. **Zeroization count — resolved in the same PR as this document.**
    SECURITY.md cited 41 `cleanBytes` call sites in `vendor/`; the 41 matches
    included the function definition and a JSDoc example. It now says 39 and
@@ -132,6 +135,15 @@ reported here rather than fixed before the audit.
    Core's AES-GCM comes from 2.2.0 (`encrypt.ts`, `stream.ts`).
 5. **`main` has no branch protection or rulesets** (checked 2026-10-25);
    see THREAT-MODEL §3.4.
+6. **No header or cross-algorithm tests for `ml-kem-512` / `ml-kem-1024`
+   ciphertexts.** The streaming mutation suite runs only for `ml-kem-768`
+   and `x-wing` (`stream-mutations.test.ts`, `ALGORITHMS`), and the one-shot
+   header tests cover v1/v2. The 512/1024 envelopes go through the same
+   checks, but nothing locks their `INVALID_CIPHERTEXT` behavior.
+7. **Stale JSDoc in `stream.ts`.** The `decryptStream` comment (around line 274) names only streaming versions `0x03` (ml-kem-768) and `0x04`
+   (x-wing); `0x05` (ml-kem-512) and `0x06` (ml-kem-1024) also exist
+   (`STREAM_ENVELOPE_VERSION`, lines 26–31). Comment only; behavior is
+   correct.
 
 ## 6. How to reproduce the numbers
 
