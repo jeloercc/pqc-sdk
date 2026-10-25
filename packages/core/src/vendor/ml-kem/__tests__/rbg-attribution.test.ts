@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { encapsulateTo, KEM_ALGORITHMS } from '../../../algorithms.js';
 import { PqcError } from '../../../errors.js';
 import { pqc } from '../../../index.js';
+import type { KemAlgorithm } from '../../../types.js';
 
 /**
  * F203-11 regression suite.
@@ -135,6 +136,113 @@ describe('F203-11: RBG failure is reported as RBG_FAILURE, not INVALID_KEY', () 
     const ciphertext = await pqc.encrypt('secret', pair.publicKey);
 
     await expect(pqc.decrypt(ciphertext, pair.secretKey)).resolves.toBeInstanceOf(Uint8Array);
+  });
+});
+
+/**
+ * Lets the first `allowed` getRandomValues calls through, then breaks the RBG in `mode`
+ * from the next call on. Records the byte lengths of the allowed draws and of the first
+ * broken one, so a test can assert *which* draw it hit ('absent' removes `crypto` itself,
+ * so no call reaches the stub and the broken length stays undefined; the allowed lengths
+ * still pin where the break happened).
+ */
+const breakEntropyAfter = (
+  allowed: number,
+  mode: 'throw' | 'absent' | 'short',
+): {
+  calls: () => number;
+  allowedLengths: () => number[];
+  brokenRequestLength: () => number | undefined;
+} => {
+  const real = globalThis.crypto;
+  let calls = 0;
+  const allowedLengths: number[] = [];
+  let brokenLength: number | undefined;
+  vi.stubGlobal('crypto', {
+    ...real,
+    subtle: real.subtle,
+    getRandomValues: (buf: Uint8Array) => {
+      calls++;
+      if (calls <= allowed) {
+        allowedLengths.push(buf.length);
+        const filled = real.getRandomValues(buf);
+        // The API disappears between this draw and the next one.
+        if (calls === allowed && mode === 'absent') vi.stubGlobal('crypto', {});
+        return filled;
+      }
+      brokenLength ??= buf.length;
+      if (mode === 'throw') throw new Error('entropy pool exhausted');
+      return buf.subarray(0, 0);
+    },
+  });
+  return {
+    calls: () => calls,
+    allowedLengths: () => [...allowedLengths],
+    brokenRequestLength: () => brokenLength,
+  };
+};
+
+describe('RBG failure on the one-shot AES-GCM nonce is reported as RBG_FAILURE', () => {
+  // getRandomValues draws (byte lengths) pqc.encrypt makes *before* the 12-byte nonce, measured: ML-KEM
+  // encapsulation draws m (32 bytes) once; X-Wing's encapsulation draws three times
+  // (64, 16, 16 bytes). Encapsulation therefore succeeds and the nonce is the first draw
+  // that fails — the path that used to leak the host's raw error.
+  const DRAWS_BEFORE_NONCE: Record<KemAlgorithm, number[]> = {
+    'ml-kem-512': [32],
+    'ml-kem-768': [32],
+    'ml-kem-1024': [32],
+    'x-wing': [64, 16, 16],
+  };
+  const NONCE_LENGTH = 12;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const cases = (Object.keys(DRAWS_BEFORE_NONCE) as KemAlgorithm[]).flatMap((algorithm) =>
+    (['throw', 'absent', 'short'] as const).map((mode) => [algorithm, mode] as const),
+  );
+
+  it.each(cases)(
+    '%s: pqc.encrypt reports RBG_FAILURE when only the nonce draw fails (%s)',
+    async (algorithm, mode) => {
+      const pair = await pqc.keys.generate({ algorithm });
+      const encapsulationDraws = DRAWS_BEFORE_NONCE[algorithm];
+      const rbg = breakEntropyAfter(encapsulationDraws.length, mode);
+
+      let result: Uint8Array | undefined;
+      let thrown: unknown;
+      try {
+        result = await pqc.encrypt('secret', pair.publicKey);
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(result).toBeUndefined(); // no ciphertext comes back
+      expect(thrown).toBeInstanceOf(PqcError);
+      expect((thrown as PqcError).code).toBe('RBG_FAILURE');
+      // The failure hit the nonce, not encapsulation: exactly the encapsulation draws
+      // succeeded, and (where the stub sees it) the broken draw was the 12-byte nonce.
+      expect(rbg.allowedLengths()).toEqual(encapsulationDraws);
+      if (mode !== 'absent') {
+        expect(rbg.brokenRequestLength()).toBe(NONCE_LENGTH);
+        expect(rbg.calls()).toBe(encapsulationDraws.length + 1);
+      }
+    },
+  );
+
+  it('the nonce RBG_FAILURE message carries no host error text or key material', async () => {
+    const pair = await pqc.keys.generate({ algorithm: 'x-wing' });
+    breakEntropyAfter(DRAWS_BEFORE_NONCE['x-wing'].length, 'throw');
+
+    const error = await pqc.encrypt('secret', pair.publicKey).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    );
+
+    const message = (error as PqcError).message;
+    expect(message).not.toContain('entropy pool exhausted');
+    expect(message).not.toMatch(/[0-9a-f]{32,}/i);
   });
 });
 
