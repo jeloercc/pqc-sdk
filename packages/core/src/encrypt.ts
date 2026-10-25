@@ -1,9 +1,9 @@
 import { gcm } from '@noble/ciphers/aes.js';
-import { randomBytes } from '@noble/post-quantum/utils.js';
 
 import { KEM_ALGORITHMS, encapsulateTo, requireKey } from './algorithms.js';
 import { PqcError } from './errors.js';
 import type { KemAlgorithm, PublicKey, SecretKey } from './types.js';
+import { RbgFailureError, sampleRandomness } from './vendor/ml-kem/ml-kem.js';
 
 const NONCE_LENGTH = 12;
 const GCM_TAG_LENGTH = 16;
@@ -58,7 +58,22 @@ export async function encrypt(
   // This invariant MUST be preserved: do not cache or reuse sharedSecret
   // across calls.
   const { cipherText, sharedSecret } = encapsulateTo(spec, publicKey.bytes, publicKey.algorithm);
-  const nonce = randomBytes(NONCE_LENGTH);
+  // Consistency with F203-11 / F204-06: draw the nonce through sampleRandomness so an
+  // RBG failure here surfaces as PqcError('RBG_FAILURE'), like key generation,
+  // encapsulation and signing, instead of the host's raw error. Same single 12-byte
+  // draw at the same point, after encapsulation, so the envelope bytes are unchanged.
+  let nonce: Uint8Array;
+  try {
+    nonce = sampleRandomness(NONCE_LENGTH);
+  } catch (cause) {
+    if (cause instanceof RbgFailureError) {
+      throw new PqcError(
+        'RBG_FAILURE',
+        `${publicKey.algorithm} encryption aborted: the platform RBG failed to produce randomness`,
+      );
+    }
+    throw cause;
+  }
 
   // Bind the 2-byte header (envelopeVersion, headerId) as AES-GCM additional
   // authenticated data so it is covered by the GCM tag (see decrypt).
