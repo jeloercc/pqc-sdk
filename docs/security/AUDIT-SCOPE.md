@@ -15,13 +15,46 @@ pqc-sdk. Threats, assets and assumptions are in
 | npm tarball integrity | `sha512-owOF8kzZQI4LILrQXHWZ2i0E4iesLVRFYkUjsudt0YsidMY5iY2/8EF5ljKYccajzNnsgGJ9RQvDZOUEGWxQmQ==` (shasum `01d3efba61c9638366a276df0bf8e53868400e18`) |
 | Repository            | https://github.com/jeloercc/pqc-sdk                                                                                                                   |
 
-Between that commit and `main` at `715221290f150171d131e0abd1ed7dc9706dfa3b`
-(2026-10-25), `packages/core/src` changed in four **test** files only
-(timeout values); production source, `package.json` and the build config
-are identical (`git diff --stat @pqc-sdk/core@0.11.2 HEAD -- packages/core/src packages/core/package.json packages/core/tsup.config.ts`).
+### 1.1 Why the audited commit is not `main`
 
-The audit covers the TypeScript source at that commit. Whether the
-published `dist/` is a reproducible build of it has **not** been verified.
+The audit targets what users install: the latest **published** release,
+0.11.2, built from `449d885` (provenance above). `main` was at
+`715221290f150171d131e0abd1ed7dc9706dfa3b` (2026-10-03, #111) when this
+document was written; no new `@pqc-sdk/core` version has been released
+since 0.11.2 because nothing after it changed core's published code.
+
+Three commits landed on `main` after the release:
+
+```
+$ git log --oneline 449d885..7152212
+7152212 ci: pin runners to ubuntu-24.04; scope test's own-build dependency (#111)
+a8217c3 fix(ci): build each package's dist once per turbo run (#110)
+e3fa99c feat(evals): open-model eval harness for @pqc-sdk/langchain (#109)
+```
+
+Only one of them touches `packages/core/src`, and only test files:
+
+```
+$ git log --oneline 449d885..7152212 -- packages/core/src
+a8217c3 fix(ci): build each package's dist once per turbo run (#110)
+
+$ git diff --stat 449d885 7152212 -- packages/core/src packages/core/package.json packages/core/tsup.config.ts
+ packages/core/src/interop-circl.test.ts                              | 5 ++++-
+ packages/core/src/key-mutations.test.ts                              | 5 ++++-
+ packages/core/src/properties.test.ts                                 | 5 ++++-
+ packages/core/src/vendor/ml-dsa/__tests__/provider-tripwires.test.ts | 5 ++++-
+ 4 files changed, 16 insertions(+), 4 deletions(-)
+```
+
+Those four edits raise the vitest timeout of CPU-bound test suites; no
+iteration count or assertion changed. #110 carried an empty changeset, so
+the release workflow on its merge commit published nothing (run
+`37096732953`: "All changesets are empty; not creating PR"). Production
+source, `package.json` and the build config of `@pqc-sdk/core` are
+therefore identical at `449d885` and `7152212`.
+
+The audit covers the TypeScript source at `449d885`. Whether the published
+`dist/` is a reproducible build of that source has **not** been verified.
 
 ## 2. In scope
 
@@ -46,8 +79,9 @@ equals `wc -l` for every file.
 | **Subtotal**                                   | 2303 |    1690 |   168 |  4161 |                                                                                                        |
 
 The modifications to the vendored files are listed in each file's header
-and in `packages/core/src/vendor/ml-kem/NOTICE.md`; the pristine upstream
-digests are recorded for `vendor-drift-check.yml`.
+and in `packages/core/src/vendor/ml-kem/NOTICE.md`, which also records the
+sha256 of each pristine upstream copy; `vendor-drift-check.yml` checks
+those digests against upstream at the pinned version.
 
 ### 2.2 Priority 2 — supporting code on every path
 
@@ -111,8 +145,9 @@ excluding `*.test.ts`. Test code: cli 778, mcp-server 742, langchain 336.
 
 ## 5. Known items to look at
 
-Found while preparing this document; none has been changed, so each is
-reported here rather than fixed before the audit.
+Found while preparing this document. Items 2 and 3 are documentation
+errors fixed in the same PR as this document; the others are reported for
+the audit and left unchanged.
 
 1. **`RBG_FAILURE` is not uniform.** Key generation, encapsulation and
    signing map a platform RNG failure to `PqcError('RBG_FAILURE')`; the
@@ -140,7 +175,8 @@ reported here rather than fixed before the audit.
    and `x-wing` (`stream-mutations.test.ts`, `ALGORITHMS`), and the one-shot
    header tests cover v1/v2. The 512/1024 envelopes go through the same
    checks, but nothing locks their `INVALID_CIPHERTEXT` behavior.
-7. **Stale JSDoc in `stream.ts`.** The `decryptStream` comment (around line 274) names only streaming versions `0x03` (ml-kem-768) and `0x04`
+7. **Stale JSDoc in `stream.ts`.** The `decryptStream` comment (lines
+   271–275) names only streaming versions `0x03` (ml-kem-768) and `0x04`
    (x-wing); `0x05` (ml-kem-512) and `0x06` (ml-kem-1024) also exist
    (`STREAM_ENVELOPE_VERSION`, lines 26–31). Comment only; behavior is
    correct.
