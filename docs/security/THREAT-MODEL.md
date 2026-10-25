@@ -195,8 +195,9 @@ maintainer account.
   `jeloercc/pqc-sdk` and `release.yml` (verifiable with
   `npm audit signatures`).
 - **Added for this audit:** a CycloneDX SBOM per published package
-  attached to each GitHub release; third-party GitHub Actions pinned by
-  full commit SHA; OpenSSF Scorecard published weekly.
+  attached to each GitHub release; every GitHub Action in every workflow,
+  GitHub-owned and third-party, pinned by full commit SHA; OpenSSF
+  Scorecard published weekly.
 
 **Does not protect**
 
@@ -215,8 +216,9 @@ maintainer account.
   account) can push to `main`, which runs `release.yml` with
   `id-token: write` and can publish with provenance. Provenance proves
   where a package was built, not that the change was reviewed.
-- **GitHub-owned actions** (`actions/*`) are still referenced by tag, not
-  SHA, and GitHub's runner infrastructure is trusted.
+- **GitHub's runner infrastructure is trusted.** SHA pins fix which action
+  code runs, not the security of the hosted runners or of the actions'
+  own dependencies, and pins only move when someone updates them.
 - **The application's own environment** (its other dependencies, build
   tools, bundler) is outside the SDK's reach — see assumption S2.
 
