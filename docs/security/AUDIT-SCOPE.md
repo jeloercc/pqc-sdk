@@ -123,9 +123,10 @@ reported here rather than fixed before the audit.
    valid version/header bytes as `{0x01, 0x02}`; envelopes v3 (`0x03`,
    ml-kem-512) and v4 (`0x04`, ml-kem-1024) exist (§2.3–§2.4 of the same
    document).
-3. **Zeroization count.** SECURITY.md cites 41 `cleanBytes` call sites in
-   `vendor/`; there are 39 calls (the 41 matches include the function
-   definition and a JSDoc example).
+3. **Zeroization count — resolved in the same PR as this document.**
+   SECURITY.md cited 41 `cleanBytes` call sites in `vendor/`; the 41 matches
+   included the function definition and a JSDoc example. It now says 39 and
+   carries the command that reproduces the number.
 4. **Duplicate `@noble/ciphers`.** Core pins `@noble/ciphers 2.2.0`, while
    `@noble/post-quantum 0.7.1` depends on `2.4.0`, so both are installed.
    Core's AES-GCM comes from 2.2.0 (`encrypt.ts`, `stream.ts`).

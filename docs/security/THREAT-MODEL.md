@@ -230,9 +230,8 @@ dependency in the same JavaScript realm.
 
 - **Partial zeroization.** The vendored ML-KEM and ML-DSA code wipes its
   internal intermediates with `cleanBytes` — 39 call sites in
-  `packages/core/src/vendor/` (counted 2026-10-25 by matching `cleanBytes(`
-  and excluding the function definition and one JSDoc example; SECURITY.md
-  says 41, which includes those two). This covers both implicit-rejection
+  `packages/core/src/vendor/` (the recount command is in SECURITY.md,
+  "Threat model: known limits"). This covers both implicit-rejection
   candidates in ML-KEM decapsulation (F203-18) and the ML-DSA verify path
   (F204-10). Outside the vendored code, the only wipe is the per-signature
   `rnd` in `sign.ts` (`rnd.fill(0)` in a `finally`).
