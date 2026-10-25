@@ -8,23 +8,35 @@
  * environment and parsed as data; nothing from it reaches a shell.
  *
  * For each package:
+ *   0. skip it if its release `<name>@<version>` (the tag changesets
+ *      creates) already has the SBOM asset, so a re-run neither fails nor
+ *      uploads a duplicate;
  *   1. `pnpm pack` it, so `workspace:*` ranges are rewritten exactly as in
  *      the tarball that was published;
- *   2. install that manifest's production dependencies with npm, the way a
+ *   2. wait until every @pqc-sdk/* dependency of that manifest is visible
+ *      in the registry at the exact version: a sibling published seconds
+ *      earlier in the same run (e.g. @pqc-sdk/core) can take minutes to
+ *      appear;
+ *   3. install that manifest's production dependencies with npm, the way a
  *      consumer resolves them: dev dependencies are omitted, peers are
  *      installed as npm 7+ does by default (some transitive dependencies
- *      have required peers). Retried, because a just-published sibling such
- *      as @pqc-sdk/core can take a few minutes to appear in the registry;
- *   3. run @cyclonedx/cyclonedx-npm with the package as the main component;
- *   4. upload `<scope>-<name>-<version>.cdx.json` to the release
- *      `<name>@<version>` (the tag changesets creates).
+ *      have required peers);
+ *   4. run @cyclonedx/cyclonedx-npm with the package as the main component;
+ *   5. upload `<scope>-<name>-<version>.cdx.json` to that release.
+ *
+ * Every npm call in steps 2 and 3 uses a fresh cache and --prefer-online.
+ * The registry serves packuments with `Cache-Control: max-age=300`, and npm
+ * answers from its cache inside that window without asking the registry, so
+ * retries against a cached packument that predates the sibling's publish
+ * keep failing with ETARGET for five minutes (release run 40237918263).
  *
  * The SBOM lists npm dependencies. Code vendored into a package's own
  * source (packages/core/src/vendor/) is part of that package, not a
  * dependency, so it does not appear as a separate component.
  *
- * SBOM_DRY_RUN=1 skips the upload (local testing). SBOM_OUT_DIR sets where
- * the files go (default: sbom/ in the repo root).
+ * SBOM_DRY_RUN=1 skips every GitHub call, the release check included, and
+ * the upload (local testing). SBOM_OUT_DIR sets where the files go
+ * (default: sbom/ in the repo root).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -36,8 +48,10 @@ import { fileURLToPath } from 'node:url';
 
 // Exact version: the generator is part of the release pipeline.
 const CYCLONEDX_NPM = '@cyclonedx/cyclonedx-npm@6.0.1';
-const INSTALL_ATTEMPTS = 10;
-const INSTALL_RETRY_MS = 30_000;
+const REGISTRY_ATTEMPTS = 30;
+const REGISTRY_RETRY_MS = 20_000;
+const INSTALL_ATTEMPTS = 3;
+const INSTALL_RETRY_MS = 20_000;
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const outDir = resolve(process.env.SBOM_OUT_DIR ?? join(root, 'sbom'));
@@ -45,6 +59,27 @@ const dryRun = process.env.SBOM_DRY_RUN === '1';
 
 function run(command, args, cwd) {
   execFileSync(command, args, { cwd, stdio: 'inherit' });
+}
+
+function output(command, args, cwd) {
+  return execFileSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+}
+
+function sbomFileName({ name, version }) {
+  return `${name.slice(1).replace('/', '-')}-${version}.cdx.json`;
+}
+
+function releaseAssets(tag) {
+  const names = output(
+    'gh',
+    ['release', 'view', tag, '--json', 'assets', '--jq', '.assets[].name'],
+    root,
+  );
+  return names.split('\n').filter(Boolean);
 }
 
 function parsePublished(raw) {
@@ -77,10 +112,44 @@ function workspaceDirs() {
   return dirs;
 }
 
-async function installProduction(cwd) {
+// The @pqc-sdk/* dependencies of a packed manifest, as exact { name, version }.
+// `pnpm pack` rewrites `workspace:*` to the sibling's exact version.
+function siblingDependencies(manifest) {
+  return Object.entries(manifest.dependencies ?? {})
+    .filter(([name]) => name.startsWith('@pqc-sdk/'))
+    .map(([name, version]) => ({ name, version }));
+}
+
+async function waitForRegistry(packages, npmFlags, cwd) {
+  for (const { name, version } of packages) {
+    for (let attempt = 1; ; attempt++) {
+      let seen = '';
+      try {
+        seen = output('npm', ['view', `${name}@${version}`, 'version', ...npmFlags], cwd).trim();
+      } catch {
+        // Reported below like a missing version; the next attempt retries.
+      }
+      if (seen === version) break;
+      if (attempt >= REGISTRY_ATTEMPTS) {
+        throw new Error(`${name}@${version} is still not visible in the registry`);
+      }
+      console.error(
+        `${name}@${version} is not in the registry yet (attempt ${attempt}); ` +
+          `retrying in ${REGISTRY_RETRY_MS / 1000}s`,
+      );
+      await sleep(REGISTRY_RETRY_MS);
+    }
+  }
+}
+
+async function installProduction(npmFlags, cwd) {
   for (let attempt = 1; ; attempt++) {
     try {
-      run('npm', ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], cwd);
+      run(
+        'npm',
+        ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', ...npmFlags],
+        cwd,
+      );
       return;
     } catch (error) {
       if (attempt >= INSTALL_ATTEMPTS) throw error;
@@ -101,9 +170,14 @@ async function sbomFor({ name, version }, workspace) {
     run('tar', ['-xzf', tarball], work);
     const pkgDir = join(work, 'package');
 
-    await installProduction(pkgDir);
+    // A cache of its own, outside pkgDir so the SBOM does not see it, and
+    // --prefer-online so no retry is answered from a stale cached packument.
+    const npmFlags = ['--cache', join(work, 'npm-cache'), '--prefer-online'];
+    const manifest = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
+    await waitForRegistry(siblingDependencies(manifest), npmFlags, pkgDir);
+    await installProduction(npmFlags, pkgDir);
 
-    const file = join(outDir, `${name.slice(1).replace('/', '-')}-${version}.cdx.json`);
+    const file = join(outDir, sbomFileName({ name, version }));
     run(
       'npx',
       [
@@ -145,8 +219,13 @@ for (const pkg of published) {
       `${pkg.name}: workspace is at ${workspace.version}, release says ${pkg.version}`,
     );
   }
+  const tag = `${pkg.name}@${pkg.version}`;
+  if (!dryRun && releaseAssets(tag).includes(sbomFileName(pkg))) {
+    console.log(`SBOM: ${tag} already has ${sbomFileName(pkg)}; skipping`);
+    continue;
+  }
   const file = await sbomFor(pkg, workspace);
   console.log(`SBOM: ${file}`);
   if (dryRun) continue;
-  run('gh', ['release', 'upload', `${pkg.name}@${pkg.version}`, file, '--clobber'], root);
+  run('gh', ['release', 'upload', tag, file], root);
 }
