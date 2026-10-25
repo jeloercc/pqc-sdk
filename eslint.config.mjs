@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -37,6 +38,13 @@ export default tseslint.config(
     // so typed linting has no project to resolve them against.
     files: ['**/*.{js,mjs,cjs,mts,cts}'],
     ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    // Root release/CI tooling runs on Node; linted by the gate via //#lint:scripts.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: globals.node,
+    },
   },
   prettier,
 );
