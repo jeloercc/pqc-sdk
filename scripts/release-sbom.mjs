@@ -20,7 +20,9 @@
  *   3. install that manifest's production dependencies with npm, the way a
  *      consumer resolves them: dev dependencies are omitted, peers are
  *      installed as npm 7+ does by default (some transitive dependencies
- *      have required peers);
+ *      have required peers). A package's own peer that is also one of its
+ *      devDependencies is resolved as dev and omitted: see "Known
+ *      limitation" in docs/security/THREAT-MODEL.md, section 3.4;
  *   4. run @cyclonedx/cyclonedx-npm with the package as the main component;
  *   5. upload `<scope>-<name>-<version>.cdx.json` to that release.
  *
