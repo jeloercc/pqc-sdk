@@ -151,11 +151,11 @@ commit, after the audited release (details in the item); the others are
 reported for the audit and left unchanged.
 
 1. **`RBG_FAILURE` is not uniform — resolved after the audited release in
-   commit `6c43e50`.** In 0.11.2, key generation, encapsulation and signing
+   [#113](https://github.com/jeloercc/pqc-sdk/pull/113).** In 0.11.2, key generation, encapsulation and signing
    map a platform RNG failure to `PqcError('RBG_FAILURE')`, but the
    one-shot AES-GCM nonce in `encrypt.ts` (`randomBytes(NONCE_LENGTH)`, from
    `@noble/post-quantum/utils.js`) does not, so a failure there propagates
-   the host's raw error; it still fails closed. Commit `6c43e50` draws the
+   the host's raw error; it still fails closed. [#113](https://github.com/jeloercc/pqc-sdk/pull/113) draws the
    nonce through `sampleRandomness` and maps the failure to `RBG_FAILURE`,
    with the same single 12-byte draw after encapsulation, so ciphertext
    bytes are unchanged. It ships in the next `@pqc-sdk/core` patch release;
