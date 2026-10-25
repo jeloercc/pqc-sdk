@@ -177,29 +177,41 @@ encoding.
 
 ## 6. Error contract (fail closed)
 
-What today's parsers do with malformed or unknown input — this is normative
-behavior, locked by tests:
+What today's parsers do with malformed or unknown input. This is normative
+behavior. The key-token rows and the ciphertext rows for `ml-kem-768` and
+`x-wing` are locked by tests (`encrypt.test.ts`, `encrypt-v2.test.ts`,
+`golden-vectors*.test.ts`, `stream-mutations.test.ts`); the `ml-kem-512` and
+`ml-kem-1024` ciphertext rows follow from the same code path but have no
+dedicated header or cross-algorithm test yet:
 
-| Input                                                   | `PqcError` code          |
-| ------------------------------------------------------- | ------------------------ |
-| Token without 4 segments or prefix ≠ `pqcv1`            | `INVALID_SERIALIZED_KEY` |
-| Token with unknown version prefix (e.g. `pqcv2`)        | `INVALID_SERIALIZED_KEY` |
-| Token with unknown algorithm segment                    | `UNSUPPORTED_ALGORITHM`  |
-| Token with unknown use segment                          | `INVALID_SERIALIZED_KEY` |
-| Token with invalid/non-canonical base64url              | `INVALID_SERIALIZED_KEY` |
-| Token with wrong decoded key length                     | `INVALID_KEY`            |
-| Ciphertext shorter than its version's minimum (§2)      | `INVALID_CIPHERTEXT`     |
-| Ciphertext with unknown version byte (∉ `{0x01, 0x02}`) | `INVALID_CIPHERTEXT`     |
-| Ciphertext with unknown header id (∉ `{0x01, 0x02}`)    | `INVALID_CIPHERTEXT`     |
-| Version/header id not matching the decrypting key       | `INVALID_CIPHERTEXT`     |
-| Tampered ciphertext / wrong key (GCM tag failure)       | `DECRYPTION_FAILED`      |
+| Input                                                                                                                                                                  | `PqcError` code          |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| Token without 4 segments or prefix ≠ `pqcv1`                                                                                                                           | `INVALID_SERIALIZED_KEY` |
+| Token with unknown version prefix (e.g. `pqcv2`)                                                                                                                       | `INVALID_SERIALIZED_KEY` |
+| Token with unknown algorithm segment                                                                                                                                   | `UNSUPPORTED_ALGORITHM`  |
+| Token with unknown use segment                                                                                                                                         | `INVALID_SERIALIZED_KEY` |
+| Token with invalid/non-canonical base64url                                                                                                                             | `INVALID_SERIALIZED_KEY` |
+| Token with wrong decoded key length                                                                                                                                    | `INVALID_KEY`            |
+| One-shot ciphertext shorter than its version's minimum (§2)                                                                                                            | `INVALID_CIPHERTEXT`     |
+| One-shot ciphertext whose `(version, header id)` is not one of `(0x01, 0x01)` ml-kem-768, `(0x02, 0x02)` x-wing, `(0x03, 0x03)` ml-kem-512, `(0x04, 0x04)` ml-kem-1024 | `INVALID_CIPHERTEXT`     |
+| One-shot ciphertext whose `(version, header id)` is valid but belongs to another algorithm than the decrypting key                                                     | `INVALID_CIPHERTEXT`     |
+| Stream header shorter than `3 + KEM ciphertext` bytes (§9.2)                                                                                                           | `INVALID_CIPHERTEXT`     |
+| Stream whose `(version, header id)` is not one of `(0x03, 0x01)` ml-kem-768, `(0x04, 0x02)` x-wing, `(0x05, 0x03)` ml-kem-512, `(0x06, 0x04)` ml-kem-1024              | `INVALID_CIPHERTEXT`     |
+| Stream whose `(version, header id)` is valid but belongs to another algorithm than the decrypting key                                                                  | `INVALID_CIPHERTEXT`     |
+| Stream chunk-size exponent `e` outside `0..=24` (§9.2)                                                                                                                 | `INVALID_CIPHERTEXT`     |
+| Tampered ciphertext / wrong key (GCM tag failure), one-shot or any stream chunk                                                                                        | `DECRYPTION_FAILED`      |
+| Stream truncated (ends without a chunk that authenticates as final) or with trailing bytes after the final chunk (§9.3)                                                | `DECRYPTION_FAILED`      |
 
-The header check is relative to the secret key in use: a v1 envelope offered
-to an `x-wing` key, or a v2 envelope offered to an `ml-kem-768` key, fails
-fast with `INVALID_CIPHERTEXT` (cross-version key confusion never reaches the
-KEM). Body tampering in either version — KEM ciphertext (`ct_M` or `ct_X`),
-nonce, or sealed payload — surfaces as `DECRYPTION_FAILED`, never a raw
-upstream error and never wrong plaintext.
+The header check is relative to the secret key in use: decryption accepts
+only the one pair registered for the key's algorithm (one-shot:
+`packages/core/src/algorithms.ts`, `envelopeVersion` / `headerId`; streaming:
+`STREAM_ENVELOPE_VERSION` in `packages/core/src/stream.ts` plus the same
+`headerId`). A v1 envelope offered to an `x-wing` key, or a v2 envelope
+offered to an `ml-kem-768` key, fails fast with `INVALID_CIPHERTEXT`
+(cross-version key confusion never reaches the KEM). Body tampering in any
+version — KEM ciphertext (`ct_M` or `ct_X`), nonce, or sealed payload —
+surfaces as `DECRYPTION_FAILED`, never a raw upstream error and never wrong
+plaintext.
 
 ## 7. Forward compatibility
 

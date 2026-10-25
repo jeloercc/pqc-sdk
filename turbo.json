@@ -30,9 +30,13 @@
       "outputs": ["api/**", "compatibility.md", ".vitepress/dist/**"]
     },
     "lint": {
-      "dependsOn": ["^build", "//#format:check", "//#check:readme"]
+      "dependsOn": ["^build", "//#format:check", "//#lint:scripts", "//#check:readme"]
     },
     "//#format:check": {
+      "outputs": []
+    },
+    "//#lint:scripts": {
+      "inputs": ["scripts/**", "eslint.config.mjs"],
       "outputs": []
     },
     "//#check:readme": {
