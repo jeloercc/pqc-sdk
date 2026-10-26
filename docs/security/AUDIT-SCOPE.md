@@ -187,6 +187,18 @@ reported for the audit and left unchanged.
    (x-wing); `0x05` (ml-kem-512) and `0x06` (ml-kem-1024) also exist
    (`STREAM_ENVELOPE_VERSION`, lines 26–31). Comment only; behavior is
    correct.
+8. **Open — RBG failure on X-Wing's X25519 scalar blinding is misattributed
+   (F203-22, NONCONFORMING).** `@noble/curves` 2.4.0 blinds every X25519
+   base-point multiplication with a 16-byte random value
+   (`abstract/curve.js:393`). If the platform RNG fails at that draw, X-Wing
+   `keys.generate` throws the host's raw error, `encrypt` / `encryptStream`
+   report `INVALID_KEY`, and `decrypt` / `collectDecryptStream` report
+   `DECRYPTION_FAILED`. Every path fails closed; the error code is wrong.
+   Decryption draws too, because the X-Wing secret key is a 32-byte seed and
+   decapsulation re-derives `pk_X` for the combiner. Affects the audited
+   0.11.2 and 0.11.3 (both pin `@noble/curves` 2.4.0). The curve code is not
+   vendored, so it is Provider-scope; details, evidence and severity (low)
+   in [`FIPS-203-MATRIX.md`](../compliance/FIPS-203-MATRIX.md) §4.3 item 5.
 
 ## 6. How to reproduce the numbers
 
