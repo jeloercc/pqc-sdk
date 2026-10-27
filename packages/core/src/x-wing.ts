@@ -7,10 +7,11 @@
  * patchable). That means X-Wing's embedded ML-KEM-768 — the component `pqc.keys.generate()`
  * uses by default — still runs the floating-point `Compress_d` (F203-19) and the
  * branch-based implicit-reject/zeroization selection (F203-18) that
- * `vendor/ml-kem/ml-kem.ts` closed for the standalone `ml-kem-768` algorithm entry. See
- * rows F203-18 and F203-19 of docs/compliance/FIPS-203-MATRIX.md (historical: §3.2 as of
- * 8c135fa, https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L161) for why those rows' CONFORMING status does
- * not extend to this composite.
+ * `vendor/ml-kem/ml-kem.ts` closed for the standalone `ml-kem-768` algorithm entry. Rows
+ * F203-18 and F203-19 of docs/compliance/FIPS-203-MATRIX.md record that CONFORMING status;
+ * for why it does not extend to this composite, see row F203-03 of the same matrix and, for
+ * the full reasoning, §3.2 as of 8c135fa:
+ * https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L161.
  *
  * The fix is not to vendor X-Wing's combiner: `combineKEMS`, `expandSeedXof` and
  * `_ecdhKem` are generic seed-expansion/composition glue with no ML-KEM math inside them,
