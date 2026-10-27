@@ -102,7 +102,10 @@ describe('F203-11: RBG failure is reported as RBG_FAILURE, not INVALID_KEY', () 
     // leak as INVALID_KEY (F203-11 was closed for the standalone ml-kem-768 entry only;
     // x-wing's combiner samples its own top-level randomness in @noble/post-quantum's
     // unvendored hybrid.js, never touching either component KEM's RBG-failure wrapper).
-    // See FIPS-203-MATRIX.md §3.4 and x-wing.ts's module doc comment.
+    // See FIPS-203-MATRIX.md §3.4 and §3.11 as of 8c135fa
+    // (https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L254,
+    // https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L682)
+    // and x-wing.ts's module doc comment.
     const pair = await pqc.keys.generate();
     expect(pair.publicKey.algorithm).toBe('x-wing');
 

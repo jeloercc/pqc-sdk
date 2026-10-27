@@ -94,7 +94,8 @@ import {
  * Upstream let whatever `randomBytes` happened to throw propagate, which the SDK's
  * `encapsulateTo` catch-all then reported as an invalid encapsulation key. Raising a
  * dedicated type lets the caller discriminate on the type rather than on an arbitrary host
- * error message. See docs/compliance/FIPS-203-MATRIX.md §3.4.
+ * error message. See docs/compliance/FIPS-203-MATRIX.md §3.4 as of 8c135fa:
+ * https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L254
  */
 export class RbgFailureError extends Error {}
 
@@ -109,7 +110,10 @@ export class RbgFailureError extends Error {}
  * Exported so `x-wing.ts` can reuse it: `combineKEMS`'s own top-level randomness sampling
  * (its `encapsulate`'s default parameter, in the npm-sourced, unvendored combiner) has this
  * same gap, and it is not reachable by correcting ML-KEM's own `encapsulate`/`decapsulate` —
- * see docs/compliance/FIPS-203-MATRIX.md §3.4 for why X-Wing needs this sampler applied one
+ * see docs/compliance/FIPS-203-MATRIX.md §3.4 and §3.11 as of 8c135fa
+ * (https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L254,
+ * https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L682)
+ * for why X-Wing needs this sampler applied one
  * layer higher, at the composition in `x-wing.ts`, rather than inside this file.
  */
 export const sampleRandomness = (n: number): TRet<Uint8Array> => {
