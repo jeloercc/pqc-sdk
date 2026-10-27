@@ -276,7 +276,8 @@ export function encapsulateTo(
     // Reachable for both ml-kem-768 (the vendored primitive's own sampleRandomness) and
     // x-wing (x-wing.ts wraps its composed encapsulate to sample via the same
     // sampleRandomness before combineKEMS's own unpatched default parameter ever runs —
-    // see x-wing.ts's module doc comment and FIPS-203-MATRIX.md §3.4).
+    // see x-wing.ts's module doc comment and FIPS-203-MATRIX.md §3.4 as of 8c135fa:
+    // https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L254).
     if (cause instanceof RbgFailureError) {
       throw new PqcError(
         'RBG_FAILURE',

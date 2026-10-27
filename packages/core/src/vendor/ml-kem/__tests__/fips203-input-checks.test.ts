@@ -7,12 +7,14 @@ import { ml_kem768 } from '../ml-kem.js';
  * FIPS 203 §7.2 modulus check (F203-05) and §7.3 dk hash check (F203-10).
  *
  * Both checks live in the vendored primitive. The compliance matrix
- * (docs/compliance/FIPS-203-MATRIX.md §3.3) recorded them as
+ * (docs/compliance/FIPS-203-MATRIX.md; historical: §3.3 as of 8c135fa,
+ * https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L198) recorded them as
  * CONFORMING (delegated) because source inspection confirmed the logic but no
  * repository test exercised it. A vendor version bump that silently removed
  * either check would still pass CI — the mutation-check rule requires that a
  * test guarding a cryptographic property fails when that property is broken.
- * These tests close that gap.
+ * These tests close that gap; rows F203-05 and F203-10 of the matrix now cite
+ * this file.
  *
  * --- F203-05 (§7.2 step 2): the modulus (ByteEncode12 ∘ ByteDecode12) round-trip ---
  *
