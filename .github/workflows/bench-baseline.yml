@@ -6,6 +6,9 @@ name: Bench baseline
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   baseline:
     runs-on: ubuntu-24.04
