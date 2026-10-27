@@ -1,0 +1,8 @@
+# OSV-Scanner exceptions for this module (read by OpenSSF Scorecard's
+# Vulnerabilities check). Format and location: next to the scanned manifest,
+# see https://google.github.io/osv-scanner/configuration/
+
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+ignoreUntil = 2027-01-25
+reason = "golang.org/x/crypto/openpgp has no fixed release. This module does not import it: `go list -deps .` lists only golang.org/x/crypto/cryptobyte and cryptobyte/asn1 from x/crypto. The module is a test helper for the CIRCL interop vectors and is not published."
