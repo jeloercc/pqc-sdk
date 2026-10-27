@@ -7,9 +7,11 @@
  * patchable). That means X-Wing's embedded ML-KEM-768 — the component `pqc.keys.generate()`
  * uses by default — still runs the floating-point `Compress_d` (F203-19) and the
  * branch-based implicit-reject/zeroization selection (F203-18) that
- * `vendor/ml-kem/ml-kem.ts` closed for the standalone `ml-kem-768` algorithm entry. See
- * docs/compliance/FIPS-203-MATRIX.md §3.2 for why that row's CONFORMING status does not
- * extend to this composite.
+ * `vendor/ml-kem/ml-kem.ts` closed for the standalone `ml-kem-768` algorithm entry. Rows
+ * F203-18 and F203-19 of docs/compliance/FIPS-203-MATRIX.md record that CONFORMING status;
+ * for why it does not extend to this composite, see row F203-03 of the same matrix and, for
+ * the full reasoning, §3.2 as of 8c135fa:
+ * https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L161.
  *
  * The fix is not to vendor X-Wing's combiner: `combineKEMS`, `expandSeedXof` and
  * `_ecdhKem` are generic seed-expansion/composition glue with no ML-KEM math inside them,
@@ -45,7 +47,9 @@
  * `crypto.getRandomValues` to throw and calling this module's own (pre-fix)
  * `ml_kem768_x25519.encapsulate(publicKey)` threw a raw `Error` from exactly that default
  * parameter, at `hybrid.js`'s `encapsulate` — never touching either component KEM. See
- * docs/compliance/FIPS-203-MATRIX.md §3.4 for the full writeup.
+ * docs/compliance/FIPS-203-MATRIX.md §3.4 and §3.11 as of 8c135fa for the full writeup:
+ * https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L254
+ * https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L682
  *
  * The fix is the same shape as the ML-KEM substitution: intervene one layer above the gap,
  * in what this module exports, rather than vendor `combineKEMS` to patch its internal
