@@ -167,6 +167,41 @@ protect matters.
   that links it to the source commit and the workflow run that built it.
 - To check the packages in your project, run `npm audit signatures`.
 
+### zod and GHSA-mrhx-c7xc-m3w5
+
+`@modelcontextprotocol/sdk` accepts `zod` `^3.25 || ^4.0`. If your application
+also depends on zod 3, the SDK can end up on that same zod 3 copy, which is
+affected by
+[GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)
+(fixed in zod 4.6.6; there is no fixed zod 3 release). An application that
+does not use zod gets a fixed zod 4 on a fresh install.
+
+To check which zod the SDK uses, run `npm ls zod` (or `pnpm why zod`) and look
+at the version under `@modelcontextprotocol/sdk`.
+
+To move only the SDK to a fixed zod, with npm:
+
+```json
+{
+  "overrides": {
+    "@modelcontextprotocol/sdk": { "zod": "^4.6.6" }
+  }
+}
+```
+
+With pnpm, an override scoped to the SDK (`"@modelcontextprotocol/sdk>zod"`)
+does not help: the SDK also lists zod as a peer dependency, and pnpm keeps
+resolving that peer to your application's zod 3. The pnpm override that works
+is a global one, which also moves your application's own `zod` to 4:
+
+```json
+{
+  "pnpm": {
+    "overrides": { "zod": "^4.6.6" }
+  }
+}
+```
+
 ## License
 
 MIT
