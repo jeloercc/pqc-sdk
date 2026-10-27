@@ -80,8 +80,9 @@ export type SupportedAlgorithm = (typeof SUPPORTED_ALGORITHMS)[number];
  * `x-wing` (X25519 + ML-KEM-768, draft-connolly-cfrg-xwing-kem-10) is a
  * CFRG Internet-Draft construction, **not** a FIPS 203 algorithm. It is not
  * listed here. Including ML-KEM-768 as one of its components does not give
- * X-Wing FIPS 203 status — see FIPS 203 §3.3 and
- * `docs/compliance/FIPS-203-MATRIX.md` §3.2.
+ * X-Wing FIPS 203 status — see FIPS 203 §3.3 and row F203-03 of
+ * `docs/compliance/FIPS-203-MATRIX.md` (historical: §3.2 as of 8c135fa,
+ * https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L161).
  *
  * @example
  * ```ts
