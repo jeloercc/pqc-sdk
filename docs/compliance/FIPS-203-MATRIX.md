@@ -157,7 +157,7 @@ documented language limitation)` as proposed, or `NONCONFORMING` on the ground t
    change is proposed either way.
 3. ~~**F203-03**~~ — closed 2026-09-09 (corrective pass 2): `FIPS_ALGORITHMS` exported from
    `index.ts` with JSDoc citing FIPS 203 §3.3 and this matrix §3.2 (`index.ts:84`; [historical: §3.2 as of `8c135fa`](https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L161), which predates this closure and still reads INDETERMINATE). No further action.
-4. ~~**F203-01**~~ — sets exposed in #93 (`a5d00d9`): envelopes v3/v4, streaming versions
+4. **F203-01** — sets exposed in #93 (`a5d00d9`): envelopes v3/v4, streaming versions
    5/6, ACVP and golden vectors. #93 recorded F203-01 as CONFORMING
    ([§3.1 at `a5d00d9`](https://github.com/jeloercc/pqc-sdk/blob/a5d00d9363daafc85f5a010c14822c85251259d6/docs/compliance/FIPS-203-MATRIX.md#L127));
    #96 (`976651a`) reverted the row to PARTIALLY CONFORMING without mentioning it. The
