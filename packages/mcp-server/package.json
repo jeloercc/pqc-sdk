@@ -19,7 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.3",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@noble/hashes": "^1.8.0",
     "@pqc-sdk/core": "workspace:*"
   },
