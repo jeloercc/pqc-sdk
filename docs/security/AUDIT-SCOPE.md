@@ -158,7 +158,7 @@ reported for the audit and left unchanged.
    the host's raw error; it still fails closed. [#113](https://github.com/jeloercc/pqc-sdk/pull/113) draws the
    nonce through `sampleRandomness` and maps the failure to `RBG_FAILURE`,
    with the same single 12-byte draw after encapsulation, so ciphertext
-   bytes are unchanged. It ships in the next `@pqc-sdk/core` patch release;
+   bytes are unchanged. It shipped in `@pqc-sdk/core` 0.11.3 (2026-10-25);
    the audited 0.11.2 still has the old behavior. Regression tests:
    `vendor/ml-kem/__tests__/rbg-attribution.test.ts`.
 2. **Error-contract table — resolved in the same PR as this document.**
@@ -187,6 +187,18 @@ reported for the audit and left unchanged.
    (x-wing); `0x05` (ml-kem-512) and `0x06` (ml-kem-1024) also exist
    (`STREAM_ENVELOPE_VERSION`, lines 26–31). Comment only; behavior is
    correct.
+8. **Open — RBG failure on X-Wing's X25519 scalar blinding is misattributed.**
+   `@noble/curves` 2.4.0 blinds every X25519 base-point multiplication with a
+   16-byte random value (`abstract/curve.js:393`). If the platform RNG fails
+   at that draw, X-Wing `keys.generate` throws the host's raw error,
+   `encrypt` / `encryptStream` report `INVALID_KEY`, and `decrypt` /
+   `collectDecryptStream` report `DECRYPTION_FAILED`. Every path fails closed;
+   the error code is wrong. Decryption draws too, because the X-Wing secret
+   key is a 32-byte seed and decapsulation re-derives `pk_X` for the
+   combiner. Affects the audited 0.11.2 and 0.11.3 (both pin `@noble/curves`
+   2.4.0). Not a FIPS 203 matter, so it is not in `FIPS-203-MATRIX.md`;
+   documented, with severity and the remediation decision, in
+   [`SECURITY.md`](../../SECURITY.md) ("Threat model: known limits").
 
 ## 6. How to reproduce the numbers
 
