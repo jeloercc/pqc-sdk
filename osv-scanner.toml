@@ -1,0 +1,85 @@
+# OSV-Scanner exceptions for pnpm-lock.yaml (read by OpenSSF Scorecard's
+# Vulnerabilities check). Format and location: next to the scanned lockfile,
+# see https://google.github.io/osv-scanner/configuration/
+# Each entry ignores the vulnerabilities of one exact package version.
+# Review by 2027-01-25; the exceptions stop applying after that date.
+
+[[PackageOverrides]]
+name = "esbuild"
+version = "0.27.7"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "GHSA-g7r4: Windows-only path traversal in esbuild's dev server (servedir); tsup/bundle-require only call build()/context(), never serve, and CI runs on Linux. Would apply if esbuild's serve API ran on Windows."
+
+[[PackageOverrides]]
+name = "esbuild"
+version = "0.21.5"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "GHSA-67mh: permissive CORS on esbuild's dev server (serve); vite 5 (vitepress, apps/docs) never calls esbuild serve. Would apply if this esbuild's serve API were used."
+
+[[PackageOverrides]]
+name = "vite"
+version = "5.4.21"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "Dev server only (vitepress dev, local; CI runs vitepress build). 4w7w/fx2h/rq7h need --host (not set); 587h/698v/v6wh would apply if vitepress dev runs on Windows; 9jrq needs an inline module script (template uses src; plugin injection not verified); r825 not verified: would apply if an attacker can create a +/- file in the repo and the editor is Vim/Emacs."
+
+[[PackageOverrides]]
+name = "undici"
+version = "7.28.0"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "Via miniflare (wrangler dev, local only) and openai's optional x509 peer (not loaded). miniflare uses only fetch/Pool/Headers/Request/Response/FormData/MockAgent against Cloudflare HTTPS endpoints and the local runtime: no interceptors, WebSocket, EventSource, BalancedPool, setCookie, SRI or Agent tls. m8rv not verified. Would apply if those features were used or a malicious server were contacted. Upstream: https://github.com/cloudflare/workers-sdk/pull/16480"
+
+[[PackageOverrides]]
+name = "sharp"
+version = "0.34.5"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "miniflare loads sharp only for the Images binding and cf.image; examples/cloudflare-workers has no bindings and no cf.image. Would apply if that example processed untrusted images through either."
+
+[[PackageOverrides]]
+name = "postcss"
+version = "8.4.49"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "Via @expo/metro-config in examples/react-native-expo (private, local only), which has no CSS files. Would apply if the example processed untrusted CSS."
+
+[[PackageOverrides]]
+name = "uuid"
+version = "7.0.3"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "GHSA-w5hq affects v3()/v5()/v6() with a caller-supplied buffer; xcode 3.0.1 (via expo) only calls uuid.v4(). Would apply if code called v3/v5/v6 with a buffer."
+
+[[PackageOverrides]]
+name = "image-size"
+version = "1.2.1"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "metro reads project assets; examples/react-native-expo has only PNGs, no JXL/HEIF/ICNS. Would apply if untrusted JXL, HEIF or ICNS images were bundled."
+
+[[PackageOverrides]]
+name = "zod"
+version = "3.25.76"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "GHSA-mrhx needs oversized input to a size-limited collection (.max/.length/.size): none in repo code, and the MCP SDK's only one (CompleteResultSchema) is parsed client-side. Size-limited schemas inside @langchain/core not verified. Would apply if untrusted oversized arrays reached such a schema. Upstream: https://github.com/colinhacks/zod/issues/6653"
+
+[[PackageOverrides]]
+name = "deepmerge"
+version = "4.3.1"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "GHSA-gcqx needs attacker-controlled source objects; @expo/config merges app.json and plugin props (repo files) in examples/react-native-expo. No fixed release. Would apply if untrusted objects were merged."
