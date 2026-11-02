@@ -57,18 +57,18 @@ Severities are this review's, on the scale used by `docs/AUDIT-2026-06.md` and
 `docs/AUDIT-2026-09.md`. The GitHub label of each Scorecard alert reflects
 Scorecard's per-check risk and is listed separately in the next table.
 
-| ID    | Sev    | Area                 | Summary                                                                                      | Status |
-| ----- | ------ | -------------------- | -------------------------------------------------------------------------------------------- | ------ |
-| SC-M1 | Medium | Docs/audit           | THREAT-MODEL and AUDIT-SCOPE say `main` has no branch protection; a ruleset enforces PR + CI | Open   |
-| SC-M2 | Medium | Supply chain/release | `release.yml` installs `npm@^11.5.1` in the job that holds `id-token: write`                 | Open   |
-| SC-L1 | Low    | Dev tooling          | Six advisories in development dependencies; every fix needs a major upgrade                  | Open   |
-| SC-L2 | Low    | CI                   | No SAST tool that Scorecard recognizes runs on commits                                       | Open   |
-| SC-L3 | Low    | Supply chain         | No automated dependency update tool is configured                                            | Open   |
-| SC-L4 | Low    | Governance           | Changes reach `main` without review by a second person                                       | Open   |
-| SC-I1 | Info   | Release integrity    | GitHub release assets (the SBOMs) are not signed                                             | Open   |
-| SC-I2 | Info   | CI                   | Five version PRs were merged with no CI check run on their head commit                       | Open   |
-| SC-I3 | Info   | Governance           | No OpenSSF Best Practices badge                                                              | Open   |
-| SC-I4 | Info   | Governance           | Scorecard finds contributors from no organization                                            | Open   |
+| ID    | Sev    | Area                 | Summary                                                                                      | Status   |
+| ----- | ------ | -------------------- | -------------------------------------------------------------------------------------------- | -------- |
+| SC-M1 | Medium | Docs/audit           | THREAT-MODEL and AUDIT-SCOPE say `main` has no branch protection; a ruleset enforces PR + CI | Resolved |
+| SC-M2 | Medium | Supply chain/release | `release.yml` installs `npm@^11.5.1` in the job that holds `id-token: write`                 | Open     |
+| SC-L1 | Low    | Dev tooling          | Six advisories in development dependencies; every fix needs a major upgrade                  | Open     |
+| SC-L2 | Low    | CI                   | No SAST tool that Scorecard recognizes runs on commits                                       | Open     |
+| SC-L3 | Low    | Supply chain         | No automated dependency update tool is configured                                            | Open     |
+| SC-L4 | Low    | Governance           | Changes reach `main` without review by a second person                                       | Open     |
+| SC-I1 | Info   | Release integrity    | GitHub release assets (the SBOMs) are not signed                                             | Open     |
+| SC-I2 | Info   | CI                   | Five version PRs were merged with no CI check run on their head commit                       | Open     |
+| SC-I3 | Info   | Governance           | No OpenSSF Best Practices badge                                                              | Open     |
+| SC-I4 | Info   | Governance           | Scorecard finds contributors from no organization                                            | Open     |
 
 ### Scorecard checks below 10 and their findings
 
@@ -412,5 +412,9 @@ In the last 30 commits on `main` there are 23 by `jeloercc` and 7 by
 
 ## Resolution log
 
-| ID  | PR  | Date | Outcome |
-| --- | --- | ---- | ------- |
+"Resolved" means merged to `main`. The findings and their evidence above are
+left as they were at `621f17b`; this log records what changed afterwards.
+
+| ID    | Status   | Resolved in                                                                                                                               |
+| ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| SC-M1 | Resolved | PR_PENDING — THREAT-MODEL §3.4 describes `protect-main` and keeps the residual risk; AUDIT-SCOPE §5 item 5 corrected, report linked in §4 |

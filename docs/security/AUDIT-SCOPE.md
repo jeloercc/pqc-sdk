@@ -142,13 +142,17 @@ excluding `*.test.ts`. Test code: cli 778, mcp-server 742, langchain 336.
   [`docs/AUDIT-2026-06.md`](../AUDIT-2026-06.md),
   [`docs/AUDIT-2026-09.md`](../AUDIT-2026-09.md),
   [`docs/SECURITY-REVIEW-2026-06.md`](../SECURITY-REVIEW-2026-06.md)
+- OpenSSF Scorecard findings for `main` @ `621f17b` (run of 2026-10-31;
+  AI-assisted, **not** independent):
+  [`docs/security/SCORECARD-REVIEW-2026-11.md`](SCORECARD-REVIEW-2026-11.md)
 
 ## 5. Known items to look at
 
 Found while preparing this document. Items 2 and 3 are documentation
 errors fixed in the same PR as this document. Item 1 was fixed in a later
-commit, after the audited release (details in the item); the others are
-reported for the audit and left unchanged.
+commit, after the audited release, and item 5 was corrected in a later
+commit (details in each item); the others are reported for the audit and
+left unchanged.
 
 1. **`RBG_FAILURE` is not uniform — resolved after the audited release in
    [#113](https://github.com/jeloercc/pqc-sdk/pull/113).** In 0.11.2, key generation, encapsulation and signing
@@ -175,8 +179,19 @@ reported for the audit and left unchanged.
 4. **Duplicate `@noble/ciphers`.** Core pins `@noble/ciphers 2.2.0`, while
    `@noble/post-quantum 0.7.1` depends on `2.4.0`, so both are installed.
    Core's AES-GCM comes from 2.2.0 (`encrypt.ts`, `stream.ts`).
-5. **`main` has no branch protection or rulesets** (checked 2026-10-25);
-   see THREAT-MODEL §3.4.
+5. **Branch protection — corrected after this document was written** (SC-M1
+   in [`SCORECARD-REVIEW-2026-11.md`](SCORECARD-REVIEW-2026-11.md)). This
+   item first said that `main` had no branch protection or rulesets (checked
+   2026-10-25). In fact the repository ruleset `protect-main` was created
+   that day at 21:01 UTC, before #112 merged this document. It is active,
+   with no bypass actors. Changes reach `main` only through a squash-merged
+   pull request whose `ci (node 20)` and `ci (node 24)` checks pass, and
+   `main` cannot be force-pushed or deleted. What remains for the audit: the
+   ruleset requires no approving review, and the project has one
+   collaborator (SC-L4). A change can therefore merge without a second
+   reviewer, and an admin can change the ruleset. Verify with
+   `gh api repos/jeloercc/pqc-sdk/rules/branches/main`; see THREAT-MODEL
+   §3.4.
 6. **No header or cross-algorithm tests for `ml-kem-512` / `ml-kem-1024`
    ciphertexts.** The streaming mutation suite runs only for `ml-kem-768`
    and `x-wing` (`stream-mutations.test.ts`, `ALGORITHMS`), and the one-shot
