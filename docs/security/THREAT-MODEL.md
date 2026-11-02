@@ -187,6 +187,9 @@ maintainer account.
   primitive**: NIST ACVP vectors, X-Wing draft-10 vectors, CIRCL (Go)
   cross-checks, golden wire-format vectors — run in CI with
   `pnpm install --frozen-lockfile`.
+- **CodeQL static analysis** (`.github/workflows/codeql.yml`) of the
+  JavaScript/TypeScript sources on every pull request, on pushes to `main`
+  and weekly, with results in code scanning. It is not a required check.
 - **Release pipeline.** Packages are published only by
   `.github/workflows/release.yml` via npm trusted publishing (OIDC); the
   repository holds **no** Actions secrets (checked with `gh secret list`),
