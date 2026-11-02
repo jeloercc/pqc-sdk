@@ -1,0 +1,45 @@
+# CodeQL static analysis (SAST) of the JavaScript/TypeScript sources, with
+# results in code scanning. Scorecard's SAST check counts this workflow
+# (github/codeql-action/analyze) and the code scanning check runs it leaves on
+# pull requests. See docs/security/SCORECARD-REVIEW-2026-11.md, SC-L2.
+#
+# JavaScript/TypeScript needs no build (build-mode: none), so the job only
+# checks out the code: no dependency install and no repository script runs.
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, Mondays 03:17 UTC, so new CodeQL queries also reach main.
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      # Upload the results to code scanning.
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:javascript-typescript
