@@ -62,7 +62,7 @@ Scorecard's per-check risk and is listed separately in the next table.
 | SC-M1 | Medium | Docs/audit           | THREAT-MODEL and AUDIT-SCOPE say `main` has no branch protection; a ruleset enforces PR + CI | Resolved |
 | SC-M2 | Medium | Supply chain/release | `release.yml` installs `npm@^11.5.1` in the job that holds `id-token: write`                 | Open     |
 | SC-L1 | Low    | Dev tooling          | Six advisories in development dependencies; every fix needs a major upgrade                  | Open     |
-| SC-L2 | Low    | CI                   | No SAST tool that Scorecard recognizes runs on commits                                       | Open     |
+| SC-L2 | Low    | CI                   | No SAST tool that Scorecard recognizes runs on commits                                       | Resolved |
 | SC-L3 | Low    | Supply chain         | No automated dependency update tool is configured                                            | Open     |
 | SC-L4 | Low    | Governance           | Changes reach `main` without review by a second person                                       | Open     |
 | SC-I1 | Info   | Release integrity    | GitHub release assets (the SBOMs) are not signed                                             | Open     |
@@ -415,6 +415,7 @@ In the last 30 commits on `main` there are 23 by `jeloercc` and 7 by
 "Resolved" means merged to `main`. The findings and their evidence above are
 left as they were at `621f17b`; this log records what changed afterwards.
 
-| ID    | Status   | Resolved in                                                                                                                                                                         |
-| ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SC-M1 | Resolved | [#125](https://github.com/jeloercc/pqc-sdk/pull/125) — THREAT-MODEL §3.4 describes `protect-main` and keeps the residual risk; AUDIT-SCOPE §5 item 5 corrected, report linked in §4 |
+| ID    | Status   | Resolved in                                                                                                                                                                                 |
+| ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SC-M1 | Resolved | [#125](https://github.com/jeloercc/pqc-sdk/pull/125) — THREAT-MODEL §3.4 describes `protect-main` and keeps the residual risk; AUDIT-SCOPE §5 item 5 corrected, report linked in §4         |
+| SC-L2 | Resolved | [#126](https://github.com/jeloercc/pqc-sdk/pull/126) — `.github/workflows/codeql.yml` (CodeQL `javascript-typescript`, on PRs, pushes to `main` and weekly); not a required check (D5 open) |
