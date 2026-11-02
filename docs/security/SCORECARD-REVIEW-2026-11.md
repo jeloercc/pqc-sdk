@@ -415,8 +415,8 @@ In the last 30 commits on `main` there are 23 by `jeloercc` and 7 by
 "Resolved" means merged to `main`. The findings and their evidence above are
 left as they were at `621f17b`; this log records what changed afterwards.
 
-| ID    | Status   | Resolved in                                                                                                                                                                                 |
-| ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SC-M1 | Resolved | [#125](https://github.com/jeloercc/pqc-sdk/pull/125) — THREAT-MODEL §3.4 describes `protect-main` and keeps the residual risk; AUDIT-SCOPE §5 item 5 corrected, report linked in §4         |
-| SC-L2 | Resolved | [#126](https://github.com/jeloercc/pqc-sdk/pull/126) — `.github/workflows/codeql.yml` (CodeQL `javascript-typescript`, on PRs, pushes to `main` and weekly); not a required check (D5 open) |
-| SC-M2 | Resolved | PR_PENDING — `npm install -g` step replaced by a check of the bundled npm (fails below 11.5.1); Scorecard v5.6.0 `--local` Pinned-Dependencies 9 → 10; first release run still to confirm   |
+| ID    | Status   | Resolved in                                                                                                                                                                                                                         |
+| ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SC-M1 | Resolved | [#125](https://github.com/jeloercc/pqc-sdk/pull/125) — THREAT-MODEL §3.4 describes `protect-main` and keeps the residual risk; AUDIT-SCOPE §5 item 5 corrected, report linked in §4                                                 |
+| SC-L2 | Resolved | [#126](https://github.com/jeloercc/pqc-sdk/pull/126) — `.github/workflows/codeql.yml` (CodeQL `javascript-typescript`, on PRs, pushes to `main` and weekly); not a required check (D5 open)                                         |
+| SC-M2 | Resolved | [#127](https://github.com/jeloercc/pqc-sdk/pull/127) — `npm install -g` step replaced by a check of the bundled npm (fails below 11.5.1); Scorecard v5.6.0 `--local` Pinned-Dependencies 9 → 10; first release run still to confirm |
