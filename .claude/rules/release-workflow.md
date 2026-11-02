@@ -26,8 +26,12 @@
 - Authentication is npm **trusted publishing (OIDC)**: each of the 4
   packages trusts `jeloercc/pqc-sdk`, workflow `release.yml`, no
   environment. The job needs `id-token: write` and npm >= 11.5.1 on PATH
-  (`pnpm publish` shells out to `npm`), which `release.yml` installs on
-  Node 24. Provenance stays on via `NPM_CONFIG_PROVENANCE=true`.
+  (`pnpm publish` shells out to `npm`). The Node 24 that `release.yml` sets
+  up bundles it (24.5.0 and later), and the "Check npm for trusted
+  publishing" step fails the job if it ever does not. Do not add an
+  `npm install -g npm@...` step back: it is an unpinned download in the job
+  that can publish (SCORECARD-REVIEW-2026-11, SC-M2). Provenance stays on
+  via `NPM_CONFIG_PROVENANCE=true`.
 - There is no npm token. Do not add `NODE_AUTH_TOKEN`/`NPM_TOKEN` back to
   the workflow; if publishing fails with an auth error, check the Trusted
   Publisher settings on npmjs.com (repo, workflow filename) and the npm
