@@ -6,6 +6,12 @@
   `pnpm changeset`, pick the bump, commit the generated `.changeset/*.md`.
   Note `@pqc-sdk/core` and `@pqc-sdk/cli` are `linked` in
   `.changeset/config.json`, so they version together.
+- Dependabot pull requests carry no changeset. Before merging one that
+  touches `packages/*`, add one: a `patch` for each published package whose
+  production dependencies change, or an empty changeset when only
+  development dependencies change (as in #122 and #128). `@noble/*` bumps
+  arrive in their own pull request; merge only with the NIST vector suites
+  green in CI.
 - On every push to `main`, `.github/workflows/release.yml`
   (`changesets/action`) either updates the "chore: version packages" PR
   (while changesets are pending) or publishes to npm (when that version PR

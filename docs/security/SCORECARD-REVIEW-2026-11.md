@@ -63,7 +63,7 @@ Scorecard's per-check risk and is listed separately in the next table.
 | SC-M2 | Medium | Supply chain/release | `release.yml` installs `npm@^11.5.1` in the job that holds `id-token: write`                 | Resolved |
 | SC-L1 | Low    | Dev tooling          | Six advisories in development dependencies; every fix needs a major upgrade                  | Resolved |
 | SC-L2 | Low    | CI                   | No SAST tool that Scorecard recognizes runs on commits                                       | Resolved |
-| SC-L3 | Low    | Supply chain         | No automated dependency update tool is configured                                            | Open     |
+| SC-L3 | Low    | Supply chain         | No automated dependency update tool is configured                                            | Resolved |
 | SC-L4 | Low    | Governance           | Changes reach `main` without review by a second person                                       | Open     |
 | SC-I1 | Info   | Release integrity    | GitHub release assets (the SBOMs) are not signed                                             | Open     |
 | SC-I2 | Info   | CI                   | Five version PRs were merged with no CI check run on their head commit                       | Open     |
@@ -421,3 +421,4 @@ left as they were at `621f17b`; this log records what changed afterwards.
 | SC-L2 | Resolved | [#126](https://github.com/jeloercc/pqc-sdk/pull/126) — `.github/workflows/codeql.yml` (CodeQL `javascript-typescript`, on PRs, pushes to `main` and weekly); not a required check (D5 open)                                                                                                            |
 | SC-M2 | Resolved | [#127](https://github.com/jeloercc/pqc-sdk/pull/127) — `npm install -g` step replaced by a check of the bundled npm (fails below 11.5.1); Scorecard v5.6.0 `--local` Pinned-Dependencies 9 → 10; the check passed in Release run 41526886771 (npm 11.19.1); publishing with it awaits the next release |
 | SC-L1 | Resolved | [#128](https://github.com/jeloercc/pqc-sdk/pull/128) — vitest 4.1.12 in all five workspaces clears GHSA-5gmw, -85c8, -82fw, -qxg6 (`tinypool` left the lockfile); `glob` 13.0.6 and `minimatch` 3.1.5 / 9.0.9 / 10.2.5 recorded in `osv-scanner.toml` (decision D1)                                    |
+| SC-L3 | Resolved | PR_PENDING — `.github/dependabot.yml`: weekly updates for GitHub Actions and npm; `@noble/*` in its own group, not ignored, so security updates still arrive (decision D2); Scorecard v5.6.0 `--local` Dependency-Update-Tool 0 → 10                                                                   |
