@@ -29,12 +29,23 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      # Trusted publishing (OIDC) needs npm >= 11.5.1. `pnpm publish` packs
-      # and then runs the `npm` on PATH, so upgrading npm is enough.
-      - name: Upgrade npm for trusted publishing
+      # Trusted publishing (OIDC) needs npm >= 11.5.1: `pnpm publish` packs and
+      # then runs the `npm` on PATH. Node 24.5.0 and later bundle npm >= 11.5.1,
+      # so nothing is installed here: an `npm install` would be an unpinned
+      # download in the job that can publish (SCORECARD-REVIEW-2026-11, SC-M2).
+      # This step only fails the job early if the bundled npm is ever older.
+      - name: Check npm for trusted publishing
         run: |
-          npm install -g npm@^11.5.1
-          npm --version
+          npm_version="$(npm --version)"
+          echo "npm ${npm_version}"
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map((n) => parseInt(n, 10));
+            const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+            if (!ok) {
+              console.error(`npm ${process.argv[1]} is older than 11.5.1, which trusted publishing needs`);
+              process.exit(1);
+            }
+          ' "${npm_version}"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
