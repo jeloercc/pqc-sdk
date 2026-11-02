@@ -194,6 +194,11 @@ maintainer account.
   all four packages carries an npm SLSA provenance attestation naming
   `jeloercc/pqc-sdk` and `release.yml` (verifiable with
   `npm audit signatures`).
+- **Ruleset `protect-main` on the default branch.** It is a repository
+  ruleset, active, with no bypass actors. Changes reach `main` only through
+  a squash-merged pull request whose `ci (node 20)` and `ci (node 24)`
+  checks pass on an up-to-date branch, and `main` cannot be force-pushed or
+  deleted. Verify with `gh api repos/jeloercc/pqc-sdk/rules/branches/main`.
 - **Added for this audit:** a CycloneDX SBOM per published package
   attached to each GitHub release; every GitHub Action in every workflow,
   GitHub-owned and third-party, pinned by full commit SHA; OpenSSF
@@ -221,12 +226,16 @@ maintainer account.
   whatever version its own install resolves, so they are part of the
   langchain attack surface that the SBOM does not show. No other package
   declares peer dependencies.
-- **Repository and account compromise.** `main` currently has **no branch
-  protection and no rulesets**, and the project has a single maintainer.
-  Anyone with write access to the repository (or the maintainer's GitHub
-  account) can push to `main`, which runs `release.yml` with
-  `id-token: write` and can publish with provenance. Provenance proves
-  where a package was built, not that the change was reviewed.
+- **Repository and account compromise.** The `protect-main` ruleset
+  requires **no approving review**, and the project has a single maintainer
+  (one collaborator, with the admin role), so no second person reviews a
+  change before it merges. Anyone with write access can merge a change that
+  passes CI: the maintainer's GitHub account, or an app or token granted
+  write access to the repository. An admin can also edit or disable the
+  ruleset. Every push to `main` runs `release.yml` with `id-token: write`,
+  which can publish with provenance. Provenance proves where a package was
+  built, not that the change was reviewed. See SC-M1 and SC-L4 in
+  [`SCORECARD-REVIEW-2026-11.md`](SCORECARD-REVIEW-2026-11.md).
 - **GitHub's runner infrastructure is trusted.** SHA pins fix which action
   code runs, not the security of the hosted runners or of the actions'
   own dependencies, and pins only move when someone updates them.
