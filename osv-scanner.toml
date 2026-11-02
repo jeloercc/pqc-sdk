@@ -83,3 +83,35 @@ ecosystem = "npm"
 vulnerability.ignore = true
 effectiveUntil = 2027-01-25
 reason = "GHSA-gcqx needs attacker-controlled source objects; @expo/config merges app.json and plugin props (repo files) in examples/react-native-expo. No fixed release. Would apply if untrusted objects were merged."
+
+[[PackageOverrides]]
+name = "glob"
+version = "13.0.6"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "GHSA-3g3m: an aborted walk keeps reading directories, which matters to callers that bound a walk over attacker-influenced patterns or directories with an AbortSignal. Only via expo -> @expo/cli in examples/react-native-expo (private; expo start/export run locally, CI runs only its tsc lint). Whether @expo/cli passes a signal was not verified. Would apply if @expo/cli walked attacker-influenced paths under a timeout. Fixed in glob 14.0.2."
+
+[[PackageOverrides]]
+name = "minimatch"
+version = "3.1.5"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "GHSA-g3hv: CPU/memory amplification from an attacker-supplied glob pattern (optimizationLevel >= 2). Via eslint, whose patterns come only from eslint.config.mjs (files/ignores) and the `eslint .` / `eslint scripts` arguments in package.json scripts. Would apply if eslint ran with an untrusted config or pattern arguments. Fixed in minimatch 11.0.1."
+
+[[PackageOverrides]]
+name = "minimatch"
+version = "10.2.5"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "GHSA-g3hv: CPU/memory amplification from an attacker-supplied glob pattern (optimizationLevel >= 2). Via typescript-eslint -> @typescript-eslint/typescript-estree; eslint.config.mjs sets projectService: true and passes no glob options, so its patterns come from repository config. Whether typescript-estree uses optimizationLevel >= 2 was not verified. Would apply if untrusted tsconfig or parserOptions globs were used. Fixed in minimatch 11.0.1."
+
+[[PackageOverrides]]
+name = "minimatch"
+version = "9.0.9"
+ecosystem = "npm"
+vulnerability.ignore = true
+effectiveUntil = 2027-01-25
+reason = "GHSA-g3hv: CPU/memory amplification from an attacker-supplied glob pattern (optimizationLevel >= 2). Only via expo -> @expo/cli in examples/react-native-expo (private, local only; CI runs only its tsc lint); the patterns @expo/cli matches were not verified. Would apply if @expo/cli matched untrusted patterns. Fixed in minimatch 11.0.1."
