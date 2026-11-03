@@ -1,0 +1,42 @@
+# Dependabot version updates for GitHub Actions and the pnpm workspace.
+# docs/security/SCORECARD-REVIEW-2026-11.md, SC-L3 (decision D2).
+#
+# Groups apply to version updates only (no `applies-to`), so a security
+# update still arrives as its own pull request. A dependency joins the first
+# group it matches, which is why `noble` comes first.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  # The root pnpm-lock.yaml covers every workspace package, examples included.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # The cryptographic primitives are pinned to exact versions and bumped
+      # deliberately behind the NIST vector tests (SECURITY.md, "Dependency
+      # policy"): they get a pull request of their own, never mixed with
+      # other updates, and nothing changes until a maintainer merges it.
+      noble:
+        patterns: ['@noble/*']
+      # Majors are left out of the groups so a breaking release arrives in
+      # its own pull request instead of holding back the rest.
+      npm-development:
+        dependency-type: development
+        update-types: [minor, patch]
+      npm-production:
+        dependency-type: production
+        update-types: [minor, patch]

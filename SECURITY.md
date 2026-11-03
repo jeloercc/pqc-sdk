@@ -162,6 +162,13 @@ The cryptographic dependencies (`@noble/post-quantum`, `@noble/ciphers`) are
 pinned to **exact versions** in `@pqc-sdk/core`, not caret ranges. A downstream
 `npm install` therefore resolves the exact primitive build that shipped and
 passed the NIST vectors; bumps are made deliberately behind the vector tests.
+
+Dependabot (`.github/dependabot.yml`) proposes updates weekly for GitHub
+Actions and for the pnpm workspace. `@noble/*` updates get a pull request of
+their own, never grouped with other dependencies; CI runs the NIST vector
+suites on it, and the pin changes only when a maintainer merges it.
+Dependabot security updates for `@noble/*` are not suppressed: they arrive as
+separate pull requests and go through the same CI.
 Published tarballs include source maps (`*.js.map` / `*.cjs.map`) — expected for
 this MIT project, noted here so it is a conscious choice.
 
