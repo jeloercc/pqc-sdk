@@ -27,7 +27,7 @@
     "@types/node": "^22.15.29",
     "tsup": "^8.5.0",
     "typescript": "5.8.3",
-    "vitest": "^4.1.12"
+    "vitest": "^5.0.5"
   },
   "license": "MIT",
   "homepage": "https://jeloercc.github.io/pqc-sdk/",
