@@ -14,6 +14,14 @@ updates:
     commit-message:
       prefix: ci
       include: scope
+    ignore:
+      # changesets/action v2 requires @changesets/cli v3 and renames its
+      # inputs/outputs; PR CI does not run the release job, so a green
+      # Dependabot PR would still break publishing (#130). Migrate the action
+      # and the CLI together, by hand. `ignore` also applies to security
+      # updates for that major.
+      - dependency-name: changesets/action
+        update-types: ['version-update:semver-major']
     groups:
       github-actions:
         patterns: ['*']
