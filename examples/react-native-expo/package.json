@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@pqc-sdk/core": "workspace:*",
-    "expo": "~54.0.37",
+    "expo": "~58.0.22",
     "expo-status-bar": "~3.0.9",
     "react": "19.3.1",
     "react-native": "0.88.1",
