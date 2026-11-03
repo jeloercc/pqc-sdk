@@ -2,8 +2,9 @@
 # docs/security/SCORECARD-REVIEW-2026-11.md, SC-L3 (decision D2).
 #
 # Groups apply to version updates only (no `applies-to`), so a security
-# update still arrives as its own pull request. A dependency joins the first
-# group it matches, which is why `noble` comes first.
+# update still arrives as its own pull request. Majors are left out of every
+# group so a breaking release arrives in its own pull request instead of
+# holding back the rest.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -16,6 +17,7 @@ updates:
     groups:
       github-actions:
         patterns: ['*']
+        update-types: [minor, patch]
 
   # The root pnpm-lock.yaml covers every workspace package, examples included.
   - package-ecosystem: npm
@@ -25,6 +27,15 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    ignore:
+      # vitest 5 needs Node >= 22.12; engines (>=20) and CI stay on Node 20
+      # (SCORECARD-REVIEW-2026-11, decision D1). `ignore` also applies to
+      # security updates, so a fix released only in a new vitest major would
+      # not arrive as a pull request.
+      - dependency-name: vitest
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@vitest/*'
+        update-types: ['version-update:semver-major']
     groups:
       # The cryptographic primitives are pinned to exact versions and bumped
       # deliberately behind the NIST vector tests (SECURITY.md, "Dependency
@@ -32,11 +43,14 @@ updates:
       # other updates, and nothing changes until a maintainer merges it.
       noble:
         patterns: ['@noble/*']
-      # Majors are left out of the groups so a breaking release arrives in
-      # its own pull request instead of holding back the rest.
+      # The other groups exclude @noble/* explicitly. Listing `noble` first
+      # was not enough: the first run (2026-11-03) put @noble/ciphers into
+      # npm-production (#132).
       npm-development:
         dependency-type: development
         update-types: [minor, patch]
+        exclude-patterns: ['@noble/*']
       npm-production:
         dependency-type: production
         update-types: [minor, patch]
+        exclude-patterns: ['@noble/*']
