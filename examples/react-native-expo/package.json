@@ -14,7 +14,7 @@
   "dependencies": {
     "@pqc-sdk/core": "workspace:*",
     "expo": "~58.0.22",
-    "expo-status-bar": "~3.0.9",
+    "expo-status-bar": "~58.0.4",
     "react": "19.3.1",
     "react-native": "0.88.1",
     "react-native-get-random-values": "^1.11.0"
