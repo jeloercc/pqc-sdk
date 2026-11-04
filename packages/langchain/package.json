@@ -37,7 +37,7 @@
     "tsup": "^9.0.0",
     "typescript": "5.8.3",
     "vitest": "^4.1.12",
-    "zod": "^3.25.67"
+    "zod": "^4.6.7"
   },
   "license": "MIT",
   "homepage": "https://jeloercc.github.io/pqc-sdk/",
