@@ -164,9 +164,11 @@ pinned to **exact versions** in `@pqc-sdk/core`, not caret ranges. A downstream
 passed the NIST vectors; bumps are made deliberately behind the vector tests.
 
 Dependabot (`.github/dependabot.yml`) proposes updates weekly for GitHub
-Actions and for the pnpm workspace. `@noble/*` updates get a pull request of
-their own, never grouped with other dependencies; CI runs the NIST vector
-suites on it, and the pin changes only when a maintainer merges it.
+Actions and for the pnpm workspace. Its pull requests are not merged as they
+are: a maintainer reproduces each accepted update in their own pull request,
+where CI runs again. `@noble/*` updates get a pull request of their own,
+never grouped with other dependencies; CI runs the NIST vector suites on
+it, and the pin changes only when a maintainer merges the update.
 Dependabot security updates for `@noble/*` are not suppressed: they arrive as
 separate pull requests and go through the same CI. The one exception
 Dependabot is told to skip is a new major of `vitest` or `@vitest/*`: vitest
