@@ -232,6 +232,11 @@ fixtures to match new output without the acknowledgment above.
 ## LangChain package specifics (`packages/langchain`)
 
 - All tools use `from 'zod/v3'` (not `'zod'`) — see interop quirks above
+- The `zod` peer range is `^3.25.1 || ^4.0.0`: `zod/v3` first imports in
+  zod 3.25.1 (3.25.0 lists it in `exports` but ships without the file), so
+  a wider range lets npm install a zod the package cannot import.
+  `src/peer-range.test.ts` checks the range against the zod entry points
+  `dist/index.js` imports
 - `dts: true` — every exported tool is typed `StructuredToolInterface` (via
   `asStructuredTool()`), so no Zod type reaches `dist/index.d.ts`.
   `src/types.test.ts` type-checks a strict `nodenext` consumer against the
