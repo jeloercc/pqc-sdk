@@ -1,5 +1,13 @@
 # @pqc-sdk/cli
 
+## 0.11.4
+
+### Patch Changes
+
+- Updated dependencies [6e94dbd]
+- Updated dependencies [6e94dbd]
+  - @pqc-sdk/core@0.11.4
+
 ## 0.11.3
 
 ### Patch Changes
