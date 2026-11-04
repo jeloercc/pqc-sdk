@@ -227,7 +227,7 @@ maintainer account.
   install time (`@pqc-sdk/mcp-server 0.4.1` resolves to ~100 packages).
   Consumers without a lockfile get whatever resolves that day.
 - **Known limitation: the `@pqc-sdk/langchain` SBOM omits its peers.**
-  `@langchain/core` (`>=0.3.0`) and `zod` (`>=3.0.0`) are
+  `@langchain/core` (`>=0.3.0`) and `zod` (`^3.25.1 || ^4.0.0`) are
   `peerDependencies` of `@pqc-sdk/langchain` and are absent from its
   SBOM. They are also listed in its `devDependencies` (the package's own
   tests use them), so when `scripts/release-sbom.mjs` installs the packed

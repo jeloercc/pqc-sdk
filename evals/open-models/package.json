@@ -18,7 +18,7 @@
     "@langchain/openai": "1.8.0",
     "@pqc-sdk/core": "workspace:*",
     "@pqc-sdk/langchain": "workspace:*",
-    "zod": "^3.25.67"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.15.29",

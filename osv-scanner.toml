@@ -69,14 +69,6 @@ effectiveUntil = 2027-01-25
 reason = "metro reads project assets; examples/react-native-expo has only PNGs, no JXL/HEIF/ICNS. Would apply if untrusted JXL, HEIF or ICNS images were bundled."
 
 [[PackageOverrides]]
-name = "zod"
-version = "3.25.76"
-ecosystem = "npm"
-vulnerability.ignore = true
-effectiveUntil = 2027-01-25
-reason = "GHSA-mrhx needs oversized input to a size-limited collection (.max/.length/.size): none in repo code, and the MCP SDK's only one (CompleteResultSchema) is parsed client-side. Size-limited schemas inside @langchain/core not verified. Would apply if untrusted oversized arrays reached such a schema. Upstream: https://github.com/colinhacks/zod/issues/6653"
-
-[[PackageOverrides]]
 name = "deepmerge"
 version = "4.3.1"
 ecosystem = "npm"
