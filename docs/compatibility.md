@@ -176,7 +176,8 @@ the test device, v54.0.8, which only supports SDK 54). Play Store rollout of
 newer Expo Go builds lags per-device, so the example tracks what is
 installable on the test hardware, not the latest SDK. Newer SDK support —
 not a PQC SDK limitation — will be revisited once a newer Expo Go build
-reaches the device.
+reaches the device. Dependabot leaves this example out of its version
+updates (`exclude-paths` in `.github/dependabot.yml`) for the same reason.
 
 **Earlier on-device validation (July 2026), superseded by the run below but
 kept as the record of when the ML-KEM-768 row was first closed.** The
