@@ -176,8 +176,10 @@ maintainer account.
 **Protects** (what the project controls)
 
 - **Exact pins for the crypto dependencies of core.**
-  `@noble/ciphers 2.2.0`, `@noble/curves 2.4.0`, `@noble/hashes 2.4.0`,
+  `@noble/ciphers 2.4.0`, `@noble/curves 2.4.0`, `@noble/hashes 2.4.0`,
   `@noble/post-quantum 0.7.1` — no caret ranges (`packages/core/package.json`).
+  Published releases up to 0.11.3 pin `@noble/ciphers 2.2.0`; `main` moved to
+  2.4.0 in #132.
 - **Vendored ML-KEM / ML-DSA with recorded upstream digests.**
   `vendor-drift-check.yml` reports when a vendored file's recorded pristine
   copy no longer matches upstream at the pinned version, or when upstream
