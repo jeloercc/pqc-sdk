@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.0",
-    "@noble/hashes": "^1.8.0",
+    "@noble/hashes": "^2.4.0",
     "@pqc-sdk/core": "workspace:*"
   },
   "devDependencies": {
