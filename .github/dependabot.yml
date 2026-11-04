@@ -51,6 +51,11 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: '@vitest/*'
         update-types: ['version-update:semver-major']
+      # @changesets/cli 3 needs changesets/action v2, and action v1 (what
+      # release.yml uses) needs CLI 2 (see the github-actions entry above and
+      # .claude/rules/release-workflow.md). Migrate both together, by hand.
+      - dependency-name: '@changesets/cli'
+        update-types: ['version-update:semver-major']
     groups:
       # The cryptographic primitives are pinned to exact versions and bumped
       # deliberately behind the NIST vector tests (SECURITY.md, "Dependency

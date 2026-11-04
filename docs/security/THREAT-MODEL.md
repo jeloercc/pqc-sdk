@@ -193,9 +193,11 @@ maintainer account.
   JavaScript/TypeScript sources on every pull request, on pushes to `main`
   and weekly, with results in code scanning. It is not a required check.
 - **Dependabot version updates** (`.github/dependabot.yml`), weekly, for
-  GitHub Actions and the pnpm workspace. `@noble/*` bumps come in their own
-  pull request and land only when a maintainer merges them with the NIST
-  vectors green; security updates are not suppressed.
+  GitHub Actions and the pnpm workspace. Its pull requests are not merged
+  as they are: a maintainer reproduces each accepted update in their own
+  pull request. `@noble/*` bumps come in their own pull request and land
+  only when a maintainer merges them with the NIST vectors green; security
+  updates are not suppressed.
 - **Release pipeline.** Packages are published only by
   `.github/workflows/release.yml` via npm trusted publishing (OIDC); the
   repository holds **no** Actions secrets (checked with `gh secret list`),
