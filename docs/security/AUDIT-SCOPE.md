@@ -110,7 +110,8 @@ imports, two places call it unmodified:
 
 Auditing how these are used (parameters, the X-Wing label and combiner
 input order against the draft) is in scope; finding defects inside them
-is upstream's (SECURITY.md, "Scope"). AES-256-GCM (`@noble/ciphers` 2.2.0),
+is upstream's (SECURITY.md, "Scope"). AES-256-GCM (`@noble/ciphers` 2.2.0
+in the audited release; 2.4.0 on `main` since #132),
 X25519 (`@noble/curves` 2.4.0) and SHA-3/SHAKE (`@noble/hashes` 2.4.0) are
 used as published and are likewise out of scope except for their use.
 
@@ -178,7 +179,9 @@ left unchanged.
    carries the command that reproduces the number.
 4. **Duplicate `@noble/ciphers`.** Core pins `@noble/ciphers 2.2.0`, while
    `@noble/post-quantum 0.7.1` depends on `2.4.0`, so both are installed.
-   Core's AES-GCM comes from 2.2.0 (`encrypt.ts`, `stream.ts`).
+   Core's AES-GCM comes from 2.2.0 (`encrypt.ts`, `stream.ts`). This holds
+   for the audited 0.11.2 and for 0.11.3 (its SBOM lists both copies). On
+   `main`, #132 moved core to 2.4.0, so `pnpm-lock.yaml` has a single copy.
 5. **Branch protection — corrected after this document was written** (SC-M1
    in [`SCORECARD-REVIEW-2026-11.md`](SCORECARD-REVIEW-2026-11.md)). This
    item first said that `main` had no branch protection or rulesets (checked
