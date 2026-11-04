@@ -29,6 +29,12 @@
 
 - Publish is `pnpm release`: build `packages/*` →
   `pnpm publish -r --no-git-checks` → `changeset tag`.
+- `changesets/action` stays on v1 (`a45c4d5`, v1.9.0) while the repo uses
+  `@changesets/cli` 2. Action v2 refuses CLI v2 ("Changesets CLI v2 is not
+  supported") and renames `version`/`publish`/`title`/`commit` and the
+  `publishedPackages` output that the SBOM step reads; it failed every
+  Release run after #130. Dependabot ignores its majors. Upgrade the CLI
+  and the action together, and update `release.yml` in the same PR.
 - Authentication is npm **trusted publishing (OIDC)**: each of the 4
   packages trusts `jeloercc/pqc-sdk`, workflow `release.yml`, no
   environment. The job needs `id-token: write` and npm >= 11.5.1 on PATH
