@@ -170,11 +170,20 @@ where CI runs again. `@noble/*` updates get a pull request of their own,
 never grouped with other dependencies; CI runs the NIST vector suites on
 it, and the pin changes only when a maintainer merges the update.
 Dependabot security updates for `@noble/*` are not suppressed: they arrive as
-separate pull requests and go through the same CI. The one exception
-Dependabot is told to skip is a new major of `vitest` or `@vitest/*`: vitest
-5 needs Node >= 22.12 and the packages support Node >= 20. Dependabot applies
-`ignore` to security updates too, so a fix released only in a new vitest
-major would have to be picked up by hand.
+separate pull requests and go through the same CI. Dependabot is told to
+skip new majors of a few development tools, each of which has to be migrated
+by hand:
+
+- `vitest` and `@vitest/*`: vitest 5 needs Node >= 22.12 and the packages
+  support Node >= 20.
+- `@changesets/cli` and `changesets/action`: each new major needs the other,
+  so they move together with `release.yml`.
+- `@babel/*`: the Hermes example's build needs every Babel package on the
+  same major.
+
+Dependabot applies `ignore` to security updates too, so a fix released only
+in one of those new majors would have to be picked up by hand. None of them
+is a runtime dependency of a published package.
 Published tarballs include source maps (`*.js.map` / `*.cjs.map`) — expected for
 this MIT project, noted here so it is a conscious choice.
 
