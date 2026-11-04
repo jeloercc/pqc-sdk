@@ -1,5 +1,12 @@
 # @pqc-sdk/core
 
+## 0.11.4
+
+### Patch Changes
+
+- 6e94dbd: Update `@noble/ciphers` (AES-256-GCM) from 2.2.0 to 2.4.0, the version `@noble/post-quantum` 0.7.1 already depends on, so a single copy is installed. The NIST ACVP, X-Wing, CIRCL interop and golden-vector suites pass unchanged; the wire format is unchanged.
+- 6e94dbd: Built with tsup 9. The runtime JavaScript is byte-identical to the tsup 8 build. The type declarations now list type-only exports in a separate `export type { … }` clause; the exported names are unchanged.
+
 ## 0.11.3
 
 ### Patch Changes

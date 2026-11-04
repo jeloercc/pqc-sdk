@@ -1,5 +1,14 @@
 # @pqc-sdk/mcp-server
 
+## 0.4.4
+
+### Patch Changes
+
+- 6e94dbd: Update `@noble/hashes` from `^1.8.0` to `^2.4.0`, the version `@pqc-sdk/core` already uses, so a single copy is installed. The server only uses `bytesToHex`, `hexToBytes` and `randomBytes` from `@noble/hashes/utils.js`; the test suite passes unchanged.
+- Updated dependencies [6e94dbd]
+- Updated dependencies [6e94dbd]
+  - @pqc-sdk/core@0.11.4
+
 ## 0.4.3
 
 ### Patch Changes

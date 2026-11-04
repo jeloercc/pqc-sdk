@@ -1,5 +1,14 @@
 # @pqc-sdk/langchain
 
+## 0.3.4
+
+### Patch Changes
+
+- 6e94dbd: Built with tsup 9. The runtime JavaScript is byte-identical to the tsup 8 build. The type declarations now list type-only exports in a separate `export type { … }` clause; the exported names are unchanged.
+- Updated dependencies [6e94dbd]
+- Updated dependencies [6e94dbd]
+  - @pqc-sdk/core@0.11.4
+
 ## 0.3.3
 
 ### Patch Changes
