@@ -11,7 +11,7 @@
     "@pqc-sdk/core": "workspace:*"
   },
   "devDependencies": {
-    "@babel/cli": "^7.29.7",
+    "@babel/cli": "^8.0.6",
     "@babel/core": "^7.29.7",
     "@babel/plugin-transform-classes": "^7.29.7",
     "esbuild": "^0.28.2"
