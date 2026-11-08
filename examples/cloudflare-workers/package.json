@@ -11,6 +11,6 @@
     "@pqc-sdk/core": "workspace:*"
   },
   "devDependencies": {
-    "wrangler": "^4.156.0"
+    "wrangler": "^4.157.0"
   }
 }
