@@ -41,32 +41,42 @@ describe('extended ML-KEM envelope dispatch', () => {
     ['ml-kem-1024', false],
     ['ml-kem-512', true],
     ['ml-kem-1024', true],
-  ] as const)('decrypts %s with streaming=%s through the real binary', async (algorithm, streaming) => {
-    const dir = await freshDir();
-    try {
-      const pair = await pqc.keys.generate({ algorithm });
-      const payload = new TextEncoder().encode('synthetic dispatch regression');
-      await writeFile(join(dir, 'key.secret.pqc'), pqc.keys.serialize(pair.secretKey), { mode: 0o600 });
-      let envelope: Uint8Array;
-      if (streaming) {
-        // eslint-disable-next-line @typescript-eslint/require-await
-        async function* source() { yield payload; }
-        const chunks: Uint8Array[] = [];
-        for await (const chunk of pqc.encryptStream(pair.publicKey, source(), { chunkSize: 8 })) {
-          chunks.push(chunk);
+  ] as const)(
+    'decrypts %s with streaming=%s through the real binary',
+    async (algorithm, streaming) => {
+      const dir = await freshDir();
+      try {
+        const pair = await pqc.keys.generate({ algorithm });
+        const payload = new TextEncoder().encode('synthetic dispatch regression');
+        await writeFile(join(dir, 'key.secret.pqc'), pqc.keys.serialize(pair.secretKey), {
+          mode: 0o600,
+        });
+        let envelope: Uint8Array;
+        if (streaming) {
+          // eslint-disable-next-line @typescript-eslint/require-await
+          async function* source() {
+            yield payload;
+          }
+          const chunks: Uint8Array[] = [];
+          for await (const chunk of pqc.encryptStream(pair.publicKey, source(), { chunkSize: 8 })) {
+            chunks.push(chunk);
+          }
+          envelope = Buffer.concat(chunks);
+        } else {
+          envelope = await pqc.encrypt(payload, pair.publicKey);
         }
-        envelope = Buffer.concat(chunks);
-      } else {
-        envelope = await pqc.encrypt(payload, pair.publicKey);
+        await writeFile(join(dir, 'input.enc'), envelope);
+        const result = await runCli(
+          ['decrypt', 'input.enc', '--key', 'key.secret.pqc', '--out', 'output'],
+          dir,
+        );
+        expect(result.code).toBe(0);
+        expect(await readFile(join(dir, 'output'))).toEqual(Buffer.from(payload));
+      } finally {
+        await rm(dir, { recursive: true, force: true });
       }
-      await writeFile(join(dir, 'input.enc'), envelope);
-      const result = await runCli(['decrypt', 'input.enc', '--key', 'key.secret.pqc', '--out', 'output'], dir);
-      expect(result.code).toBe(0);
-      expect(await readFile(join(dir, 'output'))).toEqual(Buffer.from(payload));
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
+    },
+  );
 });
 
 describe('pqc binary', () => {
