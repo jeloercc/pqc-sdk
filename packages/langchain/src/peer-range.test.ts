@@ -45,7 +45,9 @@ describe('zod peer range', () => {
     const range = manifest.peerDependencies['zod'] ?? '';
     const lowest = /^\^4\.(\d+)\.(\d+)$/.exec(range);
     expect(lowest, 'the compatibility API must not admit unreviewed future majors').not.toBeNull();
-    expect(isAtLeast(range.slice(1), '4.6.6'), 'the security minimum must remain enforced').toBe(true);
+    expect(isAtLeast(range.slice(1), '4.6.6'), 'the security minimum must remain enforced').toBe(
+      true,
+    );
   });
 
   it('admits only zod releases that export every zod entry point dist/ imports', async () => {
