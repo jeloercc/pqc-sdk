@@ -70,6 +70,28 @@ describe('pqc.keys.generate', () => {
 });
 
 describe('pqc.keys serialization', () => {
+  it('does not echo malformed serialized key material in errors', () => {
+    const marker = 'SYNTHETIC_PRIVATE_MARKER';
+    for (const token of [
+      `pqcv1.${marker}.secret.AAAA`,
+      `pqcv1.ml-kem-768.${marker}.AAAA`,
+      'pqcv1.ml-kem-768.secret.🔥AAA',
+    ]) {
+      const error = catchPqcError(() => pqc.keys.deserialize(token));
+      expect(error.message).not.toContain(marker);
+      expect(error.message).not.toContain('🔥');
+    }
+  });
+
+  it('rejects inherited object properties as algorithm names', () => {
+    for (const name of ['constructor', '__proto__', 'toString']) {
+      expectPqcCode(
+        () => pqc.keys.deserialize(`pqcv1.${name}.secret.AAAA`),
+        'UNSUPPORTED_ALGORITHM',
+      );
+    }
+  });
+
   it('serializes to base64url with algorithm and use metadata', async () => {
     const pair = await pqc.keys.generate({ algorithm: 'ml-kem-768' });
     const serialized = pqc.keys.serialize(pair.publicKey);
@@ -165,7 +187,7 @@ describe('pqc.keys low-level guards', () => {
 });
 
 describe('deserialize error hygiene', () => {
-  it('bounds the echoed algorithm segment of an untrusted token to 32 chars', () => {
+  it('does not echo an untrusted algorithm segment', () => {
     const junk = 'a'.repeat(100);
     const token = `pqcv1.${junk}.public.AAAA`;
 
@@ -178,11 +200,10 @@ describe('deserialize error hygiene', () => {
     expect(caught).toBeInstanceOf(PqcError);
     const message = (caught as PqcError).message;
     expect((caught as PqcError).code).toBe('UNSUPPORTED_ALGORITHM');
-    expect(message).toContain(`${'a'.repeat(32)}…`);
-    expect(message).not.toContain('a'.repeat(33));
+    expect(message).not.toContain('a'.repeat(32));
   });
 
-  it('bounds the echoed use segment of an untrusted token to 32 chars', () => {
+  it('does not echo an untrusted use segment', () => {
     const junk = 'b'.repeat(100);
     const token = `pqcv1.ml-kem-768.${junk}.AAAA`;
 
@@ -195,11 +216,10 @@ describe('deserialize error hygiene', () => {
     expect(caught).toBeInstanceOf(PqcError);
     const message = (caught as PqcError).message;
     expect((caught as PqcError).code).toBe('INVALID_SERIALIZED_KEY');
-    expect(message).toContain(`${'b'.repeat(32)}…`);
-    expect(message).not.toContain('b'.repeat(33));
+    expect(message).not.toContain('b'.repeat(32));
   });
 
-  it('leaves short legitimate values untouched in error messages', () => {
+  it('does not echo short untrusted values either', () => {
     let caught: unknown;
     try {
       pqc.keys.deserialize('pqcv1.rsa-2048.public.AAAA');
@@ -207,7 +227,6 @@ describe('deserialize error hygiene', () => {
       caught = error;
     }
     expect(caught).toBeInstanceOf(PqcError);
-    expect((caught as PqcError).message).toContain('rsa-2048');
-    expect((caught as PqcError).message).not.toContain('…');
+    expect((caught as PqcError).message).not.toContain('rsa-2048');
   });
 });
