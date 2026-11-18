@@ -214,9 +214,8 @@ evidence. Wired into `nist-vectors.test.ts` as one `describe` block per set (par
 **Result: CONFORMING, not merely PARTIALLY CONFORMING-closed-by-fiat.** FIPS 204 defines three
 parameter sets and does not require an implementation to provide all three — a module
 implementing only ML-DSA-65 was, and remains, a conforming ML-DSA-65 implementation. What
-changes the status here is that the row is scored against the _declared project scope_
-(`CLAUDE.md`'s "Algorithms (implemented)" line, updated in this pass from ML-DSA-65 alone to
-"ML-DSA-44/65/87"), and that scope is now fully met with objective evidence per set, not
+changes the status here is that the row is scored against the algorithms exposed by the
+SDK, and that scope is now fully met with objective evidence per set, not
 merely provider availability
 (§3.1's own opening rule from Stage 2 still holds: availability in the provider is not evidence
 of conformance).
@@ -306,12 +305,11 @@ indication, and both calls fail closed — no key, no signature is produced. The
 met.
 
 > **Observation, recorded separately because it is not a FIPS 204 breach.** A raw upstream
-> `Error` escaping `pqc.keys.generate` and `pqc.sign` does violate this project's own rule in
-> `.claude/rules/crypto-review.md` — "never a raw upstream `@noble` error leaking through" —
+> `Error` escaping `pqc.keys.generate` and `pqc.sign` is an error-handling gap,
 > and it is inconsistent with the ML-KEM path, where the same condition yields
 > `PqcError('RBG_FAILURE')`. That is an SDK-scope quality and consistency gap, closable in
 > `keys.ts` and `sign.ts` without touching the provider. It is deliberately **not** counted as
-> a nonconformity in the table above, because inflating a repo-rule deviation into a standards
+> a nonconformity in the table above, because inflating a code-quality issue into a standards
 > breach is the failure mode this programme has repeatedly had to correct.
 
 Neither row is guarded by a test in this repository; hence `(delegated)`.

@@ -7,8 +7,7 @@ import { decryptWebStream, encryptWebStream } from './stream-web.js';
 import type { KemAlgorithm } from './types.js';
 
 /**
- * Day 3 of the streaming-encryption sprint
- * (docs/proposals/streaming-encryption.md): the Web Streams adapters are
+ * Streaming envelope (docs/serialization-format.md §9): the Web Streams adapters are
  * thin plumbing around encryptStream/decryptStream (no independent crypto
  * logic — that's already covered by stream.test.ts and
  * stream-mutations.test.ts), so this file only needs to prove the bridging

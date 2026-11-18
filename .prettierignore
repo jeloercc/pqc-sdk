@@ -5,6 +5,8 @@ node_modules
 pnpm-lock.yaml
 .vitepress/cache
 .vitepress/dist
+apps/docs/.vitepress/cache
+apps/docs/.vitepress/dist
 apps/docs/api
 apps/docs/compatibility.md
 *.timestamp-*.mjs
