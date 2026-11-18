@@ -38,6 +38,16 @@ function isAtLeast(version: string, minimum: string): boolean {
 }
 
 describe('zod peer range', () => {
+  it('restricts consumers to the reviewed Zod 4 compatibility line and security minimum', async () => {
+    const manifest = JSON.parse(await readFile(new URL('package.json', PACKAGE_ROOT), 'utf8')) as {
+      peerDependencies: Record<string, string>;
+    };
+    const range = manifest.peerDependencies['zod'] ?? '';
+    const lowest = /^\^4\.(\d+)\.(\d+)$/.exec(range);
+    expect(lowest, 'the compatibility API must not admit unreviewed future majors').not.toBeNull();
+    expect(isAtLeast(range.slice(1), '4.6.6'), 'the security minimum must remain enforced').toBe(true);
+  });
+
   it('admits only zod releases that export every zod entry point dist/ imports', async () => {
     const manifest = JSON.parse(await readFile(new URL('package.json', PACKAGE_ROOT), 'utf8')) as {
       peerDependencies: Record<string, string>;
