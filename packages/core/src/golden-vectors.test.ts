@@ -14,7 +14,8 @@ import golden from './vectors/golden-serialization-v1.json';
  * every artifact produced by an already-published version: that is a breaking
  * change requiring a major version bump, a docs/serialization-format.md
  * update and regenerated vectors in the same PR — never "fix" these tests to
- * match new output without that acknowledgment (.claude/rules/crypto-review.md).
+ * match new output without that acknowledgment (see the format-versioning
+ * policy in docs/serialization-format.md).
  */
 
 const utf8 = new TextEncoder();

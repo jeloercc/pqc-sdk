@@ -1,8 +1,7 @@
 /**
  * Key encapsulation algorithm (hybrid encryption). `x-wing` is the PQ/T
  * hybrid KEM (X25519 + ML-KEM-768, draft-connolly-cfrg-xwing-kem); its
- * envelope format (`pqcenc.v2`) lands separately — see
- * `docs/proposals/hybrid-envelope.md`.
+ * envelope format (`pqcenc.v2`) is described in `docs/serialization-format.md`.
  *
  * All three FIPS 203 ML-KEM parameter sets are supported:
  * - `ml-kem-512`  — security category 1 (≈ AES-128)

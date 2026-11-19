@@ -2,7 +2,7 @@ import { pqc } from '@pqc-sdk/core';
 
 const message = 'roundtrip on Cloudflare Workers';
 
-// Streaming (pqcenc.v2 chunked envelope, docs/proposals/streaming-encryption.md):
+// Streaming envelope (§9 of docs/serialization-format.md):
 // no filesystem in workerd, so this builds a large in-memory synthetic
 // payload and pipes it through TransformStreams end to end — proving
 // pqc.encryptWebStream/decryptWebStream work on workerd's native Streams

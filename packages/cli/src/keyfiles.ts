@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -16,9 +16,10 @@ import {
 
 import { UsageError } from './errors.js';
 import { warn } from './ui.js';
+import { writeOutput } from './output.js';
 
 /** Patterns that keep generated secret keys out of version control. */
-export const KEY_IGNORE_PATTERNS = ['keys/', '*.secret.pqc'] as const;
+export const KEY_IGNORE_PATTERNS = ['keys/', '*.secret.pqc', '*.pqc-output-*.tmp'] as const;
 
 /**
  * Ensures the project `.gitignore` ignores generated key material so a secret
@@ -191,16 +192,42 @@ export async function writeKeyPair(
   if (!force) {
     for (const path of [publicPath, secretPath]) {
       if (existsSync(path)) {
-        throw new UsageError(`${path} already exists. Use --force to overwrite it.`);
+        throw new UsageError(`${path} already exists. Choose a new --name or --out directory.`);
+      }
+    }
+  }
+
+  // Check both destinations before replacing either half of an existing pair.
+  if (force) {
+    for (const path of [publicPath, secretPath]) {
+      try {
+        await lstat(path);
+        throw new UsageError(
+          `Cannot replace an existing key pair safely. Choose a new --name or --out directory.`,
+        );
+      } catch (cause) {
+        if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause;
       }
     }
   }
 
   const pair = await pqc.keys.generate({ algorithm });
   await mkdir(directory, { recursive: true });
-  await writeFile(publicPath, `${pqc.keys.serialize(pair.publicKey)}\n`);
-  await writeFile(secretPath, `${pqc.keys.serialize(pair.secretKey)}\n`, { mode: 0o600 });
-  await chmod(secretPath, 0o600);
+  await writeOutput(
+    secretPath,
+    new TextEncoder().encode(`${pqc.keys.serialize(pair.secretKey)}\n`),
+    { force: false, mode: 0o600 },
+  );
+  try {
+    await writeOutput(
+      publicPath,
+      new TextEncoder().encode(`${pqc.keys.serialize(pair.publicKey)}\n`),
+      { force: false },
+    );
+  } catch (cause) {
+    await unlink(secretPath).catch(() => undefined);
+    throw cause;
+  }
 
   return { algorithm, publicPath, secretPath };
 }

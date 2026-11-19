@@ -9,14 +9,20 @@ import { friendlyRun, UsageError } from '../errors.js';
 import {
   assertReadableInput,
   MAX_SIZE_DESCRIPTION,
-  peekEnvelopeVersion,
+  peekEnvelopeHeader,
   sizeGuardOptions,
 } from '../input.js';
 import { readKemKeyFile } from '../keyfiles.js';
 import { pipeToOutput, writeOutput } from '../output.js';
 import { item, ok, warn } from '../ui.js';
 
-const STREAMING_VERSIONS = new Set([0x03, 0x04]);
+// Algorithm ID -> streaming version (serialization-format.md §9.1).
+const STREAMING_VERSIONS = new Map([
+  [1, 3],
+  [2, 4],
+  [3, 5],
+  [4, 6],
+]);
 
 export const decrypt = defineCommand({
   meta: {
@@ -59,15 +65,15 @@ export const decrypt = defineCommand({
 
     const secretKey = await readKemKeyFile(args.key, 'secret');
 
-    // Dispatch on the envelope's own leading version byte
+    // Dispatch on the envelope's version and algorithm ID
     // (docs/serialization-format.md §2, §9) — not file size. A streaming
     // envelope can be small (e.g. produced directly by the SDK), and a
     // one-shot envelope's size already tracks whatever the CLI's own
     // encrypt threshold decided, so peeking the actual format is the only
     // way to be correct rather than guessing.
-    const version = await peekEnvelopeVersion(args.input);
+    const [version, algorithmId] = await peekEnvelopeHeader(args.input);
 
-    if (!STREAMING_VERSIONS.has(version)) {
+    if (STREAMING_VERSIONS.get(algorithmId) !== version) {
       // A Buffer already is a Uint8Array: no defensive copy needed.
       const envelope = await readFile(args.input);
       const plaintext = await pqc.decrypt(envelope, secretKey);
@@ -82,11 +88,9 @@ export const decrypt = defineCommand({
     }
 
     // Streaming envelope: pipe through decryptWebStream rather than
-    // buffering the whole ciphertext (docs/proposals/streaming-encryption.md
-    // §3). Same incremental-release caveat as decryptStream applies to the
-    // output file: it is provisional until pipeTo's promise resolves —
-    // pipeToOutput surfaces any mid-stream failure as a rejection, and the
-    // partially-written file must not be treated as a valid result.
+    // buffering the whole ciphertext. pipeToOutput keeps recovered bytes in
+    // a private temporary file and publishes only after the complete stream
+    // succeeds; a mid-stream rejection leaves no partial final output.
     const readable = Readable.toWeb(createReadStream(args.input)) as ReadableStream<Uint8Array>;
     await pipeToOutput(readable.pipeThrough(pqc.decryptWebStream(secretKey)), outPath, {
       force: args.force,

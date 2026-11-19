@@ -35,13 +35,6 @@ updates:
     commit-message:
       prefix: chore
       include: scope
-    exclude-paths:
-      # Pinned on purpose to Expo SDK 54 / RN 0.81, the combination validated
-      # on a physical device (docs/compatibility.md, "React Native app"): the
-      # test device's Expo Go only supports SDK 54. #132/#133 moved it to
-      # Expo 58 / RN 0.88 and were reverted. Version updates only; security
-      # updates still apply.
-      - 'examples/react-native-expo/**'
     ignore:
       # vitest 5 needs Node >= 22.12; engines (>=20) and CI stay on Node 20
       # (SCORECARD-REVIEW-2026-11, decision D1). `ignore` also applies to
@@ -53,7 +46,7 @@ updates:
         update-types: ['version-update:semver-major']
       # @changesets/cli 3 needs changesets/action v2, and action v1 (what
       # release.yml uses) needs CLI 2 (see the github-actions entry above and
-      # .claude/rules/release-workflow.md). Migrate both together, by hand.
+      # .github/workflows/release.yml). Migrate both together, by hand.
       - dependency-name: '@changesets/cli'
         update-types: ['version-update:semver-major']
       # examples/hermes-standalone builds with @babel/cli, @babel/core and

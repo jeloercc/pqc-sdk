@@ -15,7 +15,7 @@
  *
  * ONLY regenerate after a deliberate, acknowledged format change (a breaking
  * change requiring a major version bump) — see docs/serialization-format.md
- * and .claude/rules/crypto-review.md. Build first: the script imports the
+ * ("Golden vectors"). Build first: the script imports the
  * package entry point (`pnpm --filter @pqc-sdk/core build`).
  *
  * Usage: node scripts/generate-golden-vectors-v2.mjs [--out <file>]

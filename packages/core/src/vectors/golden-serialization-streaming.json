@@ -7,7 +7,7 @@
       "x-wing": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
     },
     "chunkSize": 8,
-    "note": "Golden serialization vectors for the streaming envelope (docs/serialization-format.md §9) — both KEMs, Days 1-2 of docs/proposals/streaming-encryption.md. Regenerating these is a breaking format change requiring a major bump."
+    "note": "Golden serialization vectors for the streaming envelope (docs/serialization-format.md §9) — both KEMs. Regenerating these is a breaking format change requiring a major bump."
   },
   "keys": {
     "ml-kem-768": {

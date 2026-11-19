@@ -7,8 +7,8 @@ import { collectDecryptStream, decryptStream, encryptStream } from './stream.js'
 import { asChunks, collect, single } from './stream-test-helpers.js';
 
 /**
- * Core primitive functionality, both KEMs (docs/proposals/streaming-encryption.md
- * Day 1 + Day 2). The full mutation-check suite (truncation, reorder,
+ * Core primitive functionality, both KEMs (docs/serialization-format.md §9).
+ * The full mutation-check suite (truncation, reorder,
  * duplicate, cross-stream swap, final-flag games, trailing garbage) lives in
  * stream-mutations.test.ts — this file covers the primitive works at all,
  * plus the nonce arithmetic cross-check against age's published STREAM
@@ -144,7 +144,7 @@ describe.each(ALGORITHMS)('encryptStream: chunkSize validation (%s)', (algorithm
  * big-endian integer — algebraically identical to "BE88(counter) ‖ flag".
  * These expected byte arrays were hand-derived from that published
  * algorithm, independent of this package's own implementation, per
- * docs/proposals/streaming-encryption.md Day 1. ml-kem-768 only: the nonce
+ * docs/serialization-format.md §9.3. ml-kem-768 only: the nonce
  * construction is algorithm-independent (it only depends on the KEM's
  * shared secret being used as the AES key, not on which KEM produced it),
  * so this is not repeated per-KEM.

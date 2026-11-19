@@ -170,7 +170,7 @@ try {
 ## Choosing a chunk size
 
 The default (`2^16`, 64 KiB) matches age's STREAM default and is the right
-choice for almost everyone — it's what `.claude/rules`-style "safe defaults
+choice for almost everyone — it uses the SDK's safe defaults
 always" means here. `chunkSize` is available as an advanced option
 (`{ chunkSize: 1024 * 1024 }` for 1 MiB chunks, say) if you have a specific
 reason to change it; it must be a power of two.

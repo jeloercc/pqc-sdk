@@ -1,6 +1,6 @@
 import { getAlgorithm, keyLengthFor, requireKeyShape } from './algorithms.js';
 import { fromBase64Url, toBase64Url } from './base64url.js';
-import { PqcError, truncateForError } from './errors.js';
+import { PqcError } from './errors.js';
 import type { Algorithm, KeyPair, KeyUse, PqcKey } from './types.js';
 import { sampleRandomness, RbgFailureError } from './vendor/ml-kem/ml-kem.js';
 
@@ -183,19 +183,23 @@ export function deserialize(serialized: string, expected?: ExpectedKey): PqcKey 
     );
   }
   const [, algorithm, use, encoded] = parts as [string, string, string, string];
-  const spec = getAlgorithm(algorithm);
+  let spec: ReturnType<typeof getAlgorithm>;
+  try {
+    spec = getAlgorithm(algorithm);
+  } catch (cause) {
+    if (cause instanceof PqcError && cause.code === 'UNSUPPORTED_ALGORITHM') {
+      throw new PqcError('UNSUPPORTED_ALGORITHM', 'Unsupported algorithm in serialized key');
+    }
+    throw cause;
+  }
   if (use !== 'public' && use !== 'secret') {
-    // The segment comes from an untrusted serialized token: bound the echo.
-    throw new PqcError('INVALID_SERIALIZED_KEY', `Unknown key use: ${truncateForError(use)}`);
+    throw new PqcError('INVALID_SERIALIZED_KEY', 'Unknown use in serialized key');
   }
   let bytes: Uint8Array;
   try {
     bytes = fromBase64Url(encoded);
-  } catch (cause) {
-    throw new PqcError(
-      'INVALID_SERIALIZED_KEY',
-      cause instanceof Error ? cause.message : 'Invalid base64url',
-    );
+  } catch {
+    throw new PqcError('INVALID_SERIALIZED_KEY', 'Invalid base64url in serialized key');
   }
   const key: PqcKey = { algorithm: algorithm as Algorithm, use, bytes };
   if (bytes.length !== keyLengthFor(spec, key.use)) {

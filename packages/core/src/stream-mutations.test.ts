@@ -7,12 +7,10 @@ import { decryptStream, encryptStream } from './stream.js';
 import { asChunks, collect, single } from './stream-test-helpers.js';
 
 /**
- * Day 2 of the streaming-encryption sprint
- * (docs/proposals/streaming-encryption.md §4): the full mutation-check
+ * Streaming envelope (docs/serialization-format.md §9): the full mutation-check
  * suite, run against both KEMs. Every case here tampers one region of a
  * genuine ciphertext and asserts fail-closed behavior with the documented
- * `PqcError` code — the crypto-review mutation-check rule
- * (.claude/rules/crypto-review.md), applied to chunk boundaries.
+ * `PqcError` code, applying the format's fail-closed rules to chunk boundaries.
  *
  * Central to this suite: the incremental-release property
  * (serialization-format.md §9.3) means a truncated/tampered stream can

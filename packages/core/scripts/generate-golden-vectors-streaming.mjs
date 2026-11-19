@@ -3,13 +3,10 @@
  * Generates the streaming-envelope golden serialization vectors
  * (src/vectors/golden-serialization-streaming.json).
  *
- * Same procedure as generate-golden-vectors-v2.mjs, with one difference:
- * encryptStream/decryptStream are not yet part of the public @pqc-sdk/core
- * surface (docs/proposals/streaming-encryption.md Day 3 exports them), so
- * this script imports the compiled dist/stream.js directly by relative path
- * rather than the package name — see tsup.config.ts's second entry, added
- * only so this script has compiled JS to run (plain `node`, not vitest,
- * can't execute TS source directly).
+ * Same procedure as generate-golden-vectors-v2.mjs. This script imports
+ * the compiled dist/stream.js directly by relative path; tsup.config.ts
+ * builds that entry so plain Node can execute the generator without a
+ * TypeScript loader. The streaming APIs are also publicly exported.
  *
  * Uses a deliberately small chunkSize (8 bytes) so a multi-chunk fixture
  * stays compact and readable in the committed JSON. The production default
@@ -17,13 +14,13 @@
  *
  * Covers both KEMs (ml-kem-768 and x-wing) in one file — unlike the v1/v2
  * split (separate files because v2 was a later, separate addition), both
- * streaming version bytes were introduced by the same sprint, Days 1-2, so
+ * streaming version bytes were introduced together, so
  * they share one fixture the same way golden-serialization-v1.json bundles
  * ml-kem-768 and ml-dsa-65.
  *
  * ONLY regenerate after a deliberate, acknowledged format change (a breaking
  * change requiring a major version bump) — see docs/serialization-format.md
- * §9 and .claude/rules/crypto-review.md. Build first: the script imports the
+ * §9. Build first: the script imports the
  * package's compiled output (`pnpm --filter @pqc-sdk/core build`).
  *
  * Usage: node scripts/generate-golden-vectors-streaming.mjs [--out <file>]
@@ -143,7 +140,7 @@ const vectors = {
     chunkSize: CHUNK_SIZE,
     note:
       'Golden serialization vectors for the streaming envelope (docs/serialization-format.md §9) — ' +
-      'both KEMs, Days 1-2 of docs/proposals/streaming-encryption.md. Regenerating these is a ' +
+      'both KEMs. Regenerating these is a ' +
       'breaking format change requiring a major bump.',
   },
   keys: {

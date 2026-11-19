@@ -22,6 +22,7 @@ import {
   pqcAlgorithmsTool,
   pqcEncryptTool,
   pqcVerifyTool,
+  MAX_TOOL_STRING_LENGTH,
 } from './index.js';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -90,6 +91,53 @@ async function keygen(
 // ─── tool set composition ────────────────────────────────────────────────────
 
 describe('createPqcTools', () => {
+  it('denies key use before resolving a key and hides policy errors', async () => {
+    const options: CreatePqcToolsOptions = {
+      ...baseOptions(),
+      authorizeKeyUse: () => {
+        throw new Error('private policy detail');
+      },
+      enableSign: true,
+    };
+    const tools = createPqcTools(options);
+    const decryptError = await invokeError(byName(tools, 'pqc_decrypt'), {
+      keyId: 'valid',
+      ciphertextHex: '00',
+    });
+    const signError = await invokeError(byName(tools, 'pqc_sign'), {
+      keyId: 'valid',
+      message: 'hello',
+    });
+    expect(decryptError).toContain('ACCESS_DENIED');
+    expect(signError).toContain('ACCESS_DENIED');
+    expect(decryptError + signError).not.toContain('private policy detail');
+    expect(resolved).toEqual([]);
+  });
+  it('passes the requested operation and input to the host policy before resolving', async () => {
+    const seen: unknown[] = [];
+    const options: CreatePqcToolsOptions = {
+      ...baseOptions(),
+      authorizeKeyUse: (request) => {
+        seen.push(request);
+        return true;
+      },
+    };
+    await invokeError(byName(createPqcTools(options), 'pqc_decrypt'), {
+      keyId: 'valid',
+      ciphertextHex: '00',
+    });
+    expect(seen).toEqual([{ operation: 'decrypt', keyId: 'valid', input: '00' }]);
+    expect(resolved).toEqual(['valid']);
+  });
+  it('rejects oversized ciphertext before resolving a key', async () => {
+    const tool = byName(createPqcTools(baseOptions()), 'pqc_decrypt');
+    const error = await invokeError(tool, {
+      keyId: 'valid',
+      ciphertextHex: 'a'.repeat(MAX_TOOL_STRING_LENGTH + 1),
+    });
+    expect(error).toContain('INVALID_ARGUMENT');
+    expect(resolved).toEqual([]);
+  });
   it('omits pqc_sign by default and includes it with enableSign', () => {
     const names = (options: CreatePqcToolsOptions) => createPqcTools(options).map((t) => t.name);
     expect(names(baseOptions())).toEqual([
@@ -235,6 +283,28 @@ describe('pqc_encrypt / pqc_decrypt', () => {
     });
     expect(message).toMatch(/^PqcError\[KEY_NOT_FOUND\]/);
     expect(message).not.toContain('vault miss');
+  });
+
+  it('does not expose callback errors through a prefixed message or error cause', async () => {
+    const marker = 'SYNTHETIC_STORAGE_DETAIL';
+    const tools = createPqcTools({
+      resolveSecretKey: () => Promise.reject(new Error(`PqcError[INTERNAL]: ${marker}`)),
+      onSecretKey: () => Promise.reject(new Error(marker)),
+    });
+    for (const [name, input] of [
+      ['pqc_decrypt', { keyId: 'test', ciphertextHex: '00' }],
+      ['pqc_keygen', { algorithm: 'x-wing' }],
+    ] as const) {
+      const error: unknown = await byName(tools, name)
+        .invoke(input)
+        .then(
+          () => undefined,
+          (cause: unknown) => cause,
+        );
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toContain(marker);
+      expect((error as Error).cause).toBeUndefined();
+    }
   });
 
   it('rejects a resolver that returns something other than a secret key', async () => {

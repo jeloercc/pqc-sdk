@@ -48,9 +48,9 @@ export const init = defineCommand({
       throw new UsageError(`${CONFIG_FILE} already exists: the project is already initialized.`);
     }
 
+    const ignored = await ensureKeysIgnored(process.cwd());
     await writeFile(CONFIG_FILE, `${JSON.stringify(CONFIG, null, 2)}\n`);
     const keys = await writeKeyPair(CONFIG.keysDir, 'dev', CONFIG.defaultAlgorithm, false);
-    const ignored = await ensureKeysIgnored(process.cwd());
     const exampleWritten = !existsSync('example.ts');
     if (exampleWritten) {
       await writeFile('example.ts', EXAMPLE);
