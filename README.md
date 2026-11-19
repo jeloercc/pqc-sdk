@@ -88,11 +88,11 @@ This SDK ships first-class support for AI agents. Both integrations expose the
 same operations: list algorithms, generate keys, encrypt, decrypt, sign,
 verify.
 
-**Secret keys never pass through the model context.** Tool arguments and
-results become part of the conversation, so no tool accepts or returns secret
-key material: the model refers to secret keys by `keyId`, and the keys stay in
-a keystore (MCP) or in your own storage (LangChain). Signing is off unless you
-enable it.
+**Key-management tools do not return stored secret keys.** The model refers
+to those keys by `keyId`; keys stay in a keystore (MCP) or in your own storage
+(LangChain). Decrypted plaintext is returned to the model and may itself
+contain secrets, so only provide keys for data the model is allowed to read.
+Signing is off unless you enable it.
 
 ### Option A — MCP server (Claude, Cursor, Continue, any MCP host)
 
@@ -300,14 +300,13 @@ fail-closed parsing.
 | Roundtrip + tamper    | **Property-based tests** (`fast-check`): decrypt(encrypt(x)) === x, any single-byte tamper fails closed — [`properties.test.ts`](./packages/core/src/properties.test.ts)                             |
 | Streaming envelope    | **Mutation matrix** tampering every region independently — truncation, reorder, duplication, cross-stream splice — [`stream-mutations.test.ts`](./packages/core/src/stream-mutations.test.ts)        |
 | Format specification  | Normative byte layout — [`docs/serialization-format.md`](./docs/serialization-format.md)                                                                                                             |
-| Security review       | Pre-launch findings + source-level review — [`docs/AUDIT-2026-06.md`](./docs/AUDIT-2026-06.md)                                                                                                       |
-| Runtime claims        | Node, Deno, Workers, Hermes, physical Android device — ✅ only after the real roundtrip ran — [`docs/compatibility.md`](./docs/compatibility.md)                                                     |
+| Security policy       | Reporting and known limitations — [`SECURITY.md`](./SECURITY.md)                                                                                                                                     |
+| Runtime claims        | Node, Deno, Workers and standalone Hermes — ✅ only after the real roundtrip ran — [`docs/compatibility.md`](./docs/compatibility.md)                                                                |
 | Interop               | CIRCL (Go) cross-check for ML-DSA and X-Wing shared secrets — [`interop-circl.test.ts`](./packages/core/src/interop-circl.test.ts)                                                                   |
 
-**What these reviews are not.** The audit docs are internal, AI-assisted
-reviews — **not** an independent third-party cryptographic audit. There are
-no constant-time guarantees in JavaScript, and no memory zeroization of
-secrets (no reliable JS primitive exists). Full threat model:
+**Audit status and limitations.** This SDK has not undergone an independent
+third-party cryptographic audit. JavaScript provides no constant-time
+guarantees or reliable memory zeroization for secrets. See
 [SECURITY.md](./SECURITY.md).
 
 ---

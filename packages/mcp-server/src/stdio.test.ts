@@ -60,6 +60,18 @@ async function callJson(client: Client, name: string, args: Record<string, unkno
 }
 
 describe('stdio server', { timeout: SPAWN_TEST_TIMEOUT_MS }, () => {
+  it('closes an oversized raw input without processing it', () => {
+    const result = spawnSync(process.execPath, [SERVER], {
+      env: { PATH: process.env['PATH'] ?? '', PQC_KEYSTORE_DIR: keyDir },
+      input: 'a'.repeat(10 * 1024 * 1024 + 1),
+      encoding: 'utf8',
+      timeout: 15_000,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.stdout).toBe('');
+    expect(result.status).toBe(0);
+  });
+
   it('logs its configuration to stderr and hides pqc_sign by default', async () => {
     const { client, stderr } = await start();
     const { tools } = await client.listTools();
@@ -74,6 +86,36 @@ describe('stdio server', { timeout: SPAWN_TEST_TIMEOUT_MS }, () => {
     const { client } = await start({ PQC_MCP_ENABLE_SIGN: '1' });
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).toContain('pqc_sign');
+  });
+
+  it('enforces an empty decrypt allowlist over stdio', async () => {
+    const { client } = await start({ PQC_MCP_DECRYPT_KEY_IDS: '' });
+    const { keyId } = await callJson(client, 'pqc_keygen');
+    const result = await callJson(client, 'pqc_decrypt', { keyId, ciphertextHex: '00' });
+    expect(result['error']).toBe('ACCESS_DENIED');
+  });
+
+  it('allows only the configured key over stdio after restart', async () => {
+    const first = await start();
+    const allowed = await callJson(first.client, 'pqc_keygen');
+    const denied = await callJson(first.client, 'pqc_keygen');
+    const encrypted = await callJson(first.client, 'pqc_encrypt', {
+      publicToken: allowed['publicToken'],
+      plaintext: 'test data',
+    });
+    await first.client.close();
+
+    const second = await start({ PQC_MCP_DECRYPT_KEY_IDS: String(allowed['keyId']) });
+    const accepted = await callJson(second.client, 'pqc_decrypt', {
+      keyId: allowed['keyId'],
+      ciphertextHex: encrypted['ciphertextHex'],
+    });
+    const rejected = await callJson(second.client, 'pqc_decrypt', {
+      keyId: denied['keyId'],
+      ciphertextHex: encrypted['ciphertextHex'],
+    });
+    expect(accepted['plaintext']).toBe('test data');
+    expect(rejected['error']).toBe('ACCESS_DENIED');
   });
 
   it('decrypts with a key generated before a server restart', async () => {
@@ -102,5 +144,20 @@ describe('stdio server', { timeout: SPAWN_TEST_TIMEOUT_MS }, () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('PQC_MCP_MAX_KEYS must be a positive integer');
     expect(result.stdout).toBe('');
+  });
+
+  it('refuses an invalid key allowlist at startup', () => {
+    const result = spawnSync(process.execPath, [SERVER], {
+      env: {
+        PATH: process.env['PATH'] ?? '',
+        PQC_KEYSTORE_DIR: keyDir,
+        PQC_MCP_DECRYPT_KEY_IDS: '../invalid',
+      },
+      input: '',
+      encoding: 'utf8',
+      timeout: 15_000,
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('PQC_MCP_DECRYPT_KEY_IDS');
   });
 });

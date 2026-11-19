@@ -110,8 +110,6 @@ from the tagged commit.]
 
   **Evidence moved up front.** The README's "How this is verified" section now precedes the quickstart and opens with the strongest signals: NIST ACVP vectors running in CI, five runtimes validated by actual execution (including a physical Android device), parser fuzzing, property tests, golden wire-format vectors and the streaming mutation matrix.
 
-  **Process stated plainly.** `CONTRIBUTING.md` gains a "Development process" section: development is AI-assisted, every commit carries a `Co-Authored-By` trailer, and the working agreements are checked in rather than hidden. It links `.claude/rules/crypto-review.md` as the standing discipline and is explicit that none of it substitutes for an independent third-party audit, which this project has not had.
-
   No code or behaviour changes.
 
 - Updated dependencies [a318274]
@@ -135,7 +133,7 @@ from the tagged commit.]
 
 - fab1693: `pqc audit` now states its limits wherever it speaks. The help text, the runtime banner, and both READMEs describe it as a heuristic, non-exhaustive regex scan — a starting point for a migration review, not a substitute for one. A clean run says so explicitly ("not a clean bill of health: it means the patterns above did not match, not that none exists") rather than leaving "No pre-quantum crypto detected" to be read as a guarantee, and findings are framed as candidates to confirm rather than a finished migration list. The scan itself is unchanged; only its framing is.
 
-  Documentation: a new **How this is verified** section in the root README maps each layer the SDK actually owns — envelope format, key serialization, nonce derivation, fail-closed parsing — to the suite that covers it, linking the NIST ACVP vectors, golden serialization vectors, parser fuzzing, `fast-check` property tests, the streaming mutation matrix, the format spec, the audit and security reviews, and the runtime compatibility record. It also states plainly that those reviews are internal and AI-assisted rather than an independent third-party audit, and surfaces the absence of memory zeroization from `SECURITY.md` into the README where adopters will actually see it.
+  Documentation: a new **How this is verified** section in the root README maps the SDK's envelope format, key serialization, nonce derivation and fail-closed parsing to their tests and specifications. It also discloses the lack of an independent third-party audit and the absence of memory zeroization.
 
 - Updated dependencies [fab1693]
 - Updated dependencies [0242754]
@@ -158,13 +156,13 @@ from the tagged commit.]
 
   Bypassing the guard is explicit and loud: when `--max-size` admits a file the 1 TiB default would have refused, the CLI prints a warning naming the file size, the default, and the raised ceiling, rather than proceeding silently. Passing `--max-size` without actually crossing the default stays quiet.
 
-  Closes the deviation tracked in #54: `docs/proposals/streaming-encryption.md` §2 specified this ceiling as overridable, but 0.6.0 shipped it as a hard constant.
+  Closes the deviation tracked in #54: the streaming CLI size ceiling is now overridable as documented in the CLI help.
 
 ## 0.6.0
 
 ### Minor Changes
 
-- 944a70c: `pqc encrypt`/`pqc decrypt` now stream automatically for large files instead of refusing them: the old hard 1 GiB in-memory cap is gone, replaced by an 8 MiB cutover (at or below: the existing one-shot path; above: streaming, bounded memory regardless of file size) and a generous 1 TiB operational ceiling (a sanity check against accidental inputs, not a cryptographic limit — see `docs/proposals/streaming-encryption.md` §2). `pqc encrypt` picks the path from input size; `pqc decrypt` dispatches on the ciphertext's own envelope version byte, so a small streaming envelope (however it was produced) still decrypts correctly regardless of file size. On a failed streamed decrypt (tampered or truncated ciphertext), the partially-written output file is deleted rather than left on disk as a misleading result — the incremental-release property of `decryptStream` applied concretely.
+- 944a70c: `pqc encrypt`/`pqc decrypt` now stream automatically for large files instead of refusing them: the old hard 1 GiB in-memory cap is gone, replaced by an 8 MiB cutover (at or below: the existing one-shot path; above: streaming, bounded memory regardless of file size) and a 1 TiB operational ceiling (a sanity check against accidental inputs, not a cryptographic limit). `pqc encrypt` picks the path from input size; `pqc decrypt` dispatches on the ciphertext's own envelope version byte, so a small streaming envelope still decrypts correctly regardless of file size. On a failed streamed decrypt (tampered or truncated ciphertext), the partially-written output file is deleted rather than left on disk as a misleading result — the incremental-release property of `decryptStream` applied concretely.
 
 ### Patch Changes
 

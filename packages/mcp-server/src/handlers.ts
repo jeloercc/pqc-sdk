@@ -26,6 +26,9 @@ export interface HandlerContext {
   readonly keyStore: KeyStore;
   /** Whether `pqc_sign` may be called. */
   readonly enableSign: boolean;
+  /** Undefined permits all keys; an empty set denies every key. */
+  readonly decryptKeyIds?: ReadonlySet<string>;
+  readonly signKeyIds?: ReadonlySet<string>;
 }
 
 // ─── Response helpers ─────────────────────────────────────────────────────────
@@ -45,6 +48,9 @@ function fail(code: string, message: string): CallToolResult {
 
 /** A tool argument is missing or malformed. Mapped to `INVALID_ARGUMENT`. */
 class ArgumentError extends Error {}
+
+/** Maximum UTF-16 code units per tool string argument. */
+export const MAX_TOOL_STRING_LENGTH = 2 * 1024 * 1024;
 
 function requireString(args: Record<string, unknown>, field: string): string {
   const value = args[field];
@@ -124,6 +130,14 @@ export async function handleTool(
   context: HandlerContext,
 ): Promise<CallToolResult> {
   try {
+    // Reject before decoding or consulting the keystore; do not echo input.
+    for (const value of Object.values(args)) {
+      if (typeof value === 'string' && value.length > MAX_TOOL_STRING_LENGTH) {
+        throw new ArgumentError(
+          `Tool string arguments must not exceed ${MAX_TOOL_STRING_LENGTH} characters`,
+        );
+      }
+    }
     switch (name) {
       case 'pqc_keygen': {
         const algorithm = optionalString(args, 'algorithm') ?? 'x-wing';
@@ -166,6 +180,9 @@ export async function handleTool(
 
       case 'pqc_decrypt': {
         const keyId = requireKeyId(args);
+        if (context.decryptKeyIds && !context.decryptKeyIds.has(keyId)) {
+          return fail('ACCESS_DENIED', 'Key use was not authorized');
+        }
         const ciphertext = parseHex(requireString(args, 'ciphertextHex'));
         if (ciphertext === undefined) {
           return fail('INVALID_CIPHERTEXT', '"ciphertextHex" is not valid hex');
@@ -183,6 +200,9 @@ export async function handleTool(
           return fail('TOOL_DISABLED', 'pqc_sign is disabled on this server');
         }
         const keyId = requireKeyId(args);
+        if (context.signKeyIds && !context.signKeyIds.has(keyId)) {
+          return fail('ACCESS_DENIED', 'Key use was not authorized');
+        }
         const message = requireString(args, 'message');
         const key = await context.keyStore.loadSecretKey(keyId);
         const sig = await (pqc.sign as (data: string, key: PqcKey) => Promise<Uint8Array>)(
@@ -211,7 +231,7 @@ export async function handleTool(
       }
 
       default:
-        return fail('UNKNOWN_TOOL', `Unknown tool: ${name}`);
+        return fail('UNKNOWN_TOOL', 'Unknown tool');
     }
   } catch (cause) {
     if (cause instanceof PqcError || cause instanceof KeystoreError) {
@@ -220,10 +240,8 @@ export async function handleTool(
     if (cause instanceof ArgumentError) {
       return fail('INVALID_ARGUMENT', cause.message);
     }
-    // Unexpected failures (e.g. filesystem errors) may carry local paths:
-    // log the detail for the operator, return only a generic message.
-    const detail = cause instanceof Error ? cause.message : String(cause);
-    process.stderr.write(`pqc-mcp: ${name} failed: ${detail}\n`);
-    return fail('INTERNAL_ERROR', `${name} failed unexpectedly; see the server log`);
+    // Unexpected errors can contain key material or other sensitive input.
+    process.stderr.write('pqc-mcp: a tool failed unexpectedly\n');
+    return fail('INTERNAL_ERROR', 'Tool failed unexpectedly; see the server log');
   }
 }

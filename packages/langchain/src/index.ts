@@ -14,10 +14,11 @@
  *   pqcAlgorithmsTool — list supported algorithms (stateless)
  *
  * Security contract:
- *   - Secret keys never pass through the model context. No tool accepts or
- *     returns secret key material: tools refer to secret keys by `keyId`, and
+ *   - Key-management tools refer to secret keys by `keyId`, and
  *     the keys themselves move only through callbacks you provide
  *     (`resolveSecretKey`, `onSecretKey`). This package performs no I/O.
+ *     Arbitrary decrypted plaintext can itself contain secrets; it is returned
+ *     to the model and is not inspected or redacted.
  *   - `pqc_sign` is excluded unless you opt in with `enableSign: true`.
  *   - All errors propagate as thrown errors with a structured
  *     `PqcError[CODE]: message` prefix so the agent's error handler can branch.
@@ -71,6 +72,9 @@ function asStructuredTool(built: unknown): StructuredToolInterface {
  */
 export const KEY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
+/** Maximum UTF-16 code units per tool string argument. */
+export const MAX_TOOL_STRING_LENGTH = 2 * 1024 * 1024;
+
 const AlgorithmSchema = z
   .enum([
     'ml-kem-512',
@@ -95,6 +99,17 @@ const KeyIdSchema = z
   .describe('Id of a stored key, as returned by pqc_keygen or provided by the application.');
 
 // ─── Error helpers ────────────────────────────────────────────────────────────
+
+function checkToolStrings(input: Record<string, unknown>): void {
+  for (const value of Object.values(input)) {
+    if (typeof value === 'string' && value.length > MAX_TOOL_STRING_LENGTH) {
+      throw toolError(
+        'INVALID_ARGUMENT',
+        `Tool string arguments must not exceed ${MAX_TOOL_STRING_LENGTH} characters`,
+      );
+    }
+  }
+}
 
 function toolError(code: string, message: string): Error {
   return new Error(`PqcError[${code}]: ${message}`);
@@ -182,6 +197,7 @@ export const pqcEncryptTool: StructuredToolInterface = asStructuredTool(
       plaintextBase64?: string | undefined;
     }) =>
       run(async () => {
+        checkToolStrings(input);
         const { publicToken, plaintext, plaintextBase64 } = input;
         if ((plaintext === undefined) === (plaintextBase64 === undefined)) {
           throw toolError('INVALID_ARGUMENT', 'Pass exactly one of plaintext or plaintextBase64');
@@ -252,6 +268,7 @@ export const pqcVerifyTool: StructuredToolInterface = asStructuredTool(
   tool(
     (input: { message: string; signatureHex: string; publicToken: string }) =>
       run(async () => {
+        checkToolStrings(input);
         const { message, signatureHex, publicToken } = input;
         const key = pqc.keys.deserialize(publicToken);
         let signature: Uint8Array;
@@ -324,6 +341,13 @@ export const pqcAlgorithmsTool: StructuredToolInterface = asStructuredTool(
 
 /** Options for {@link createPqcTools}. */
 export interface CreatePqcToolsOptions {
+  /** Optional host policy invoked before loading a key. Return true to allow. */
+  readonly authorizeKeyUse?: (request: {
+    readonly operation: 'decrypt' | 'sign';
+    readonly keyId: string;
+    /** Ciphertext hex for decrypt, or the message for sign; never a secret key. */
+    readonly input: string;
+  }) => boolean | Promise<boolean>;
   /**
    * Returns the secret key stored under `keyId`. Called on every
    * `pqc_decrypt` / `pqc_sign`, with a `keyId` already checked against
@@ -340,18 +364,31 @@ export interface CreatePqcToolsOptions {
   readonly enableSign?: boolean;
 }
 
+async function authorizeKeyUse(
+  options: CreatePqcToolsOptions,
+  operation: 'decrypt' | 'sign',
+  keyId: string,
+  input: string,
+): Promise<void> {
+  const validKeyId = requireKeyId(keyId);
+  if (!options.authorizeKeyUse) return;
+  let allowed = false;
+  try {
+    allowed = (await options.authorizeKeyUse({ operation, keyId: validKeyId, input })) === true;
+  } catch {
+    // The policy may contain sensitive details; never return them to the model.
+  }
+  if (!allowed) throw toolError('ACCESS_DENIED', 'Key use was not authorized');
+}
+
 async function resolveKey(options: CreatePqcToolsOptions, keyId: string): Promise<SecretKey> {
+  const validKeyId = requireKeyId(keyId);
   let key: unknown;
   try {
-    key = await options.resolveSecretKey(requireKeyId(keyId));
-  } catch (cause) {
-    if (cause instanceof Error && cause.message.startsWith('PqcError[')) throw cause;
-    // The application's error may carry storage details; keep them out of the
-    // model context (they remain available as `cause` to the caller).
-    throw Object.assign(
-      toolError('KEY_NOT_FOUND', `No secret key could be resolved for keyId "${keyId}"`),
-      { cause },
-    );
+    key = await options.resolveSecretKey(validKeyId);
+  } catch {
+    // Callback errors can contain secrets, including in nested causes.
+    throw toolError('KEY_NOT_FOUND', `No secret key could be resolved for keyId "${validKeyId}"`);
   }
   if (typeof key !== 'object' || key === null || (key as Partial<PqcKey>).use !== 'secret') {
     throw toolError(
@@ -374,13 +411,10 @@ function keygenTool(
           const keyId = `${algorithm}-${bytesToHex(randomBytes(6))}`;
           try {
             await onSecretKey(keyId, pair.secretKey);
-          } catch (cause) {
-            throw Object.assign(
-              toolError(
-                'KEY_STORAGE_FAILED',
-                'onSecretKey failed; the generated key was discarded',
-              ),
-              { cause },
+          } catch {
+            throw toolError(
+              'KEY_STORAGE_FAILED',
+              'onSecretKey failed; the generated key was discarded',
             );
           }
           return JSON.stringify({
@@ -407,12 +441,14 @@ function decryptTool(options: CreatePqcToolsOptions): StructuredToolInterface {
     tool(
       (input: { keyId: string; ciphertextHex: string }) =>
         run(async () => {
+          checkToolStrings(input);
           let ciphertext: Uint8Array;
           try {
             ciphertext = hexToBytes(input.ciphertextHex);
           } catch {
             throw toolError('INVALID_CIPHERTEXT', 'ciphertextHex is not valid hex');
           }
+          await authorizeKeyUse(options, 'decrypt', input.keyId, input.ciphertextHex);
           const key = await resolveKey(options, input.keyId);
           const pt = await (pqc.decrypt as (ct: Uint8Array, key: PqcKey) => Promise<Uint8Array>)(
             ciphertext,
@@ -444,6 +480,8 @@ function signTool(options: CreatePqcToolsOptions): StructuredToolInterface {
     tool(
       (input: { keyId: string; message: string }) =>
         run(async () => {
+          checkToolStrings(input);
+          await authorizeKeyUse(options, 'sign', input.keyId, input.message);
           const key = await resolveKey(options, input.keyId);
           const sig = await (pqc.sign as (data: string, key: PqcKey) => Promise<Uint8Array>)(
             input.message,

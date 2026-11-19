@@ -13,7 +13,7 @@ import golden from './vectors/golden-serialization-v2.json';
  * breaking change requiring a major version bump, a
  * docs/serialization-format.md update and regenerated vectors in the same PR
  * — never "fix" these tests to match new output without that acknowledgment
- * (.claude/rules/crypto-review.md).
+ * (see the format-versioning policy in docs/serialization-format.md).
  */
 
 const utf8 = new TextEncoder();

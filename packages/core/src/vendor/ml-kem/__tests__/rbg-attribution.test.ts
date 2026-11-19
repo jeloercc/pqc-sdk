@@ -168,10 +168,14 @@ const breakEntropyAfter = (
       calls++;
       if (calls <= allowed) {
         allowedLengths.push(buf.length);
-        const filled = real.getRandomValues(buf);
+        // TS 6 narrows Web Crypto's accepted view to ArrayBuffer-backed
+        // arrays, while this stub intentionally accepts the wider
+        // ArrayBufferLike type used by crypto implementations.
+        const random = real.getRandomValues(new Uint8Array(buf.length));
+        buf.set(random);
         // The API disappears between this draw and the next one.
         if (calls === allowed && mode === 'absent') vi.stubGlobal('crypto', {});
-        return filled;
+        return buf;
       }
       brokenLength ??= buf.length;
       if (mode === 'throw') throw new Error('entropy pool exhausted');

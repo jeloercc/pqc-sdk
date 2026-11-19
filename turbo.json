@@ -15,11 +15,11 @@
     },
     "@pqc-sdk/langchain#test": {
       "dependsOn": ["^build", "build"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "@pqc-sdk/mcp-server#test": {
       "dependsOn": ["^build", "build"],
-      "outputs": ["coverage/**"]
+      "outputs": []
     },
     "@pqc-sdk/eval-open-models#test": {
       "dependsOn": ["^build", "build"],
