@@ -15,7 +15,25 @@ apps/docs/compliance/fips-205.md
 .env
 .env.*
 .DS_Store
+._*
 .claude/settings.local.json
+
+# Local AI assistant context and workflow instructions
+CLAUDE.md
+AGENTS.md
+.claude/
+.agents/
+.codex/
+.security-pending.local.md
+
+# Internal planning, audit notes, security review details, and draft proposals
+MPC/PLAN.md
+MPC/pr-bodies.md
+docs/AUDIT-*.md
+docs/SECURITY-REVIEW-*.md
+docs/proposals/
+docs/security/
+docs/research-pqc-libs.md
 
 # Local benchmark output (only the committed baseline.json belongs in git)
 packages/core/bench/results.json
@@ -23,6 +41,8 @@ packages/core/bench/results.json
 # PQC key material — never commit secret keys
 keys/
 *.secret.pqc
+*.secret.pqc.*.tmp
+*.pqc-output-*.tmp
 
 # Transient vitepress config bundle (orphaned when a build is interrupted)
 *.timestamp-*.mjs

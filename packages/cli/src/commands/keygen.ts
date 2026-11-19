@@ -35,15 +35,15 @@ export const keygen = defineCommand({
     },
     force: {
       type: 'boolean',
-      description: 'Overwrite existing keys',
+      description: 'Reserved; existing key files cannot be overwritten',
       default: false,
     },
   },
   run: friendlyRun(async ({ args }) => {
     const algorithm = assertSupportedAlgorithm(args.algorithm);
     const baseName = args.name === undefined ? algorithm : assertSafeName(args.name);
-    const keys = await writeKeyPair(args.out, baseName, algorithm, args.force);
     const ignored = await ensureKeysIgnored(process.cwd());
+    const keys = await writeKeyPair(args.out, baseName, algorithm, args.force);
 
     ok(`${algorithm} pair generated:`);
     item(`public: ${keys.publicPath}`);

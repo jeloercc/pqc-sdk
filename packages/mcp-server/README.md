@@ -1,11 +1,17 @@
 # @pqc-sdk/mcp-server
 
+Tool string arguments are limited to 2,097,152 UTF-16 code units each. The limit
+applies to encoded inputs as well, so hex ciphertext has roughly twice the
+length of its binary representation. The host must also limit request sizes
+before passing them to the server. The stdio transport limits its unparsed
+input buffer to 10 MiB and closes the connection if that limit is exceeded.
+
 MCP (Model Context Protocol) server exposing post-quantum cryptography from
 [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core) as agent tools:
 hybrid X-Wing and ML-KEM encryption (FIPS 203), ML-DSA signatures (FIPS 204).
 Works with Claude Desktop, Cursor, Continue and any MCP host that speaks stdio.
 
-**Secret keys never pass through the model context.** They live in a keystore
+**Keystore secret keys are not returned by key-management tools.** They live in a keystore
 directory on the server's machine; the model refers to them only by `keyId`.
 
 ## Install
@@ -36,14 +42,23 @@ Add it to your host's MCP config (Claude Desktop:
 > Point `PQC_KEYSTORE_DIR` at a directory **dedicated to this agent** — never
 > at your personal key folder or a project's `keys/` directory.
 
-| Setting               | Value                                                                                                                                                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `PQC_KEYSTORE_DIR`    | Keystore directory. If unset, the server uses its own default: `${XDG_DATA_HOME:-~/.local/share}/pqc-sdk/agent-keys` (`%LOCALAPPDATA%\pqc-sdk\agent-keys` on Windows). It never falls back to the CLI's `./keys`.        |
-| `PQC_MCP_ENABLE_SIGN` | Set to `1` to expose `pqc_sign`. Off by default.                                                                                                                                                                         |
-| `PQC_MCP_MAX_KEYS`    | Maximum number of keys in the keystore (default `100`). Once reached, `pqc_keygen` fails with `KEYSTORE_FULL`; listing, decrypting and signing keep working. Must be a positive integer, or the server refuses to start. |
+| Setting                   | Value                                                                                                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PQC_KEYSTORE_DIR`        | Keystore directory. If unset, the server uses its own default: `${XDG_DATA_HOME:-~/.local/share}/pqc-sdk/agent-keys` (`%LOCALAPPDATA%\pqc-sdk\agent-keys` on Windows). It never falls back to the CLI's `./keys`.        |
+| `PQC_MCP_ENABLE_SIGN`     | Set to `1` to expose `pqc_sign`. Off by default.                                                                                                                                                                         |
+| `PQC_MCP_MAX_KEYS`        | Maximum number of keys in the keystore (default `100`). Once reached, `pqc_keygen` fails with `KEYSTORE_FULL`; listing, decrypting and signing keep working. Must be a positive integer, or the server refuses to start. |
+| `PQC_MCP_DECRYPT_KEY_IDS` | Comma-separated key IDs allowed for decrypt. Unset allows all; empty denies all.                                                                                                                                         |
+| `PQC_MCP_SIGN_KEY_IDS`    | Comma-separated key IDs allowed for sign. Unset allows all; empty denies all. Signing also requires `PQC_MCP_ENABLE_SIGN=1`.                                                                                             |
 
 The server prints its keystore path, key limit and signing state to stderr at
 startup. stdout is reserved for the MCP protocol.
+
+These optional allowlists are static per server process. Invalid IDs prevent
+startup. Set both variables to restrict both operations; generated keys are
+not automatically added. They restrict which keys can be used, but do not
+authorize a particular ciphertext or message or protect other tools from
+exfiltrating plaintext. Configure host-side approval and access controls for
+each sensitive operation as appropriate.
 
 The key limit counts every secret key file in the keystore, including keys you
 imported with the CLI. It stops a model that calls `pqc_keygen` in a loop from
@@ -118,6 +133,14 @@ _key_ out of the model context, but whatever the model decrypts, it reads. Only
 put keys in the keystore whose plaintexts the model is allowed to see. The
 same reasoning is why `pqc_sign` is off by default: a signature is a statement
 made under the key owner's identity, and enabling it is your decision.
+
+Decrypted content is untrusted data and can contain instructions intended to
+manipulate an agent. Authentication verifies the ciphertext, not the sender's
+identity or the safety of its contents. The host must enforce authorization for
+subsequent actions outside the model and require user approval where appropriate.
+Do not give the model access to ciphertext whose plaintext may contain secret
+keys or other information the model must not receive; the tool cannot identify
+or redact arbitrary secrets in plaintext.
 
 ## Upgrading from 0.3.x
 
