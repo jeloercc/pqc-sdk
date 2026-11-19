@@ -10,11 +10,11 @@ import { join } from 'node:path';
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FIPS_ALGORITHMS, SUPPORTED_ALGORITHMS } from '@pqc-sdk/core';
 
-import { type HandlerContext, handleTool } from './handlers.js';
+import { type HandlerContext, handleTool, MAX_TOOL_STRING_LENGTH } from './handlers.js';
 import { FileKeyStore } from './keystore.js';
 import { listTools } from './tools.js';
 
@@ -98,6 +98,56 @@ describe('pqc_algorithms', () => {
     expect(data['supported']).toEqual([...SUPPORTED_ALGORITHMS]);
     expect(data['fips']).toEqual([...FIPS_ALGORITHMS]);
     expect(data['fips']).not.toContain('x-wing');
+  });
+});
+
+describe('input limits', () => {
+  it('rejects oversized ciphertext before loading a key', async () => {
+    const keyStore = {
+      ...context.keyStore,
+      loadSecretKey: () => {
+        throw new Error('unexpected key access');
+      },
+    };
+    const result = await call(
+      'pqc_decrypt',
+      { keyId: 'valid', ciphertextHex: 'a'.repeat(MAX_TOOL_STRING_LENGTH + 1) },
+      { keyStore, enableSign: false },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.data['error']).toBe('INVALID_ARGUMENT');
+  });
+});
+
+describe('key allowlists', () => {
+  it('denies decrypt and sign before loading a disallowed key', async () => {
+    const keyStore = {
+      ...context.keyStore,
+      loadSecretKey: () => {
+        throw new Error('unexpected key access');
+      },
+    };
+    const restricted = {
+      keyStore,
+      enableSign: true,
+      decryptKeyIds: new Set<string>(),
+      signKeyIds: new Set<string>(),
+    };
+    const decrypt = await call('pqc_decrypt', { keyId: 'valid', ciphertextHex: '00' }, restricted);
+    const sign = await call('pqc_sign', { keyId: 'valid', message: 'hello' }, restricted);
+    expect(decrypt.data['error']).toBe('ACCESS_DENIED');
+    expect(sign.data['error']).toBe('ACCESS_DENIED');
+  });
+
+  it('allows an explicitly listed key to decrypt', async () => {
+    const { keyId, publicToken } = await keygen('x-wing');
+    const ciphertextHex = await encryptText(publicToken, 'hello');
+    const result = await call(
+      'pqc_decrypt',
+      { keyId, ciphertextHex },
+      { ...context, decryptKeyIds: new Set([keyId]) },
+    );
+    expect(result.data['plaintext']).toBe('hello');
   });
 });
 
@@ -307,6 +357,32 @@ describe('error handling', () => {
   it('returns UNKNOWN_TOOL for an unknown tool name', async () => {
     const { data } = await call('pqc_nonexistent');
     expect(data['error']).toBe('UNKNOWN_TOOL');
+  });
+
+  it('does not expose unexpected error details in the response or server log', async () => {
+    const marker = 'SYNTHETIC_PRIVATE_DETAIL';
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const keyStore = {
+        ...context.keyStore,
+        loadSecretKey: () => {
+          throw new Error(marker);
+        },
+      };
+      const result = await call(
+        'pqc_decrypt',
+        { keyId: 'test', ciphertextHex: '00' },
+        {
+          ...context,
+          keyStore,
+        },
+      );
+      expect(result.data['error']).toBe('INTERNAL_ERROR');
+      expect(JSON.stringify(result)).not.toContain(marker);
+      expect(JSON.stringify(stderr.mock.calls)).not.toContain(marker);
+    } finally {
+      stderr.mockRestore();
+    }
   });
 });
 

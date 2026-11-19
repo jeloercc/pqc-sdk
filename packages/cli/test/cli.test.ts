@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, mkdir, readFile, stat, truncate, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +34,50 @@ async function runCli(args: string[], cwd: string): Promise<CliResult> {
 }
 
 const freshDir = () => mkdtemp(join(tmpdir(), 'pqc-cli-'));
+
+describe('extended ML-KEM envelope dispatch', () => {
+  it.each([
+    ['ml-kem-512', false],
+    ['ml-kem-1024', false],
+    ['ml-kem-512', true],
+    ['ml-kem-1024', true],
+  ] as const)(
+    'decrypts %s with streaming=%s through the real binary',
+    async (algorithm, streaming) => {
+      const dir = await freshDir();
+      try {
+        const pair = await pqc.keys.generate({ algorithm });
+        const payload = new TextEncoder().encode('synthetic dispatch regression');
+        await writeFile(join(dir, 'key.secret.pqc'), pqc.keys.serialize(pair.secretKey), {
+          mode: 0o600,
+        });
+        let envelope: Uint8Array;
+        if (streaming) {
+          // eslint-disable-next-line @typescript-eslint/require-await
+          async function* source() {
+            yield payload;
+          }
+          const chunks: Uint8Array[] = [];
+          for await (const chunk of pqc.encryptStream(pair.publicKey, source(), { chunkSize: 8 })) {
+            chunks.push(chunk);
+          }
+          envelope = Buffer.concat(chunks);
+        } else {
+          envelope = await pqc.encrypt(payload, pair.publicKey);
+        }
+        await writeFile(join(dir, 'input.enc'), envelope);
+        const result = await runCli(
+          ['decrypt', 'input.enc', '--key', 'key.secret.pqc', '--out', 'output'],
+          dir,
+        );
+        expect(result.code).toBe(0);
+        expect(await readFile(join(dir, 'output'))).toEqual(Buffer.from(payload));
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+  );
+});
 
 describe('pqc binary', () => {
   it('has a shebang so it runs via npx', async () => {
@@ -138,6 +182,7 @@ describe('pqc init', () => {
     const gitignore = await readFile(join(dir, '.gitignore'), 'utf8');
     expect(gitignore).toContain('keys/');
     expect(gitignore).toContain('*.secret.pqc');
+    expect(gitignore).toContain('*.pqc-output-*.tmp');
   });
 
   it('appends key patterns to an existing .gitignore without dropping its content', async () => {
@@ -246,7 +291,7 @@ describe('pqc keygen', () => {
     expect(traversal.stdout + traversal.stderr).toMatch(/invalid.*name/i);
   });
 
-  it('does not overwrite existing keys without --force', async () => {
+  it('does not overwrite existing keys, including with --force', async () => {
     const dir = await freshDir();
     await runCli(['keygen'], dir);
     const original = await readFile(join(dir, 'keys/x-wing.public.pqc'), 'utf8');
@@ -256,8 +301,8 @@ describe('pqc keygen', () => {
     expect(await readFile(join(dir, 'keys/x-wing.public.pqc'), 'utf8')).toBe(original);
 
     const forced = await runCli(['keygen', '--force'], dir);
-    expect(forced.code).toBe(0);
-    expect(await readFile(join(dir, 'keys/x-wing.public.pqc'), 'utf8')).not.toBe(original);
+    expect(forced.code).not.toBe(0);
+    expect(await readFile(join(dir, 'keys/x-wing.public.pqc'), 'utf8')).toBe(original);
   });
 
   it('protects secret keys with .gitignore and does not duplicate patterns', async () => {
@@ -271,7 +316,8 @@ describe('pqc keygen', () => {
     // A second run must not append the patterns again (idempotent).
     await runCli(['keygen', '--name', 'second'], dir);
     const after = await readFile(join(dir, '.gitignore'), 'utf8');
-    expect(after.match(/\*\.secret\.pqc/g)).toHaveLength(1);
+    expect(after.match(/^\*\.secret\.pqc$/gm)).toHaveLength(1);
+    expect(after.match(/^\*\.pqc-output-\*\.tmp$/gm)).toHaveLength(1);
   });
 });
 

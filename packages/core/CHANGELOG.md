@@ -490,8 +490,6 @@ from the tagged commit.]
 
   **Evidence moved up front.** The README's "How this is verified" section now precedes the quickstart and opens with the strongest signals: NIST ACVP vectors running in CI, five runtimes validated by actual execution (including a physical Android device), parser fuzzing, property tests, golden wire-format vectors and the streaming mutation matrix.
 
-  **Process stated plainly.** `CONTRIBUTING.md` gains a "Development process" section: development is AI-assisted, every commit carries a `Co-Authored-By` trailer, and the working agreements are checked in rather than hidden. It links `.claude/rules/crypto-review.md` as the standing discipline and is explicit that none of it substitutes for an independent third-party audit, which this project has not had.
-
   No code or behaviour changes.
 
 ## 0.8.0
@@ -512,7 +510,7 @@ from the tagged commit.]
 
 - fab1693: `pqc audit` now states its limits wherever it speaks. The help text, the runtime banner, and both READMEs describe it as a heuristic, non-exhaustive regex scan — a starting point for a migration review, not a substitute for one. A clean run says so explicitly ("not a clean bill of health: it means the patterns above did not match, not that none exists") rather than leaving "No pre-quantum crypto detected" to be read as a guarantee, and findings are framed as candidates to confirm rather than a finished migration list. The scan itself is unchanged; only its framing is.
 
-  Documentation: a new **How this is verified** section in the root README maps each layer the SDK actually owns — envelope format, key serialization, nonce derivation, fail-closed parsing — to the suite that covers it, linking the NIST ACVP vectors, golden serialization vectors, parser fuzzing, `fast-check` property tests, the streaming mutation matrix, the format spec, the audit and security reviews, and the runtime compatibility record. It also states plainly that those reviews are internal and AI-assisted rather than an independent third-party audit, and surfaces the absence of memory zeroization from `SECURITY.md` into the README where adopters will actually see it.
+  Documentation: a new **How this is verified** section in the root README maps the SDK's envelope format, key serialization, nonce derivation and fail-closed parsing to their tests and specifications. It also discloses the lack of an independent third-party audit and the absence of memory zeroization.
 
 ## 0.7.1
 
@@ -528,7 +526,7 @@ from the tagged commit.]
 
 ### Minor Changes
 
-- 944a70c: Streaming encryption (`docs/proposals/streaming-encryption.md`) is now public: `pqc.encryptStream`/`pqc.decryptStream` for arbitrarily large payloads without holding them fully in memory, plus `pqc.encryptWebStream`/`pqc.decryptWebStream` (thin `TransformStream` adapters for `pipeThrough`/`pipeTo` pipelines) — both ML-KEM-768 and X-Wing supported from day one. New `pqcenc` envelope version bytes `0x03` (ml-kem-768 streaming) and `0x04` (x-wing streaming), additive alongside the existing v1/v2 one-shot envelopes, which are byte-for-byte unchanged.
+- 944a70c: Streaming encryption (specified in `docs/serialization-format.md` §9) is now public: `pqc.encryptStream`/`pqc.decryptStream` for arbitrarily large payloads without holding them fully in memory, plus `pqc.encryptWebStream`/`pqc.decryptWebStream` (thin `TransformStream` adapters for `pipeThrough`/`pipeTo` pipelines) — both ML-KEM-768 and X-Wing supported from day one. New `pqcenc` envelope version bytes `0x03` (ml-kem-768 streaming) and `0x04` (x-wing streaming), additive alongside the existing v1/v2 one-shot envelopes, which are byte-for-byte unchanged.
 
   `pqc.decryptStream` has an incremental-release property one-shot `pqc.decrypt` does not: it yields each plaintext chunk as soon as that chunk authenticates, so a truncated or tampered stream can yield genuine prefix chunks before throwing. Only the async iterable completing without throwing means the full plaintext is authentic and complete — see the JSDoc on `decryptStream` for the full explanation and a worked example of handling this correctly.
 
@@ -540,7 +538,7 @@ from the tagged commit.]
 
 - ce2fa4c: X-Wing is now a fully supported algorithm across the public API and CLI: `SUPPORTED_ALGORITHMS` includes `'x-wing'`, and `KEM_NAMES` is exported for introspection. `pqc keygen --algorithm x-wing` generates a hybrid key pair, and `pqc encrypt`/`pqc decrypt` accept either KEM key (`ml-kem-768` or `x-wing`) and write/read the matching envelope version automatically — `readKeyFile`'s expectation loosened from "exactly ml-kem-768" to "any KEM key," reporting the algorithm actually found on a mismatch. `pqc audit` migration hints now mention x-wing for long-term data. `pqc.keys.generate()` with no arguments is unchanged (`ml-kem-768`); the default flips to `x-wing` at v1.0 as previously announced.
 - 7340a0d: New `x-wing` KEM algorithm (X25519 + ML-KEM-768 hybrid per draft-connolly-cfrg-xwing-kem-10): `pqc.keys.generate({ algorithm: 'x-wing' })` generates a pair (1216-byte public key, 32-byte seed secret key) that serializes with the existing `pqcv1` token format, validated against the draft's Appendix C test vectors. The hybrid envelope format (`pqcenc.v2`) is not implemented yet — `encrypt`/`decrypt` fail closed with `UNSUPPORTED_ALGORITHM` on x-wing keys until it lands. The no-argument `keys.generate()` default is unchanged (`ml-kem-768`).
-- 79d4565: Hybrid envelope v2 (`pqcenc.v2`): `pqc.encrypt` with an `x-wing` public key now produces a v2 envelope (version byte `0x02`, X-Wing ciphertext `ct_M ‖ ct_X`, AES-256-GCM keyed by the draft's SHA3-256 combiner output used verbatim — see `docs/serialization-format.md` §2.2), and `pqc.decrypt` dispatches on the version byte, accepting both v1 and v2. The Day-1 `UNSUPPORTED_ALGORITHM` guard on x-wing keys is removed; `encrypt`/`decrypt` signatures widen to any KEM key. This is the additive layout change acknowledged in `docs/proposals/hybrid-envelope.md` §3: every v1 artifact remains valid and byte-identical (v1 golden vectors untouched), so no major bump. Caveat for mixed-version fleets: peers on ≤0.4.x cannot decrypt v2 envelopes — upgrade readers before writers.
+- 79d4565: Hybrid envelope v2 (`pqcenc.v2`): `pqc.encrypt` with an `x-wing` public key now produces a v2 envelope (version byte `0x02`, X-Wing ciphertext `ct_M ‖ ct_X`, AES-256-GCM keyed by the draft's SHA3-256 combiner output used verbatim — see `docs/serialization-format.md` §2.2), and `pqc.decrypt` dispatches on the version byte, accepting both v1 and v2. The Day-1 `UNSUPPORTED_ALGORITHM` guard on x-wing keys is removed; `encrypt`/`decrypt` signatures widen to any KEM key. This is an additive layout change: every v1 artifact remains valid and byte-identical, so no major bump. Caveat for mixed-version fleets: peers on ≤0.4.x cannot decrypt v2 envelopes — upgrade readers before writers.
 
 ## 0.4.1
 

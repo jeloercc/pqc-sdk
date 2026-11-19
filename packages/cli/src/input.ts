@@ -4,8 +4,8 @@ import { open, stat } from 'node:fs/promises';
 import { UsageError } from './errors.js';
 
 /**
- * `pqc encrypt` picks the envelope by input size (docs/proposals/streaming-encryption.md
- * §3): at or below this, the existing one-shot `pqc.encrypt` path (v1/v2) —
+ * `pqc encrypt` picks the envelope by input size: at or below this, the
+ * existing one-shot `pqc.encrypt` path (v1/v2) —
  * simpler, already battle-tested, negligible RAM cost at this size. Above
  * it, the streaming path (`pqc.encryptWebStream`, v3/v4), bounding CLI
  * memory to roughly one chunk regardless of file size.
@@ -20,8 +20,7 @@ export const STREAMING_THRESHOLD_BYTES = 8 * 1024 * 1024; // 8 MiB
  * mean there is no "total bytes under one key" concern to manage.
  *
  * This is the *default*: `--max-size` raises or lowers it, per
- * `docs/proposals/streaming-encryption.md` §2, which specifies the ceiling
- * as overridable. Because it guards against mistakes rather than against an
+ * the operator's needs. Because it guards against mistakes rather than against an
  * attacker or a cryptographic bound, overriding it is a legitimate operator
  * decision — it is just never a silent one (see {@link assertReadableInput}).
  */
@@ -121,7 +120,7 @@ export async function assertReadableInput(
         ? ' If this is genuinely intended, raise the guard with --max-size (e.g. --max-size 2TiB) or split the file.'
         : ' Raise --max-size further if this is genuinely intended.';
     throw new UsageError(
-      `${path} is ${formatSize(size)}, above the ${limit} operational limit. This is a sanity check against accidental inputs (e.g. a mounted device), not a cryptographic limit — see docs/proposals/streaming-encryption.md §2.${raise}`,
+      `${path} is ${formatSize(size)}, above the ${limit} operational limit. This is a sanity check against accidental inputs (e.g. a mounted device), not a cryptographic limit.${raise}`,
     );
   }
   if (size > MAX_INPUT_BYTES) {
@@ -159,24 +158,27 @@ export function sizeGuardOptions(
 }
 
 /**
- * Reads the leading envelope version byte without loading the rest of the
- * file — enough for `pqc decrypt` to dispatch between the one-shot
- * (`0x01`/`0x02`) and streaming (`0x03`/`0x04`) decoders
- * (docs/serialization-format.md §2, §9) before committing to either code
- * path. An empty or unreadable file surfaces the same `UsageError` either
- * decoder would eventually give for a too-short envelope.
+ * Reads the version and algorithm ID without loading the rest of the file.
+ * Both bytes are needed: one-shot ML-KEM-512/1024 reuse version bytes 3/4
+ * with different algorithm IDs from streaming ML-KEM-768/X-Wing.
+ *
+ * @example
+ * ```ts
+ * import { peekEnvelopeHeader } from './input.js';
+ * const [version, algorithmId] = await peekEnvelopeHeader('message.enc');
+ * ```
  */
-export async function peekEnvelopeVersion(path: string): Promise<number> {
+export async function peekEnvelopeHeader(path: string): Promise<readonly [number, number]> {
   const fd = await open(path, 'r');
   try {
-    const buf = new Uint8Array(1);
-    const { bytesRead } = await fd.read(buf, 0, 1, 0);
-    if (bytesRead < 1) {
+    const buf = new Uint8Array(2);
+    const { bytesRead } = await fd.read(buf, 0, 2, 0);
+    if (bytesRead < 2) {
       throw new UsageError(
         `${path} is empty or truncated: not a valid pqc envelope produced by \`pqc encrypt\`.`,
       );
     }
-    return buf[0]!;
+    return [buf[0]!, buf[1]!];
   } finally {
     await fd.close();
   }

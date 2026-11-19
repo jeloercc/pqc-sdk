@@ -70,7 +70,7 @@ export const encrypt = defineCommand({
     }
 
     // Above the threshold: stream instead of holding the whole file in
-    // memory (docs/proposals/streaming-encryption.md §3).
+    // memory.
     const readable = Readable.toWeb(createReadStream(args.input)) as ReadableStream<Uint8Array>;
     await pipeToOutput(readable.pipeThrough(pqc.encryptWebStream(publicKey)), outPath, {
       force: args.force,

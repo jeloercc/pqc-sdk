@@ -106,9 +106,7 @@ So you can assess whether the SDK fits your case:
   closed** — no key, ciphertext or plaintext is returned — but the error
   points at a bad key or a tampered ciphertext instead of the RNG, and on key
   generation it passes host error text through. ML-KEM keys are not
-  affected. **Severity: Low**, by the precedent of `docs/AUDIT-2026-09.md`
-  L5 (raw errors instead of `PqcError`, rated Low); the repository defines no
-  severity criterion beyond such precedents.
+  affected. The failure is closed, but its cause is not consistently reported.
   **Decision:** documented here for now; the fix is to be requested upstream
   in `@noble/curves` — a way to supply `randomBytes` to x25519's base-point
   multiplication, or an identifiable RNG error — so the SDK can attribute the
@@ -131,13 +129,12 @@ path, and a failure of the platform generator now surfaces as a distinct `RBG_FA
 error instead of being reported as an invalid key. What the SDK does not control is the
 generator behind `crypto.getRandomValues`, which belongs to the host runtime:
 
-| Runtime                          | Randomness API resolved at run time                                                      |
-| -------------------------------- | ---------------------------------------------------------------------------------------- |
-| Node 20+                         | `globalThis.crypto.getRandomValues` (Web Crypto, backed by OpenSSL's `RAND_bytes`)       |
-| Deno                             | `globalThis.crypto.getRandomValues`                                                      |
-| Cloudflare Workers               | `globalThis.crypto.getRandomValues` (workerd)                                            |
-| React Native (Expo)              | `react-native-get-random-values`, which bridges to `SecRandomCopyBytes` / `SecureRandom` |
-| Hermes standalone (example only) | **`Math.random`** — see below                                                            |
+| Runtime                          | Randomness API resolved at run time                                                |
+| -------------------------------- | ---------------------------------------------------------------------------------- |
+| Node 20+                         | `globalThis.crypto.getRandomValues` (Web Crypto, backed by OpenSSL's `RAND_bytes`) |
+| Deno                             | `globalThis.crypto.getRandomValues`                                                |
+| Cloudflare Workers               | `globalThis.crypto.getRandomValues` (workerd)                                      |
+| Hermes standalone (example only) | **`Math.random`** — see below                                                      |
 
 This table documents where the bytes come from. It makes **no claim about the SP 800-90
 approval status of any of them**; establishing that is the responsibility of whoever
@@ -148,9 +145,7 @@ ensure that an overall implementation provides an acceptable level of security."
 
 ⚠️ The `examples/hermes-standalone` shim fills bytes from `Math.random`, which is **not
 cryptographically secure**. That example exists solely to validate that the Hermes engine
-can execute the SDK; it is not a usable configuration. A real React Native app must
-install `react-native-get-random-values` and import it before the SDK, as
-`examples/react-native-expo` does.
+can execute the SDK; it is not a usable configuration.
 
 If your deployment must demonstrate FIPS 203 §3.3 compliance, the RBG — not this
 library — is what has to be validated. See `docs/compliance/FIPS-203-MATRIX.md` row
@@ -187,6 +182,6 @@ is a runtime dependency of a published package.
 Published tarballs include source maps (`*.js.map` / `*.cjs.map`) — expected for
 this MIT project, noted here so it is a conscious choice.
 
-## Internal security review
+## Independent audit status
 
-An internal, AI-assisted security review (not an independent third-party audit) is available at [`docs/SECURITY-REVIEW-2026-06.md`](docs/SECURITY-REVIEW-2026-06.md).
+This project has not undergone an independent third-party security audit.

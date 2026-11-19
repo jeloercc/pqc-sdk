@@ -88,9 +88,8 @@ Full documentation at **[jeloercc.github.io/pqc-sdk](https://jeloercc.github.io/
   its internal intermediates, but the shared secret, decrypted plaintext and
   secret-key bytes you hold are not wiped — JavaScript offers no reliable
   primitive for it. Details in [SECURITY.md](https://github.com/jeloercc/pqc-sdk/blob/main/SECURITY.md).
-- `@noble/post-quantum` has no independent audit yet (self-audit 04/2026).
-  As with all JS, there are no strict constant-time guarantees. The reviews in
-  `docs/` are internal and AI-assisted — not an independent third-party audit.
+- This SDK has not undergone an independent third-party cryptographic audit.
+  As with all JavaScript, there are no strict constant-time guarantees.
 - Security reports: see [SECURITY.md](https://github.com/jeloercc/pqc-sdk/blob/main/SECURITY.md) —
   please do not open public issues.
 
