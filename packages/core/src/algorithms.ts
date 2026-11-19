@@ -164,7 +164,9 @@ export const ALGORITHMS: Record<Algorithm, KemSpec | SignerSpec> = {
 };
 
 export function getAlgorithm(algorithm: string): KemSpec | SignerSpec {
-  const spec = (ALGORITHMS as Record<string, KemSpec | SignerSpec>)[algorithm];
+  const spec = Object.hasOwn(ALGORITHMS, algorithm)
+    ? (ALGORITHMS as Record<string, KemSpec | SignerSpec>)[algorithm]
+    : undefined;
   if (!spec) {
     // The name can come from an untrusted serialized key: bound the echo.
     throw new PqcError(

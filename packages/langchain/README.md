@@ -1,13 +1,17 @@
 # @pqc-sdk/langchain
 
+Tool string arguments are limited to 2,097,152 UTF-16 code units each. Encoded
+inputs count toward this limit, so hex ciphertext has roughly twice the length
+of its binary representation. The host must also limit requests before invoking
+the tools.
+
 LangChain / LangGraph tools for post-quantum cryptography from
 [`@pqc-sdk/core`](https://www.npmjs.com/package/@pqc-sdk/core): hybrid X-Wing
 and ML-KEM encryption (FIPS 203), ML-DSA signatures (FIPS 204). The tools are
 `StructuredToolInterface`s, usable with `createReactAgent`, `ToolNode`, or
 anything built on `@langchain/core`.
 
-**Secret keys never pass through the model context.** No tool accepts or
-returns secret key material. Tools refer to secret keys by `keyId`, and the
+**Key-management tools do not return stored secret keys.** Tools refer to secret keys by `keyId`, and the
 keys move only through two callbacks you provide. This package does no I/O:
 where keys live — a secrets manager, a KMS-wrapped database, an encrypted
 file — is your decision.
@@ -17,6 +21,13 @@ file — is your decision.
 ```bash
 npm install @pqc-sdk/langchain @pqc-sdk/core @langchain/core zod
 ```
+
+Use Zod 4.6.6 or later within the 4.x major for application schemas. Earlier versions are affected
+by GHSA-mrhx-c7xc-m3w5. For LangChain compatibility this package still imports
+the `zod/v3` compatibility API, even when Zod 4 is installed; upgrading Zod
+does not replace that API with Zod 4 schemas. The tool schemas here do not
+contain arrays. Applications accepting untrusted data must limit request sizes
+before validation and assess their own schemas and dependencies.
 
 ## Usage
 
@@ -41,6 +52,8 @@ const tools = createPqcTools({
   onSecretKey: async (keyId, secretKey) => {
     vault.set(keyId, secretKey);
   },
+  // For production, authorize each operation in trusted application code.
+  // authorizeKeyUse: async ({ operation, keyId, input }) => policyAllows(operation, keyId, input),
   // enableSign: true, // pqc_sign is excluded unless you opt in
 });
 
@@ -57,6 +70,12 @@ choice and tell the model that id — the key itself never needs to reach it.
 | `resolveSecretKey` | `(keyId) => Promise<SecretKey>`               | Required. Throw if the key does not exist. The `keyId` is already validated against `KEY_ID_PATTERN`.                  |
 | `onSecretKey`      | `(keyId, secretKey) => void \| Promise<void>` | Optional. `pqc_keygen` returns the public key only after this resolves; if it throws, the model gets an error, no key. |
 | `enableSign`       | `boolean`                                     | Default `false`. Adds `pqc_sign`.                                                                                      |
+| `authorizeKeyUse`  | `(request) => boolean \| Promise<boolean>`    | Optional host policy called before decrypt or sign loads a key. Only `true` allows; errors deny access.                |
+
+Without `authorizeKeyUse`, key use is permitted as in previous releases. The
+callback receives the operation, key ID, and ciphertext or message; it never
+receives the secret key. Protect and avoid logging callback inputs, and enforce
+authorization separately for other tools and data destinations.
 
 **Valid key ids** (`KEY_ID_PATTERN`): 1–64 characters, a letter or digit
 first, then letters, digits, `_` or `-`. Anything else is rejected before
@@ -90,6 +109,13 @@ _key_ out of the model context, but whatever the model decrypts, it reads.
 Only resolve keys whose plaintexts the model is allowed to see. The same
 reasoning is why `pqc_sign` is off by default: a signature is a statement made
 under the key owner's identity, and enabling it is your decision.
+
+Decrypted content is untrusted data and may contain instructions that try to
+manipulate an agent. Authentication does not establish the sender's identity
+or make the plaintext safe to follow. Enforce authorization for subsequent
+actions outside the model. Do not decrypt for the model when plaintext may
+contain secret keys or other information it must not receive: arbitrary
+plaintext is not inspected or redacted for secrets.
 
 ## Migrating from 0.2.x
 

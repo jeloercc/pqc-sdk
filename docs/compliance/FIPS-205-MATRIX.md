@@ -83,8 +83,8 @@ Verified against the code, not assumed:
 | Import of `@noble/post-quantum/slh-dsa.js` | **none** anywhere in `packages/core/src` or `packages/cli/src`           |
 | Any `slh` / `sphincs` identifier           | **none**; the sole textual match is a prose comment at `algorithms.ts:8` |
 
-This matches the project's own statement in `CLAUDE.md`: "Algorithms (roadmap, not yet
-implemented): SLH-DSA (FIPS 205)."
+The SDK does not currently expose SLH-DSA. Provider availability alone does
+not make an algorithm part of the SDK's supported surface.
 
 **The provider, by contrast, implements SLH-DSA completely** — all 12 parameter sets of
 Table 2, plus `.prehash()` on each (§3.9). That asymmetry is the single most important fact

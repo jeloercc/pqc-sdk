@@ -25,7 +25,7 @@ if (hybridDecoded !== message) {
 console.log('✅ Deno: generate → encrypt → decrypt OK (x-wing hybrid)');
 console.log(`   algorithm: ${hybridPair.algorithm}, ciphertext: ${hybridCiphertext.length} bytes`);
 
-// Streaming (pqcenc.v2 chunked envelope, docs/proposals/streaming-encryption.md):
+// Streaming envelope (§9 of docs/serialization-format.md):
 // a real large file, piped through Deno's native file streams and the Web
 // Streams adapters — never held fully in memory, unlike pqc.encrypt above.
 // Deno.FsFile's `.readable`/`.writable` are already WHATWG streams, so no

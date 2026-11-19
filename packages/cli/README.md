@@ -39,12 +39,18 @@ pqc decrypt report.pdf.enc --key keys/alice.secret.pqc   # report.pdf (0600)
 
 Worth knowing:
 
+- `keygen` never overwrites an existing key file, even with `--force`. To
+  rotate a key, choose a new name (for example, `pqc keygen --name alice-2026-11`)
+  and keep the previous secret key in a private backup to decrypt older data.
 - Output defaults: `encrypt` writes `<input>.enc`; `decrypt` strips the
   `.enc` (or appends `.dec`). Neither overwrites an existing file unless you
   pass `--force`.
 - Decrypted plaintext is written readable only by you (mode 0600), and the
   CLI warns — without refusing — when a secret key file is readable by other
   users (fix with `chmod 600 <file>`).
+- On POSIX, private output is refused if the filesystem does not report the
+  requested `0600` permissions after they are applied. On Windows, use a
+  directory protected with appropriate access control lists.
 - Files at or below 8 MiB are loaded fully into memory; larger files stream
   automatically (bounded memory regardless of size), up to a 1 TiB
   operational ceiling. No flag needed — the CLI picks the right path from the

@@ -3,3 +3,12 @@ packages:
   - examples/*
   - apps/*
   - evals/*
+
+overrides:
+  # VitePress currently pins Vite 5; the docs build is verified with Vite 6.
+  'vitepress>vite': '6.4.6'
+  # Patched versions checked with Node 20 lint and tests.
+  'glob@13.0.7': '14.0.2'
+  '@typescript-eslint/typescript-estree>minimatch': '11.0.1'
+  # Use the corrected esbuild while keeping bundle-require's peer aligned.
+  'tsup>esbuild': '0.28.2'
