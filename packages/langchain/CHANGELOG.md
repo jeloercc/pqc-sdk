@@ -1,5 +1,21 @@
 # @pqc-sdk/langchain
 
+## 0.4.0
+
+### Minor Changes
+
+- 4f3bd09: Limit individual tool string arguments to 2,097,152 UTF-16 code units before decoding or resolving keys.
+  The MCP stdio transport also caps its unparsed input buffer at 10 MiB.
+  LangChain hosts can supply an authorization callback for decrypt and sign operations.
+  MCP hosts can restrict decrypt and sign to separate key ID allowlists.
+
+### Patch Changes
+
+- 4f3bd09: Keep the Zod security minimum at 4.6.6 while limiting the peer range to the reviewed 4.x compatibility API.
+- 4f3bd09: Prevent secret key storage callback errors and their causes from leaking into tool errors.
+- Updated dependencies [4f3bd09]
+  - @pqc-sdk/core@0.12.0
+
 ## 0.3.5
 
 ### Patch Changes
