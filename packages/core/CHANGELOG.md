@@ -1,5 +1,11 @@
 # @pqc-sdk/core
 
+## 0.12.0
+
+### Patch Changes
+
+- 4f3bd09: Avoid including malformed serialized key fragments in deserialization errors and reject inherited properties as algorithm names.
+
 ## 0.11.4
 
 ### Patch Changes

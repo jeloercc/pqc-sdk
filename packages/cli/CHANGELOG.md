@@ -1,5 +1,18 @@
 # @pqc-sdk/cli
 
+## 0.12.0
+
+### Minor Changes
+
+- 4f3bd09: Write output through the initially opened temporary file and reject overwriting existing key files, including with `keygen --force`.
+  On POSIX, refuse private output if the filesystem does not apply mode 0600.
+
+### Patch Changes
+
+- 4f3bd09: Dispatch CLI decryption using both envelope header bytes so one-shot and streaming ML-KEM-512/1024 ciphertexts reach the correct parser without changing their serialized format.
+- Updated dependencies [4f3bd09]
+  - @pqc-sdk/core@0.12.0
+
 ## 0.11.4
 
 ### Patch Changes
