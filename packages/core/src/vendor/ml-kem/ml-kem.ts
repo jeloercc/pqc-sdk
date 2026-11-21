@@ -682,25 +682,36 @@ function createKyber(opts: TArg<KyberOpts>): TRet<MLKEM> {
       if (!equalBytes(test, secretKey.subarray(start, start + 32)))
         throw new Error('invalid secretKey: hash check failed');
       const [sk, publicKey, publicKeyHash, z] = secretCoder.decode(secretKey);
-      const msg = KPKE.decrypt(cipherText, sk);
-      // derive randomness, Khat, rHat = G(mHat || h)
-      const kr = HASH512.create().update(msg).update(publicKeyHash).digest();
-      const Khat = kr.subarray(0, 32);
-      // re-encrypt using the derived randomness
-      const cipherText2 = KPKE.encrypt(publicKey, msg, kr.subarray(32, 64));
-      // if ciphertexts do not match, “implicitly reject”
-      const isValid = equalBytes(cipherText, cipherText2);
-      const Kbar = KDF.create({ dkLen: 32 }).update(z).update(cipherText).digest();
-      // LOCAL MODIFICATION (F203-18). Upstream selected and cleaned with ternaries on the
-      // secret flag: `!isValid ? Khat : Kbar` / `isValid ? Khat : Kbar`. Those are
-      // source-level branches whose condition is secret intermediate data, and which decide
-      // which heap object survives. selectSharedSecret replaces them with byte-wise mask
-      // arithmetic, so both candidates are read in full and both are destroyed
-      // unconditionally — there is no longer a branch choosing between them.
-      // kr[32:64] is the derived K-PKE encryption randomness: wipe it like encapsulate() does.
-      const sharedSecret = selectSharedSecret(isValid, Khat, Kbar);
-      cleanBytes(msg, cipherText2, kr.subarray(32), Khat, Kbar);
-      return sharedSecret as TRet<Uint8Array>;
+      // Raw secretCoder views are borrowed; only these owned buffers are disposable.
+      let msg: Uint8Array | undefined;
+      let kr: Uint8Array | undefined;
+      let cipherText2: Uint8Array | undefined;
+      let Kbar: Uint8Array | undefined;
+      try {
+        msg = KPKE.decrypt(cipherText, sk);
+        // derive randomness, Khat, rHat = G(mHat || h)
+        kr = HASH512.create().update(msg).update(publicKeyHash).digest();
+        const Khat = kr.subarray(0, 32);
+        // re-encrypt using the derived randomness
+        cipherText2 = KPKE.encrypt(publicKey, msg, kr.subarray(32, 64));
+        // if ciphertexts do not match, “implicitly reject”
+        const isValid = equalBytes(cipherText, cipherText2);
+        Kbar = KDF.create({ dkLen: 32 }).update(z).update(cipherText).digest();
+        // LOCAL MODIFICATION (F203-18). Upstream selected and cleaned with ternaries on the
+        // secret flag: `!isValid ? Khat : Kbar` / `isValid ? Khat : Kbar`. Those are
+        // source-level branches whose condition is secret intermediate data, and which decide
+        // which heap object survives. selectSharedSecret replaces them with byte-wise mask
+        // arithmetic, so both candidates are read in full and both are destroyed
+        // unconditionally — there is no longer a branch choosing between them.
+        // kr[32:64] is the derived K-PKE encryption randomness: wipe it like encapsulate() does.
+        const sharedSecret = selectSharedSecret(isValid, Khat, Kbar);
+        return sharedSecret as TRet<Uint8Array>;
+      } finally {
+        if (msg !== undefined) cleanBytes(msg);
+        if (kr !== undefined) cleanBytes(kr);
+        if (cipherText2 !== undefined) cleanBytes(cipherText2);
+        if (Kbar !== undefined) cleanBytes(Kbar);
+      }
     },
     /**
      * Experimental prototype: pre-expand a public key so repeated encapsulate/decapsulate
@@ -747,19 +758,30 @@ function createKyber(opts: TArg<KyberOpts>): TRet<MLKEM> {
           // stronger than) FIPS 203 §7.3's `H(dk[384k : 768k+32]) == dk[768k+32 : 768k+64]`.
           if (!equalBytes(ekEmbedded, ek) || !equalBytes(storedHash, publicKeyHash))
             throw new Error('ML-KEM.decapsulate: secretKey does not match prepared publicKey');
-          const msg = KPKE.decrypt(cipherText, sk);
-          // derive randomness, Khat, rHat = G(mHat || h)
-          const kr = HASH512.create().update(msg).update(publicKeyHash).digest();
-          const Khat = kr.subarray(0, 32);
-          // re-encrypt using the derived randomness and cached Â/t̂
-          const cipherText2 = cached.encrypt(msg, kr.subarray(32, 64));
-          // if ciphertexts do not match, “implicitly reject”
-          const isValid = equalBytes(cipherText, cipherText2);
-          const Kbar = KDF.create({ dkLen: 32 }).update(z).update(cipherText).digest();
-          // LOCAL MODIFICATION (F203-18): see the note at the non-prepared decapsulate.
-          const sharedSecret = selectSharedSecret(isValid, Khat, Kbar);
-          cleanBytes(msg, cipherText2, kr.subarray(32), Khat, Kbar);
-          return sharedSecret as TRet<Uint8Array>;
+          // Raw secretCoder views are borrowed; only these owned buffers are disposable.
+          let msg: Uint8Array | undefined;
+          let kr: Uint8Array | undefined;
+          let cipherText2: Uint8Array | undefined;
+          let Kbar: Uint8Array | undefined;
+          try {
+            msg = KPKE.decrypt(cipherText, sk);
+            // derive randomness, Khat, rHat = G(mHat || h)
+            kr = HASH512.create().update(msg).update(publicKeyHash).digest();
+            const Khat = kr.subarray(0, 32);
+            // re-encrypt using the derived randomness and cached Â/t̂
+            cipherText2 = cached.encrypt(msg, kr.subarray(32, 64));
+            // if ciphertexts do not match, “implicitly reject”
+            const isValid = equalBytes(cipherText, cipherText2);
+            Kbar = KDF.create({ dkLen: 32 }).update(z).update(cipherText).digest();
+            // LOCAL MODIFICATION (F203-18): see the note at the non-prepared decapsulate.
+            const sharedSecret = selectSharedSecret(isValid, Khat, Kbar);
+            return sharedSecret as TRet<Uint8Array>;
+          } finally {
+            if (msg !== undefined) cleanBytes(msg);
+            if (kr !== undefined) cleanBytes(kr);
+            if (cipherText2 !== undefined) cleanBytes(cipherText2);
+            if (Kbar !== undefined) cleanBytes(Kbar);
+          }
         },
         clean: cached.clean,
       }) as TRet<KEMPrepared>;
