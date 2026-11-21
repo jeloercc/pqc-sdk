@@ -430,7 +430,13 @@ function sampleCBD(
   eta: number
 ): TRet<Poly> {
   const PRF = PRF_ as PRF;
-  return sampleCBDBytes(PRF((eta * N) / 4, seed, nonce), eta);
+  // This wrapper owns the PRF output; sampleCBDBytes also accepts borrowed test input.
+  const bytes = PRF((eta * N) / 4, seed, nonce);
+  try {
+    return sampleCBDBytes(bytes, eta);
+  } finally {
+    cleanBytes(bytes);
+  }
 }
 
 // K-PKE
