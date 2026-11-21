@@ -116,12 +116,19 @@ try {
         const trace = stack(),
           site = sourceSite(trace);
         if (site.includes('selectSharedSecret')) beforeAllocation('select');
+        if (site.includes('encode') && trace.includes('Object.decrypt')) beforeAllocation('decrypt-encode');
         if (
-          site.includes('/utils.ts') &&
+          (site.includes('/utils.ts') || site.includes('/_crystals.ts')) &&
           site.includes('encode') &&
           (trace.includes('encryptCore') || active.operation === 'keygen')
         )
           beforeAllocation('encode');
+        if (active.operation === 'keygen' && site.includes('/utils.ts') && site.includes('encode')
+          && active.counts.encode >= active.k + 3 && args[0] === 384 * active.k) {
+          const ref = Reflect.construct(target, args, target);
+          active.values.push({ ref, role: 'encoded-secret' });
+          return ref;
+        }
       }
       return Reflect.construct(target, args, target);
     },
@@ -162,7 +169,8 @@ try {
             for (const nth of new Set([1, Math.ceil(limit / 2), limit]))
               scenarios.push({ reason: normal[0], fault: { target, nth } });
           }
-          scenarios.push({ reason: normal[0], fault: { target: 'encode', nth: 1 } });
+          for (const nth of [1, 3, operation === 'keygen' ? 2 * k + 3 : k + 3]) scenarios.push({ reason: normal[0], fault: { target: 'encode', nth } });
+          if (operation === 'decapsulate') scenarios.push({ reason: normal[0], fault: { target: 'decrypt-encode', nth: 1 } });
           if (operation === 'decapsulate')
             for (const nth of [2, k + 1, 2 * k + 1])
               scenarios.push({ reason: normal[0], fault: { target: 'decrypt-poly', nth } });
@@ -179,6 +187,7 @@ try {
           const prepared = path === 'prepared' ? kem.prepare(pk) : null;
           const context = {
             operation,
+            k,
             fault: scenario.fault,
             injected: false,
             values: [],
@@ -240,8 +249,10 @@ try {
               : mode === 'polynomial'
                 ? [
                     ...context.polys,
+                    ...context.values.filter((v) => v.role === 'encoded-secret' && scenario.fault),
                     ...context.values.filter(
-                      (v) => operation === 'keygen' && ['digest', 'seed-copy'].includes(v.role),
+                      (v) => (operation === 'keygen' && ['digest', 'seed-copy'].includes(v.role))
+                        || (operation === 'encapsulate' && scenario.fault && v.role === 'digest'),
                     ),
                   ]
                 : context.values.filter(
