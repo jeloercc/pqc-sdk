@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test attribution controls without network access
+        run: node --experimental-test-coverage --test scripts/__tests__/contributor-policy.test.mjs
+
       - name: Lint
         run: pnpm lint
 
