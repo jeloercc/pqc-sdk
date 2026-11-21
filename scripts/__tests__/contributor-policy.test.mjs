@@ -572,8 +572,16 @@ test('gh adapter pins hostname and passes JSON on stdin rather than a shell', as
   });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].command, 'gh');
-  assert.ok(calls[0].args.includes('github.com'));
-  assert.ok(calls[0].args.includes('--input'));
+  assert.deepEqual(calls[0].args, [
+    'api',
+    '--hostname',
+    'github.com',
+    '--method',
+    'PUT',
+    'repos/example/project/pulls/7/merge',
+    '--input',
+    '-',
+  ]);
   assert.equal(JSON.parse(calls[0].options.input).commit_message, 'literal $(text) `text`');
   assert.equal(calls[0].options.shell, undefined);
 });
