@@ -11,6 +11,11 @@ overrides:
   typedoc@0.28.20>minimatch: 11.0.9
   tsup>esbuild: 0.28.2
 
+patchedDependencies:
+  typedoc@0.28.20:
+    hash: be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb
+    path: patches/typedoc@0.28.20.patch
+
 importers:
 
   .:
@@ -57,13 +62,13 @@ importers:
         version: 26.6.6
       typedoc:
         specifier: 0.28.20
-        version: 0.28.20(typescript@6.0.3)
+        version: 0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3)
       typedoc-plugin-markdown:
         specifier: ^4.14.1
-        version: 4.14.1(typedoc@0.28.20(typescript@6.0.3))
+        version: 4.14.1(typedoc@0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3))
       typedoc-vitepress-theme:
         specifier: ^1.1.4
-        version: 1.1.4(typedoc-plugin-markdown@4.14.1(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3))
+        version: 1.1.4(typedoc-plugin-markdown@4.14.1(typedoc@0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3)))(typedoc@0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3))
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -7528,16 +7533,16 @@ snapshots:
       media-typer: 1.1.1
       mime-types: 3.0.2
 
-  typedoc-plugin-markdown@4.14.1(typedoc@0.28.20(typescript@6.0.3)):
+  typedoc-plugin-markdown@4.14.1(typedoc@0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3)):
     dependencies:
-      typedoc: 0.28.20(typescript@6.0.3)
+      typedoc: 0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3)
 
-  typedoc-vitepress-theme@1.1.4(typedoc-plugin-markdown@4.14.1(typedoc@0.28.20(typescript@6.0.3)))(typedoc@0.28.20(typescript@6.0.3)):
+  typedoc-vitepress-theme@1.1.4(typedoc-plugin-markdown@4.14.1(typedoc@0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3)))(typedoc@0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3)):
     dependencies:
-      typedoc: 0.28.20(typescript@6.0.3)
-      typedoc-plugin-markdown: 4.14.1(typedoc@0.28.20(typescript@6.0.3))
+      typedoc: 0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3)
+      typedoc-plugin-markdown: 4.14.1(typedoc@0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3))
 
-  typedoc@0.28.20(typescript@6.0.3):
+  typedoc@0.28.20(patch_hash=be8db75b9e412cf072fb6adcd8c3e53705f8207994c12893d756a95e7dfa0fbb)(typescript@6.0.3):
     dependencies:
       '@gerrit0/mini-shiki': 3.23.0
       lunr: 2.3.9

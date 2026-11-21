@@ -1,0 +1,27 @@
+diff --git a/dist/node-utils.js b/dist/node-utils.js
+index 96a483d44c9ca066a5128dc40abcffdb8a3aee4b..8f0a7c139f20f2767e87a01b8b647b3e231cddbe 100644
+--- a/dist/node-utils.js
++++ b/dist/node-utils.js
+@@ -316,6 +316,8 @@ function discoverFiles(rootDir, controller) {
+ }
+ function glob(pattern, root, options = {}) {
+   const mini = new Minimatch2(pattern);
++  // Traverse positive pattern prefixes; keep negation in final file matching.
++  const traversal = new Minimatch2(pattern, { flipNegate: true });
+   const shouldIncludeNodeModules = pattern.includes("node_modules");
+   const controller = {
+     matches(path) {
+@@ -325,12 +327,7 @@ function glob(pattern, root, options = {}) {
+       if (childPath[childPath.length - 1] === "node_modules" && !shouldIncludeNodeModules) {
+         return false;
+       }
+-      return mini.set.some((row) => mini.matchOne(
+-        childPath,
+-        row,
+-        /* partial */
+-        true
+-      ));
++      return traversal.match(childPath.join("/"), true);
+     },
+     matchDirectories: options.includeDirectories,
+     followSymlinks: options.followSymlinks

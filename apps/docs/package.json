@@ -7,7 +7,8 @@
     "predev": "node scripts/sync.mjs && typedoc",
     "dev": "vitepress dev",
     "build": "node scripts/sync.mjs && typedoc && vitepress build",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test/typedoc-glob.test.mjs",
+    "lint": "eslint test",
     "preview": "vitepress preview"
   },
   "dependencies": {

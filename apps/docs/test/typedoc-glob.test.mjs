@@ -21,37 +21,57 @@ async function documentedNames(t, entryPoint, exclude = []) {
     await writeFile(path, content);
   }
   const tsconfig = join(directory, 'tsconfig.json');
-  await writeFile(tsconfig, JSON.stringify({
-    compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', types: [] },
-    include: ['src/**/*'],
-  }));
-  const app = await Application.bootstrap({
-    entryPoints: [join(directory, entryPoint)],
-    entryPointStrategy: 'expand',
+  await writeFile(
     tsconfig,
-    exclude,
-    name: 'Glob fixture',
-    logLevel: 'Error',
-  }, [new TSConfigReader()]);
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: 'ES2022',
+        module: 'ESNext',
+        moduleResolution: 'Bundler',
+        types: [],
+      },
+      include: ['src/**/*'],
+    }),
+  );
+  const app = await Application.bootstrap(
+    {
+      entryPoints: [join(directory, entryPoint)],
+      entryPointStrategy: 'expand',
+      tsconfig,
+      exclude,
+      name: 'Glob fixture',
+      logLevel: 'Error',
+    },
+    [new TSConfigReader()],
+  );
   const project = await app.convert();
-  assert.equal(app.logger.hasErrors(), false, 'TypeDoc must not report configuration or conversion errors');
+  assert.equal(
+    app.logger.hasErrors(),
+    false,
+    'TypeDoc must not report configuration or conversion errors',
+  );
   assert.ok(project, 'TypeDoc must convert the fixture project');
-  return project.getReflectionsByKind(ReflectionKind.Interface | ReflectionKind.Function | ReflectionKind.TypeAlias)
-    .map(reflection => reflection.name).sort();
+  return project
+    .getReflectionsByKind(
+      ReflectionKind.Interface | ReflectionKind.Function | ReflectionKind.TypeAlias,
+    )
+    .map((reflection) => reflection.name)
+    .sort();
 }
 
-test('discovers nested TypeScript entries without dependencies or hidden directories', async t => {
+test('discovers nested TypeScript entries without dependencies or hidden directories', async (t) => {
   assert.deepEqual(await documentedNames(t, 'src/**/*.ts'), ['RootEntry', 'nestedEntry']);
 });
 
-test('expands brace patterns without descending into nested entries', async t => {
+test('expands brace patterns without descending into nested entries', async (t) => {
   assert.deepEqual(await documentedNames(t, 'src/*.{ts,tsx}'), ['OtherEntry', 'RootEntry']);
 });
 
-test('preserves configured exclusion patterns during discovery', async t => {
+test('preserves configured exclusion patterns during discovery', async (t) => {
   assert.deepEqual(await documentedNames(t, 'src/**/*.ts', ['**/nested/**']), ['RootEntry']);
 });
 
-test('discovers an exact entry point', async t => {
+test('discovers an exact entry point', async (t) => {
   assert.deepEqual(await documentedNames(t, 'src/index.ts'), ['RootEntry']);
 });
