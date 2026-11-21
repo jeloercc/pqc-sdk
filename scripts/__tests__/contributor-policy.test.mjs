@@ -540,6 +540,36 @@ test('merge helper defaults to dry-run, performs one exact-head squash only on a
   assert.equal(writes[0].body.merge_method, 'squash');
   assert.ok(!writes[0].body.commit_message.toLowerCase().includes('co-authored-by:'));
 });
+test('trusted workflow must bind the exact PR, repository, head branch and current base', async () => {
+  for (const change of [
+    (f) => {
+      f.data.run.pull_requests = [];
+    },
+    (f) => {
+      f.data.run.pull_requests[0].number = 8;
+    },
+    (f) => {
+      f.data.run.pull_requests[0].base.sha = HEAD;
+    },
+    (f) => {
+      f.data.run.pull_requests[0].head.sha = BASE;
+    },
+    (f) => {
+      f.data.run.pull_requests[0].head.repo.url = 'https://api.github.com/repos/other/project';
+    },
+    (f) => {
+      f.data.run.head_branch = 'other-branch';
+    },
+  ]) {
+    const f = fixture();
+    change(f);
+    await assert.rejects(
+      () => assessMerge(f.api, policy, expected),
+      error('UNTRUSTED_POLICY_STATUS'),
+    );
+    assert.ok(f.calls.every((c) => c.method === 'GET'));
+  }
+});
 test('merge result with unapproved author, tree or parent is rejected without repair writes', async () => {
   for (const [change, code] of [
     [
