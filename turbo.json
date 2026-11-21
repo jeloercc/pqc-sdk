@@ -13,6 +13,10 @@
       "dependsOn": ["^build", "build"],
       "outputs": []
     },
+    "@pqc-sdk/docs#test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "@pqc-sdk/langchain#test": {
       "dependsOn": ["^build", "build"],
       "outputs": []
