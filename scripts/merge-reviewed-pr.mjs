@@ -131,8 +131,19 @@ export async function assessMerge(api, policy, expected) {
     String(run.id) === runId &&
       run.path === '.github/workflows/attribution-policy.yml' &&
       run.event === 'pull_request_target' &&
-      run.head_sha === snapshot.base &&
-      run.head_branch === policy.baseBranch &&
+      run.head_sha === snapshot.head &&
+      run.head_branch === snapshot.pr.head.ref &&
+      Array.isArray(run.pull_requests) &&
+      run.pull_requests.some(
+        (pr) =>
+          pr.number === snapshot.number &&
+          pr.head?.sha === snapshot.head &&
+          pr.head?.ref === snapshot.pr.head.ref &&
+          pr.base?.sha === snapshot.base &&
+          pr.base?.ref === policy.baseBranch &&
+          pr.head?.repo?.url === `https://api.github.com/repos/${policy.repository}` &&
+          pr.base?.repo?.url === `https://api.github.com/repos/${policy.repository}`,
+      ) &&
       run.status === 'completed' &&
       run.conclusion === 'success',
     'UNTRUSTED_POLICY_STATUS',
