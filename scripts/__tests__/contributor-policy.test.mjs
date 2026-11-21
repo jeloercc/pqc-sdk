@@ -61,7 +61,7 @@ function fixture(overrides = {}) {
       draft: false,
       user: { id: 1001 },
       commits: 1,
-      head: { sha: HEAD, repo: { full_name: 'example/project' } },
+      head: { sha: HEAD, ref: 'owner-update', repo: { full_name: 'example/project' } },
       base: { sha: BASE, ref: 'main', repo: { full_name: 'example/project' } },
       mergeable: true,
       mergeable_state: 'clean',
@@ -90,8 +90,23 @@ function fixture(overrides = {}) {
       id: 12,
       path: '.github/workflows/attribution-policy.yml',
       event: 'pull_request_target',
-      head_sha: BASE,
-      head_branch: 'main',
+      head_sha: HEAD,
+      head_branch: 'owner-update',
+      pull_requests: [
+        {
+          number: 7,
+          head: {
+            sha: HEAD,
+            ref: 'owner-update',
+            repo: { url: 'https://api.github.com/repos/example/project' },
+          },
+          base: {
+            sha: BASE,
+            ref: 'main',
+            repo: { url: 'https://api.github.com/repos/example/project' },
+          },
+        },
+      ],
       status: 'completed',
       conclusion: 'success',
     },
@@ -498,7 +513,7 @@ test('merge assessment requires real status creator, base stamp and trusted work
       f.data.run.event = 'pull_request';
     },
     (f) => {
-      f.data.run.head_sha = HEAD;
+      f.data.run.head_sha = BASE;
     },
     (f) => {
       f.data.checks[0].conclusion = 'failure';
