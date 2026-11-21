@@ -10,5 +10,6 @@ overrides:
   # Patched versions checked with Node 20 lint and tests.
   'glob@13.0.7': '14.0.2'
   '@typescript-eslint/typescript-estree>minimatch': '11.0.1'
+  'typedoc@0.28.20>minimatch': '11.0.9'
   # Use the corrected esbuild while keeping bundle-require's peer aligned.
   'tsup>esbuild': '0.28.2'
