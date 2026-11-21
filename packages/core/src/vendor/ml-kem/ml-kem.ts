@@ -25,6 +25,9 @@
  *      branch-free selectSharedSecret() mask and zeroize both candidates unconditionally,
  *      instead of branching twice on the secret implicit-reject flag (FIPS 203 §6.3).
  *   5. Added the `@ts-nocheck` directive on line 1 — see below.
+ *   6. F203-18 cleanup follow-up: wipe owned PRF bytes, polynomial/products and partial
+ *      helper state; use finally for assigned decapsulation buffers and wipe failed
+ *      encapsulation candidates. Preserve borrowed inputs and detached return values.
  *
  * Type checking: this repo compiles with `noUncheckedIndexedAccess: true`, which upstream
  * does not use. Every one of the 37 resulting errors across the three vendored files is
@@ -450,11 +453,12 @@ const genKPKE = (opts_: TArg<KyberOpts>) => {
   const polyV = polyCoder(dv);
   const polyU = polyCoder(du);
   const publicCoder = splitCoder('publicKey', vecCoder(polyCoder(12), K), 32);
-  const secretCoder = vecCoder(polyCoder(12), K);
+  const polyS = polyCoder(12);
+  const secretCoder = vecCoder(polyS, K);
   const cipherCoder = splitCoder('ciphertext', vecCoder(polyU, K), polyV);
   const seedCoder = splitCoder('seed', 32, 32);
   // Algorithm 14 (K-PKE.Encrypt) core, after ek parsing. `tHat` and every poly returned by
-  // `getA(i, j)` are treated as disposable scratch: they are mutated in place and wiped/dropped,
+  // `getA(i, j)` are treated as disposable scratch: they are mutated in place and wiped,
   // so callers holding cached copies must pass fresh copies.
   const encryptCore = (
     tHat: TArg<Poly[]>,
@@ -462,28 +466,50 @@ const genKPKE = (opts_: TArg<KyberOpts>) => {
     msg: TArg<Uint8Array>,
     seed: TArg<Uint8Array>
   ): TRet<Uint8Array> => {
-    const rHat = [];
-    for (let i = 0; i < K; i++) rHat.push(crystals.NTT.encode(sampleCBD(PRF, seed, i, ETA1)));
-    const tmp2 = new Uint16Array(N);
-    const u = [];
-    for (let i = 0; i < K; i++) {
-      const e1 = sampleCBD(PRF, seed, K + i, ETA2);
-      const tmp = new Uint16Array(N);
-      for (let j = 0; j < K; j++) {
-        const aij = getA(i, j); // A[j][i], inplace transpose access
-        polyAdd(tmp, MultiplyNTTs(aij, rHat[j])); // t += aij * rHat[j]
+    const rHat: Poly[] = [];
+    const u: Poly[] = [];
+    let tmp2: Poly | undefined;
+    let e2: Poly | undefined;
+    let v: Poly | undefined;
+    try {
+      for (let i = 0; i < K; i++) {
+        const r = sampleCBD(PRF, seed, i, ETA1);
+        rHat.push(r); // acquire ownership before the in-place transform
+        crystals.NTT.encode(r);
       }
-      polyAdd(e1, crystals.NTT.decode(tmp)); // e1 += tmp
-      u.push(e1);
-      polyAdd(tmp2, MultiplyNTTs(tHat[i], rHat[i])); // t2 += tHat[i] * rHat[i]
-      cleanBytes(tmp);
+      tmp2 = new Uint16Array(N);
+      for (let i = 0; i < K; i++) {
+        const e1 = sampleCBD(PRF, seed, K + i, ETA2);
+        u.push(e1); // retain even if the next allocation/transform fails
+        let tmp: Poly | undefined;
+        try {
+          tmp = new Uint16Array(N);
+          for (let j = 0; j < K; j++) {
+            const aij = getA(i, j); // disposable A[j][i] copy, mutated by multiplication
+            try {
+              polyAdd(tmp, MultiplyNTTs(aij, rHat[j]));
+            } finally {
+              cleanBytes(aij);
+            }
+          }
+          polyAdd(e1, crystals.NTT.decode(tmp));
+          polyAdd(tmp2, MultiplyNTTs(tHat[i], rHat[i]));
+        } finally {
+          if (tmp !== undefined) cleanBytes(tmp);
+        }
+      }
+      e2 = sampleCBD(PRF, seed, 2 * K, ETA2);
+      polyAdd(e2, crystals.NTT.decode(tmp2));
+      v = poly1.decode(msg);
+      polyAdd(v, e2);
+      // Encoding allocates detached bytes; the input polynomials remain owned scratch.
+      return cipherCoder.encode([u, v]) as TRet<Uint8Array>;
+    } finally {
+      cleanBytes(tHat as Poly[], rHat, u);
+      if (tmp2 !== undefined) cleanBytes(tmp2);
+      if (e2 !== undefined) cleanBytes(e2);
+      if (v !== undefined) cleanBytes(v);
     }
-    const e2 = sampleCBD(PRF, seed, 2 * K, ETA2);
-    polyAdd(e2, crystals.NTT.decode(tmp2)); // e2 += tmp2
-    const v = poly1.decode(msg); // encode plaintext m into polynomial v
-    polyAdd(v, e2); // v += e2
-    cleanBytes(tHat, rHat, tmp2, e2);
-    return cipherCoder.encode([u, v]) as TRet<Uint8Array>;
   };
   return {
     secretCoder,
@@ -495,33 +521,44 @@ const genKPKE = (opts_: TArg<KyberOpts>) => {
     keygen: (seed: TArg<Uint8Array>) => {
       abytes(seed, 32, 'seed');
       const seedDst = new Uint8Array(33);
-      seedDst.set(seed);
-      // FIPS 203 Algorithm 13 appends the parameter-set byte `k`
-      // before `G(d || k)`, so expanding the same 32-byte seed
-      // under a different ML-KEM parameter set yields unrelated keys.
-      seedDst[32] = K;
-      const seedHash = HASH512(seedDst);
-
-      const [rho, sigma] = seedCoder.decode(seedHash);
       const sHat: Poly[] = [];
       const tHat: Poly[] = [];
-      for (let i = 0; i < K; i++) sHat.push(crystals.NTT.encode(sampleCBD(PRF, sigma, i, ETA1)));
-      const x = XOF(rho);
-      for (let i = 0; i < K; i++) {
-        const e = crystals.NTT.encode(sampleCBD(PRF, sigma, K + i, ETA1));
-        for (let j = 0; j < K; j++) {
-          const aji = SampleNTT(x.get(j, i)); // A[i][j], inplace
-          polyAdd(e, MultiplyNTTs(aji, sHat[j]));
+      let seedHash: Uint8Array | undefined;
+      let x: ReturnType<typeof XOF> | undefined;
+      try {
+        seedDst.set(seed);
+        // FIPS 203 Algorithm 13 appends k to the seed before expansion.
+        seedDst[32] = K;
+        seedHash = HASH512(seedDst);
+        const [rho, sigma] = seedCoder.decode(seedHash);
+        for (let i = 0; i < K; i++) {
+          const s = sampleCBD(PRF, sigma, i, ETA1);
+          sHat.push(s);
+          crystals.NTT.encode(s);
         }
-        tHat.push(e); // t ← A ◦ s + e
+        x = XOF(rho);
+        for (let i = 0; i < K; i++) {
+          const e = sampleCBD(PRF, sigma, K + i, ETA1);
+          tHat.push(e);
+          crystals.NTT.encode(e);
+          for (let j = 0; j < K; j++) {
+            const aji = SampleNTT(x.get(j, i));
+            try {
+              polyAdd(e, MultiplyNTTs(aji, sHat[j]));
+            } finally {
+              cleanBytes(aji);
+            }
+          }
+        }
+        return {
+          publicKey: publicCoder.encode([tHat, rho]),
+          secretKey: secretCoder.encode(sHat),
+        };
+      } finally {
+        x?.clean();
+        cleanBytes(seedDst, sHat, tHat);
+        if (seedHash !== undefined) cleanBytes(seedHash);
       }
-      x.clean();
-      const res = {
-        publicKey: publicCoder.encode([tHat, rho]),
-        secretKey: secretCoder.encode(sHat),
-      };
-      cleanBytes(rho, sigma, sHat, tHat, seedDst, seedHash);
-      return res;
     },
     encrypt: (
       publicKey: TArg<Uint8Array>,
@@ -530,9 +567,11 @@ const genKPKE = (opts_: TArg<KyberOpts>) => {
     ): TRet<Uint8Array> => {
       const [tHat, rho] = publicCoder.decode(publicKey);
       const x = XOF(rho);
-      const res = encryptCore(tHat as Poly[], (i, j) => SampleNTT(x.get(i, j)) as Poly, msg, seed);
-      x.clean();
-      return res;
+      try {
+        return encryptCore(tHat as Poly[], (i, j) => SampleNTT(x.get(i, j)) as Poly, msg, seed);
+      } finally {
+        x.clean();
+      }
     },
     // Expands the full Â matrix (public data derived from rho) once, so repeated encryptions
     // against the same ek skip the K² SampleNTT XOF expansions. Cached polys are copied per
@@ -556,17 +595,29 @@ const genKPKE = (opts_: TArg<KyberOpts>) => {
       };
     },
     decrypt: (cipherText: TArg<Uint8Array>, privateKey: TArg<Uint8Array>): TRet<Uint8Array> => {
-      const [u, v] = cipherCoder.decode(cipherText);
-      const sk = secretCoder.decode(privateKey); // s  ← ByteDecode_12(dkPKE)
-      const tmp = new Uint16Array(N);
-      // tmp += sk[i] * u[i]
-      for (let i = 0; i < K; i++) polyAdd(tmp, MultiplyNTTs(sk[i], crystals.NTT.encode(u[i])));
-      polySub(v, crystals.NTT.decode(tmp)); // w = v' - tmp
-      // `v` now holds w, from which the plaintext is just a 1-bit threshold away, so wipe it too.
-      // encode() allocates its own buffer, so the returned bytes do not alias `v`.
-      const res = poly1.encode(v) as TRet<Uint8Array>;
-      cleanBytes(tmp, sk, u, v);
-      return res;
+      abytes(cipherText, cipherCoder.bytesLen, 'cipherText');
+      abytes(privateKey, secretCoder.bytesLen, 'privateKey');
+      const u: Poly[] = [];
+      const sk: Poly[] = [];
+      let v: Poly | undefined;
+      let tmp: Poly | undefined;
+      try {
+        // Decode incrementally so partial vectors remain owned if a later decode fails.
+        for (let i = 0; i < K; i++)
+          u.push(polyU.decode(cipherText.subarray(i * polyU.bytesLen, (i + 1) * polyU.bytesLen)));
+        v = polyV.decode(cipherText.subarray(K * polyU.bytesLen));
+        for (let i = 0; i < K; i++)
+          sk.push(polyS.decode(privateKey.subarray(i * polyS.bytesLen, (i + 1) * polyS.bytesLen)));
+        tmp = new Uint16Array(N);
+        for (let i = 0; i < K; i++)
+          polyAdd(tmp, MultiplyNTTs(sk[i], crystals.NTT.encode(u[i])));
+        polySub(v, crystals.NTT.decode(tmp));
+        return poly1.encode(v) as TRet<Uint8Array>;
+      } finally {
+        cleanBytes(sk, u);
+        if (tmp !== undefined) cleanBytes(tmp);
+        if (v !== undefined) cleanBytes(v);
+      }
     },
   };
 };
@@ -655,6 +706,7 @@ function createKyber(opts: TArg<KyberOpts>): TRet<MLKEM> {
       // module-sampled branch changes; a caller-supplied message is untouched.
       const m = ownMsg ? sampleRandomness(msgLen) : (msg as TArg<Uint8Array>);
       let kr: Uint8Array | undefined;
+      let completed = false;
       try {
         abytes(publicKey, lengths.publicKey, 'publicKey');
         abytes(m, msgLen, 'message');
@@ -662,12 +714,14 @@ function createKyber(opts: TArg<KyberOpts>): TRet<MLKEM> {
         // derive randomness
         kr = HASH512.create().update(m).update(HASH256(publicKey)).digest();
         const cipherText = KPKE.encrypt(publicKey, m, kr.subarray(32, 64));
-        return {
+        const result = {
           cipherText: cipherText as TRet<Uint8Array>,
           sharedSecret: kr.subarray(0, 32) as TRet<Uint8Array>,
         };
+        completed = true;
+        return result;
       } finally {
-        if (kr !== undefined) cleanBytes(kr.subarray(32));
+        if (kr !== undefined) cleanBytes(completed ? kr.subarray(32) : kr);
         if (ownMsg) cleanBytes(m);
       }
     },
@@ -733,16 +787,19 @@ function createKyber(opts: TArg<KyberOpts>): TRet<MLKEM> {
           // LOCAL MODIFICATION (F203-11): see the note at the non-prepared encapsulate.
           const m = ownMsg ? sampleRandomness(msgLen) : (msg as TArg<Uint8Array>);
           let kr: Uint8Array | undefined;
+          let completed = false;
           try {
             abytes(m, msgLen, 'message');
             kr = HASH512.create().update(m).update(publicKeyHash).digest();
             const cipherText = cached.encrypt(m, kr.subarray(32, 64));
-            return {
+            const result = {
               cipherText: cipherText as TRet<Uint8Array>,
               sharedSecret: kr.subarray(0, 32) as TRet<Uint8Array>,
             };
+            completed = true;
+            return result;
           } finally {
-            if (kr !== undefined) cleanBytes(kr.subarray(32));
+            if (kr !== undefined) cleanBytes(completed ? kr.subarray(32) : kr);
             if (ownMsg) cleanBytes(m);
           }
         },

@@ -11,10 +11,11 @@
  *
  * Modifications relative to upstream 0.7.1:
  *   1. Added the `@ts-nocheck` directive on line 1.
- *   (otherwise byte-identical to upstream)
+ *   2. F203-18 follow-up: split/vector encoders clear owned nested encodings and
+ *      partial aggregate outputs on exceptions, while preserving borrowed raw fields.
  *
  * This file serves every noble-post-quantum algorithm, so much of it is unused by the
- * vendored ML-KEM surface. It is copied whole and unmodified rather than trimmed, so that
+ * vendored ML-KEM surface. It is retained whole rather than trimmed, so that
  * a future re-vendor is a plain file copy and the diff against upstream stays reviewable.
  */
 /**
@@ -575,16 +576,26 @@ export function splitCoder<T extends (number | BytesCoderLen<any>)[]>(
     bytesLen,
     encode: (bufs: T) => {
       const res = new Uint8Array(bytesLen);
-      for (let i = 0, pos = 0; i < lengths.length; i++) {
-        const c = lengths[i];
-        const l = getLength(c);
-        const b: Uint8Array = typeof c === 'number' ? (bufs[i] as any) : c.encode(bufs[i]);
-        abytes_(b, l, label);
-        res.set(b, pos);
-        if (typeof c !== 'number') b.fill(0); // clean
-        pos += l;
+      let completed = false;
+      try {
+        for (let i = 0, pos = 0; i < lengths.length; i++) {
+          const c = lengths[i];
+          const l = getLength(c);
+          const b: Uint8Array = typeof c === 'number' ? (bufs[i] as any) : c.encode(bufs[i]);
+          try {
+            abytes_(b, l, label);
+            res.set(b, pos);
+          } finally {
+            // Numeric fields borrow input; nested encoded outputs are owned scratch.
+            if (typeof c !== 'number') b.fill(0);
+          }
+          pos += l;
+        }
+        completed = true;
+        return res;
+      } finally {
+        if (!completed) res.fill(0);
       }
-      return res;
     },
     decode: (buf: TArg<Uint8Array>) => {
       abytes_(buf, bytesLen, label);
@@ -629,13 +640,22 @@ export function vecCoder<T>(c: TArg<BytesCoderLen<T>>, vecLen: number): TRet<Byt
       if (uArr.length !== vecLen)
         throw new RangeError(`vecCoder.encode: wrong length=${uArr.length}. Expected: ${vecLen}`);
       const res = new Uint8Array(bytesLen);
-      for (let i = 0, pos = 0; i < uArr.length; i++) {
-        const b = coder.encode(uArr[i] as T);
-        res.set(b, pos);
-        b.fill(0); // clean
-        pos += b.length;
+      let completed = false;
+      try {
+        for (let i = 0, pos = 0; i < uArr.length; i++) {
+          const b = coder.encode(uArr[i] as T);
+          try {
+            res.set(b, pos);
+            pos += b.length;
+          } finally {
+            b.fill(0);
+          }
+        }
+        completed = true;
+        return res as TRet<Uint8Array>;
+      } finally {
+        if (!completed) res.fill(0);
       }
-      return res as TRet<Uint8Array>;
     },
     decode: (a: TArg<Uint8Array>): TRet<T[]> => {
       abytes_(a, bytesLen);

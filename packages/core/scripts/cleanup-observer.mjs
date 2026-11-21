@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
 import process from 'node:process';
+import { URL } from 'node:url';
 
 import { Keccak } from '@noble/hashes/sha3.js';
 
@@ -53,7 +54,8 @@ function beforeAllocation(role) {
 }
 function retainPoly(ref, role, trace) {
   // Modulus validation decodes public key coefficients; they are not secret scratch.
-  if (active && sourceSite(trace) && !trace.includes('validateModulus')) active.polys.push({ ref, role });
+  if (active && sourceSite(trace) && !trace.includes('validateModulus'))
+    active.polys.push({ ref, role });
   return ref;
 }
 
@@ -116,15 +118,21 @@ try {
         const trace = stack(),
           site = sourceSite(trace);
         if (site.includes('selectSharedSecret')) beforeAllocation('select');
-        if (site.includes('encode') && trace.includes('Object.decrypt')) beforeAllocation('decrypt-encode');
+        if (site.includes('encode') && trace.includes('Object.decrypt'))
+          beforeAllocation('decrypt-encode');
         if (
           (site.includes('/utils.ts') || site.includes('/_crystals.ts')) &&
           site.includes('encode') &&
           (trace.includes('encryptCore') || active.operation === 'keygen')
         )
           beforeAllocation('encode');
-        if (active.operation === 'keygen' && site.includes('/utils.ts') && site.includes('encode')
-          && active.counts.encode >= active.k + 3 && args[0] === 384 * active.k) {
+        if (
+          active.operation === 'keygen' &&
+          site.includes('/utils.ts') &&
+          site.includes('encode') &&
+          active.counts.encode >= active.k + 3 &&
+          args[0] === 384 * active.k
+        ) {
           const ref = Reflect.construct(target, args, target);
           active.values.push({ ref, role: 'encoded-secret' });
           return ref;
@@ -169,8 +177,10 @@ try {
             for (const nth of new Set([1, Math.ceil(limit / 2), limit]))
               scenarios.push({ reason: normal[0], fault: { target, nth } });
           }
-          for (const nth of [1, 3, operation === 'keygen' ? 2 * k + 3 : k + 3]) scenarios.push({ reason: normal[0], fault: { target: 'encode', nth } });
-          if (operation === 'decapsulate') scenarios.push({ reason: normal[0], fault: { target: 'decrypt-encode', nth: 1 } });
+          for (const nth of [1, 3, operation === 'keygen' ? 2 * k + 3 : k + 3])
+            scenarios.push({ reason: normal[0], fault: { target: 'encode', nth } });
+          if (operation === 'decapsulate')
+            scenarios.push({ reason: normal[0], fault: { target: 'decrypt-encode', nth: 1 } });
           if (operation === 'decapsulate')
             for (const nth of [2, k + 1, 2 * k + 1])
               scenarios.push({ reason: normal[0], fault: { target: 'decrypt-poly', nth } });
@@ -222,6 +232,8 @@ try {
           if (!inputs.every((a, i) => same(a, snapshots[i])))
             controlErrors.push({ ...id, issue: 'borrowed input mutated' });
           if (!scenario.fault && out) {
+            if (operation === 'decapsulate' && context.values.some((v) => v.ref.buffer === out.buffer))
+              controlErrors.push({ ...id, issue: 'returned secret aliases an intermediate' });
             const correct =
               operation === 'decapsulate'
                 ? same(out, hex(reference.k))
@@ -233,10 +245,19 @@ try {
           const prfs = context.values.filter((v) => v.role === 'prf');
           if (!scenario.fault && prfs.length !== (operation === 'keygen' ? 2 * k : 2 * k + 1))
             controlErrors.push({ ...id, issue: 'PRF count' });
-          const expectedPolys = operation === 'keygen' ? k * k + 2 * k
-            : operation === 'decapsulate' ? k * k + 6 * k + 5 : k * k + 4 * k + 3;
+          const expectedPolys =
+            operation === 'keygen'
+              ? k * k + 2 * k
+              : operation === 'decapsulate'
+                ? k * k + 6 * k + 5
+                : k * k + 4 * k + 3;
           if (!scenario.fault && context.polys.length !== expectedPolys)
-            controlErrors.push({ ...id, issue: 'polynomial count', actual: context.polys.length, expected: expectedPolys });
+            controlErrors.push({
+              ...id,
+              issue: 'polynomial count',
+              actual: context.polys.length,
+              expected: expectedPolys,
+            });
           if (mode === 'sampling' && !prfs.length)
             controlErrors.push({ ...id, issue: 'empty PRF observation' });
           if (mode === 'polynomial' && !context.polys.length && operation !== 'keygen')
@@ -251,15 +272,17 @@ try {
                     ...context.polys,
                     ...context.values.filter((v) => v.role === 'encoded-secret' && scenario.fault),
                     ...context.values.filter(
-                      (v) => (operation === 'keygen' && ['digest', 'seed-copy'].includes(v.role))
-                        || (operation === 'encapsulate' && scenario.fault && v.role === 'digest'),
+                      (v) =>
+                        (operation === 'keygen' && ['digest', 'seed-copy'].includes(v.role)) ||
+                        (operation === 'encapsulate' && scenario.fault && v.role === 'digest'),
                     ),
                   ]
                 : context.values.filter(
                     (v) => ['message', 'digest', 'alternate'].includes(v.role) && v.owned !== false,
                   );
           const remaining = pending.filter((v) => nonzero(v.ref));
-          if (!pending.length) controlErrors.push({ ...id, issue: 'empty owned-buffer observation' });
+          if (!pending.length)
+            controlErrors.push({ ...id, issue: 'empty owned-buffer observation' });
           if (remaining.length)
             failures.push({
               ...id,
