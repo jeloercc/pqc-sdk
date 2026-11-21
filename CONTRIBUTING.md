@@ -114,3 +114,5 @@ prevent an administrator from deliberately editing repository policy or rules.
 ## Security reports
 
 Do not open public issues for vulnerabilities: see [SECURITY.md](./SECURITY.md).
+
+<!-- Temporary owner attribution allow validation; this branch is not intended for merge. -->
