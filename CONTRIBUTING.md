@@ -64,8 +64,52 @@ pnpm changeset
 
 Pick the bump (`patch`/`minor`) and describe the change from the user's
 perspective — that text goes into the CHANGELOG. Docs, CI or example changes
-don't need one. Releases are automated: on merge to `main`, the changesets bot
-opens a version PR and publishes to npm when it gets merged.
+don't need one. On merge to `main`, Changesets proposes a version PR. Reproduce
+an accepted version update on an owner-authored branch with `pnpm version-packages`
+and review its generated manifests and changelogs before integrating it.
+
+## Attribution and reviewed merges
+
+`scripts/contributor-policy.json` records the owner's public account ID, accepted
+Git identities and a reviewed history baseline. Keep credentials out of this file.
+The attribution guard checks the PR creator, every introduced commit and additional
+author-credit trailers. Automated proposals remain available for review, but their
+bot-authored commits are not integrated directly into main.
+
+For an accepted automated update, reproduce the reviewed change on a new branch
+from main with the owner's identity, open a new PR and link the original proposal.
+Do not change human authorship or remove third-party license notices. A human
+contribution from another author needs an explicit policy decision before merging.
+
+The merge helper defaults to inspection only:
+
+```sh
+node scripts/merge-reviewed-pr.mjs --pr PR_NUMBER --head REVIEWED_HEAD_SHA
+```
+
+After explicit authorization, `--apply` requests an exact-head squash. It requires
+all reported checks, the trusted `policy/owner-attribution` status and its completed
+default-branch workflow. It verifies the resulting author, parent and tree; it
+never bypasses rules, rewrites history or repairs an unexpected merge automatically.
+If the API fails during a merge, inspect the PR before attempting recovery. A closed
+PR is rejected rather than merged again. The helper uses the existing `gh` session;
+it does not extract tokens or create credentials.
+
+The trusted PR workflow reads metadata without checking out the PR head or
+installing dependencies. Its only write permission is for commit statuses.
+The Release validation job reads the actual main history before the separate job
+with publishing/OIDC permissions can start. GitHub's platform committer is not
+treated as an additional author; the actual commit author still must be permitted.
+
+The first PR installing these controls needs manual owner-attribution review with
+the existing required CI. After the workflow is on main, verify its status on the
+PR head and its source before separately authorizing the new required context.
+Do not enable a missing check or weaken the existing Node 20/24 requirements.
+Review the applicable Actions event policies before activation. If an event policy
+blocks this workflow, stop and revise the integration plan; do not automatically
+add a policy exception or require a status that cannot run.
+Contributors is cached and is not used as the execution gate. These controls do not
+prevent an administrator from deliberately editing repository policy or rules.
 
 ## Security reports
 

@@ -12,10 +12,17 @@ import {
   policyDigest,
   policyStatusDescription,
   runPullRequestGuard,
+  runCheckerCli,
   validatePolicy,
   verifyMain,
 } from '../check-contributor-policy.mjs';
-import { assessMerge, createGhClient, mergeReviewedPr } from '../merge-reviewed-pr.mjs';
+import {
+  assessMerge,
+  createGhClient,
+  mergeReviewedPr,
+  parseMergeArguments,
+  runMergeCli,
+} from '../merge-reviewed-pr.mjs';
 
 const HEAD = 'a'.repeat(40),
   BASE = 'b'.repeat(40),
@@ -132,8 +139,11 @@ test('policy rejects malformed identities, repositories, SHA and limits', () => 
     { ...policy, repository: '../evil' },
     { ...policy, baseline: 'invalid' },
     { ...policy, maxPrCommits: 251 },
+    { ...policy, context: undefined },
     { ...policy, owner: { ...policy.owner, id: 0 } },
     { ...policy, owner: { ...policy.owner, emails: [] } },
+    { ...policy, owner: { ...policy.owner, login: undefined } },
+    { ...policy, owner: { ...policy.owner, extra: 'unexpected' } },
   ])
     assert.throws(() => validatePolicy(changed), error('INVALID_POLICY'));
 });
@@ -515,17 +525,38 @@ test('merge helper defaults to dry-run, performs one exact-head squash only on a
   assert.equal(writes[0].body.merge_method, 'squash');
   assert.ok(!writes[0].body.commit_message.toLowerCase().includes('co-authored-by:'));
 });
-test('merge result with unapproved author or tree is rejected without repair writes', async () => {
-  const f = fixture();
-  const api = async (path, options) =>
-    path.endsWith(`/commits/${'d'.repeat(40)}`)
-      ? { ...commit(), author: { id: 2001 } }
-      : f.api(path, options);
-  await assert.rejects(
-    () => mergeReviewedPr(api, policy, { ...expected, apply: true }),
-    error('COMMIT_ACCOUNT_NOT_ALLOWED'),
-  );
-  assert.equal(f.calls.filter((c) => c.method !== 'GET').length, 1);
+test('merge result with unapproved author, tree or parent is rejected without repair writes', async () => {
+  for (const [change, code] of [
+    [
+      (c) => {
+        c.author.id = 2001;
+      },
+      'COMMIT_ACCOUNT_NOT_ALLOWED',
+    ],
+    [
+      (c) => {
+        c.commit.tree.sha = HEAD;
+      },
+      'TREE_MISMATCH',
+    ],
+    [
+      (c) => {
+        c.parents[0].sha = HEAD;
+      },
+      'BASE_CHANGED',
+    ],
+  ]) {
+    const f = fixture();
+    const merged = { ...commit(), sha: 'd'.repeat(40) };
+    change(merged);
+    const api = async (path, options) =>
+      path.endsWith(`/commits/${'d'.repeat(40)}`) ? merged : f.api(path, options);
+    await assert.rejects(
+      () => mergeReviewedPr(api, policy, { ...expected, apply: true }),
+      (e) => e.code === code && e.mergeSha === 'd'.repeat(40),
+    );
+    assert.equal(f.calls.filter((c) => c.method !== 'GET').length, 1);
+  }
 });
 test('gh adapter pins hostname and passes JSON on stdin rather than a shell', async () => {
   const calls = [];
@@ -545,4 +576,160 @@ test('gh adapter pins hostname and passes JSON on stdin rather than a shell', as
   assert.ok(calls[0].args.includes('--input'));
   assert.equal(JSON.parse(calls[0].options.input).commit_message, 'literal $(text) `text`');
   assert.equal(calls[0].options.shell, undefined);
+});
+
+test('CLI requires a reviewed SHA and unique explicit arguments, with dry-run as default', () => {
+  assert.deepEqual(parseMergeArguments(['--pr', '7', '--head', HEAD]), {
+    number: 7,
+    head: HEAD,
+    apply: false,
+  });
+  assert.equal(parseMergeArguments(['--head', HEAD, '--apply', '--pr', '7']).apply, true);
+  for (const args of [
+    [],
+    ['--pr', '7'],
+    ['--pr', '0', '--head', HEAD],
+    ['--pr', '7', '--head', 'main'],
+    ['--pr', '7', '--head', HEAD, '--apply', '--apply'],
+    ['--pr', '7', '--head', HEAD, '--pr', '8'],
+    ['--pr', '7', '--head', HEAD, '--force'],
+  ]) {
+    assert.throws(() => parseMergeArguments(args), error('INVALID_ARGUMENTS'));
+  }
+});
+
+test('merge CLI loads fixed policy and stays read-only unless apply is explicit', async () => {
+  const f = fixture();
+  const result = await runMergeCli(['--pr', '7', '--head', HEAD], {
+    api: f.api,
+    readFile: (path) => {
+      assert.ok(String(path).endsWith('/contributor-policy.json'));
+      return JSON.stringify(policy);
+    },
+  });
+  assert.equal(result.state, 'dry-run');
+  assert.ok(f.calls.every((c) => c.method === 'GET'));
+});
+
+test('checker CLI rejects unrelated events before any API write and dispatches trusted PR metadata', async () => {
+  const f = fixture();
+  const event = {
+    repository: { full_name: policy.repository },
+    number: 7,
+    pull_request: f.data.pr,
+  };
+  const readFile = (path) =>
+    String(path).endsWith('contributor-policy.json')
+      ? JSON.stringify(policy)
+      : JSON.stringify(event);
+  const env = {
+    GITHUB_REPOSITORY: policy.repository,
+    GITHUB_EVENT_NAME: 'pull_request_target',
+    GITHUB_EVENT_PATH: '/event.json',
+    GITHUB_SHA: BASE,
+    GITHUB_RUN_ID: '12',
+  };
+  for (const options of [
+    { args: [], env },
+    { args: ['--pull-request'], env: { ...env, GITHUB_REPOSITORY: 'other/project' } },
+    { args: ['--pull-request'], env: { ...env, GITHUB_EVENT_NAME: 'pull_request' } },
+    { args: ['--main'], env },
+  ])
+    await assert.rejects(() =>
+      runCheckerCli(options.args, { env: options.env, readFile, api: f.api }),
+    );
+  assert.equal(f.calls.length, 0);
+  const result = await runCheckerCli(['--pull-request'], { env, readFile, api: f.api });
+  assert.equal(result.state, 'success');
+});
+
+test('checker CLI validates main through the same full-history gate', async (t) => {
+  const f = gitFixture(t);
+  const head = f.head;
+  const p = { ...policy, baseline: head };
+  const c = {
+    ...commit(),
+    sha: head,
+    commit: { ...commit().commit, tree: { sha: f.git('rev-parse', 'HEAD^{tree}') } },
+  };
+  const api = async (path) => (path.includes('/git/ref/') ? { object: { sha: head } } : c);
+  const result = await runCheckerCli(['--main'], {
+    cwd: f.cwd,
+    env: {
+      GITHUB_REPOSITORY: p.repository,
+      GITHUB_EVENT_NAME: 'push',
+      GITHUB_REF: 'refs/heads/main',
+      GITHUB_SHA: head,
+    },
+    readFile: () => JSON.stringify(p),
+    api,
+  });
+  assert.equal(result.state, 'success');
+});
+
+test('transports reject forbidden mutations, invalid paths, and sanitize subprocess errors', async () => {
+  const fetchApi = createGitHubClient({
+    token: 'synthetic',
+    fetchImpl: async () => {
+      throw new Error('synthetic secret');
+    },
+  });
+  assert.throws(() => createGitHubClient({ token: '' }), error('MISSING_TOKEN'));
+  await assert.rejects(
+    () => fetchApi('repos/example/project/pulls/7', { method: 'DELETE' }),
+    error('INVALID_API_PATH'),
+  );
+  await assert.rejects(() => fetchApi('repos/example/project/../evil'), error('INVALID_API_PATH'));
+  await assert.rejects(
+    () => fetchApi('user'),
+    (e) => e.code === 'API_ERROR' && !e.message.includes('secret'),
+  );
+  const ghApi = createGhClient({
+    exec: () => {
+      throw new Error('synthetic secret');
+    },
+  });
+  await assert.rejects(() => ghApi('user'), error('API_ERROR'));
+  await assert.rejects(() => ghApi('user', { method: 'POST' }), error('INVALID_API_PATH'));
+});
+
+test('merge assessment rejects incomplete checks, stale statuses, and an unapproved merger', async () => {
+  for (const setup of [
+    (f) => {
+      f.data.checks = [];
+    },
+    (f) => {
+      f.data.checks[0].app.id = 2001;
+    },
+    (f) => {
+      f.data.statuses[0].sha = BASE;
+    },
+    (f) => {
+      f.data.statuses[0].target_url = 'https://example.test/actions/runs/12';
+    },
+    (f) => {
+      f.data.statuses[0].state = 'pending';
+    },
+  ]) {
+    const f = fixture();
+    setup(f);
+    await assert.rejects(() => assessMerge(f.api, policy, expected));
+    assert.ok(f.calls.every((c) => c.method === 'GET'));
+  }
+  const f = fixture();
+  await assert.rejects(
+    () =>
+      assessMerge(async (path) => (path === 'user' ? { id: 2001 } : f.api(path)), policy, expected),
+    error('MERGER_NOT_ALLOWED'),
+  );
+  await assert.rejects(
+    () =>
+      assessMerge(
+        async (path) =>
+          path.includes('/check-runs?') ? { total_count: 101, check_runs: [] } : f.api(path),
+        policy,
+        expected,
+      ),
+    error('CHECKS_INCOMPLETE'),
+  );
 });

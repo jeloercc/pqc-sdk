@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "repository": "jeloercc/pqc-sdk",
+  "baseBranch": "main",
+  "baseline": "deb6e74b6d9f7c54159d1a6626437e247d023086",
+  "owner": {
+    "id": 221666745,
+    "login": "jeloercc",
+    "names": ["julian M", "jeloercc", "jeloerc"],
+    "emails": ["mjul064@gmail.com"]
+  },
+  "context": "policy/owner-attribution",
+  "maxPrCommits": 250,
+  "statusCreatorId": 41898282,
+  "actionsAppId": 15368,
+  "requiredChecks": ["ci (node 20)", "ci (node 24)", "bench"]
+}
