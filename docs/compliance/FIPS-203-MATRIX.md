@@ -1,13 +1,16 @@
 # FIPS 203 (ML-KEM) — Conformance Matrix
 
-**Object of assessment:** `@pqc-sdk/core` @ `0.8.3`, commit `3d76be9`, branch `main`
+**Assessment baseline:** `@pqc-sdk/core` @ `0.12.0`, commit `e55ca5d17aa82bee1390e2aa77674dd63150b6ef`.
+The cleanup follow-up described below is an unreleased source change against that baseline.
 **Normative document:** FIPS 203, _Module-Lattice-Based Key-Encapsulation Mechanism
 Standard_ (NIST, August 2024)
 **Primitive provider:** `@noble/post-quantum@0.7.1` (exact pin), with the ML-KEM surface
 vendored into `packages/core/src/vendor/ml-kem/` — see §1.3
 **Assessment date:** 2026-09-07 (initial), 2026-09-07 (corrective pass), 2026-09-09
-(corrective pass — see §4.4)
-**Method:** static source analysis. Rows recorded as CONFORMING on the strength of a
+(corrective pass — see §4.4); cleanup/evidence follow-up 2026-11-21.
+**Method:** source analysis, independent public sample comparisons and controlled buffer
+observations. Buffer observations establish visible writes, not physical erasure or
+compiled constant-time execution. Rows recorded as CONFORMING on the strength of a
 correction cite the specific test that demonstrates it; those tests were executed.
 
 ---
@@ -16,6 +19,12 @@ correction cite the specific test that demonstrates it; those tests were execute
 
 This matrix records, requirement by requirement, the state of FIPS 203 conformance
 for the ML-KEM surface of `packages/core`.
+
+The SDK's default remains X-Wing; it is separate from the standard's parameter-set
+recommendation. `FIPS_ALGORITHMS` enumerates supported primitives, not assurance of
+a combined procedure or deployed RBG approval/strength. The host and interpretation
+questions already recorded below remain open. The 2026-11-21 cleanup follow-up does
+not change any formal row status; the F203-18 qualifier and assessor decision remain.
 
 It began as a pure findings document, per the project's findings-before-fixes rule: the
 assessment pass changed nothing. Remediation then landed separately, referencing the
@@ -143,18 +152,28 @@ the entire period the requirement was breached, and still pass now that it is no
 known-answer test cannot see the difference, which is exactly why closing that row
 required a source-level assertion and not only a behavioural one.
 
-The 31 ACVP cases now execute against the vendored primitive, because
-`generateKeyPairFromSeed` and `pqc.decrypt` route through `algorithms.ts`. Their passing
-is what establishes that vendoring changed no ML-KEM output.
+The legacy vector suite routes through the vendored primitive. In addition,
+`vendor/ml-kem/__tests__/acvp-oracle.test.ts` checks 240 byte-pinned official public
+sample cases across all three sets, including 75 direct Encaps ciphertext/secret
+comparisons. Provenance and exact group/case inventories live in
+`packages/core/src/vectors/acvp/ml-kem/manifest.json`. Locally generated legacy
+fixtures remain regression data; passing public samples is not official validation
+or proof of every requirement.
 
 ### 4.3 Next actions (open)
 
 1. ~~**F203-05, F203-10**~~ — closed 2026-09-09 (corrective pass 2): `fips203-input-checks.test.ts`
    exercises both checks directly. No further action.
-2. **F203-18** — assessor decision on the proposed status ([§3.8 as of `8c135fa`](https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L420)): `CONFORMING (with
-documented language limitation)` as proposed, or `NONCONFORMING` on the ground that the
-   `shall` cannot be met in a language with no zeroization primitive. No further code
-   change is proposed either way.
+2. **F203-18** — owner/assessor disposition remains pending. The existing
+   `CONFORMING (with documented language limitation)` row is retained as a historical
+   qualified classification, not a new closure decision. The 2026-11-21 follow-up
+   identified fixable PRF, polynomial and exception-cleanup omissions on the baseline
+   and added repairs with retained-buffer regressions. That supersedes the earlier
+   statement that no further code change was proposed. After repair, runtime flag,
+   register/copy and compiled timing guarantees still require separate assessment;
+   neither samples nor visible overwrites automatically settle formal conformance.
+   See the [cleanup follow-up](https://github.com/jeloercc/pqc-sdk/blob/main/docs/compliance/ML-KEM-CLEANUP.md)
+   and [historical decision](https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L420).
 3. ~~**F203-03**~~ — closed 2026-09-09 (corrective pass 2): `FIPS_ALGORITHMS` exported from
    `index.ts` with JSDoc citing FIPS 203 §3.3 and this matrix §3.2 (`index.ts:84`; [historical: §3.2 as of `8c135fa`](https://github.com/jeloercc/pqc-sdk/blob/8c135fa31e1efd2e8faeabea23d2cb833e55092f/docs/compliance/FIPS-203-MATRIX.md#L161), which predates this closure and still reads INDETERMINATE). No further action.
 4. **F203-01** — sets exposed in #93 (`a5d00d9`): envelopes v3/v4, streaming versions

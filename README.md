@@ -33,8 +33,8 @@ NIST finalised three post-quantum standards in 2024:
 
 This SDK implements FIPS 203 and FIPS 204 in pure TypeScript, with a
 clause-by-clause self-assessment against both standards, 6 closed
-`NONCONFORMING` findings, and tests against NIST ACVP known-answer vectors for
-every parameter set. **SLH-DSA (FIPS 205) is deliberately not implemented** — see
+`NONCONFORMING` findings, independent pinned NIST ACVP public samples for every
+ML-KEM parameter set, and the existing ML-DSA vector suite. **SLH-DSA (FIPS 205) is deliberately not implemented** — see
 [SLH-DSA scope decision](#slh-dsa-fips-205-not-implemented-by-scope-decision).
 
 ---
@@ -292,17 +292,17 @@ used as published. The risk we carry is those corrections plus the layer
 _around_ the primitives: envelope format, key serialization, nonce derivation,
 fail-closed parsing.
 
-| Layer                 | How it is verified                                                                                                                                                                                   |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Primitive correctness | **NIST ACVP vectors** for ML-KEM-512/768/1024 and ML-DSA-44/65/87, plus X-Wing Appendix C — [`nist-vectors.test.ts`](./packages/core/src/nist-vectors.test.ts)                                       |
-| Wire format stability | **Golden vectors** for every envelope version (v1, v2, streaming) — regenerated only behind an acknowledged breaking change — [`golden-vectors.test.ts`](./packages/core/src/golden-vectors.test.ts) |
-| Parser hostility      | **Fuzzing** of `keys.deserialize` against arbitrary and hostile input — always fails closed — [`deserialize-fuzz.test.ts`](./packages/core/src/deserialize-fuzz.test.ts)                             |
-| Roundtrip + tamper    | **Property-based tests** (`fast-check`): decrypt(encrypt(x)) === x, any single-byte tamper fails closed — [`properties.test.ts`](./packages/core/src/properties.test.ts)                             |
-| Streaming envelope    | **Mutation matrix** tampering every region independently — truncation, reorder, duplication, cross-stream splice — [`stream-mutations.test.ts`](./packages/core/src/stream-mutations.test.ts)        |
-| Format specification  | Normative byte layout — [`docs/serialization-format.md`](./docs/serialization-format.md)                                                                                                             |
-| Security policy       | Reporting and known limitations — [`SECURITY.md`](./SECURITY.md)                                                                                                                                     |
-| Runtime claims        | Node, Deno, Workers and standalone Hermes — ✅ only after the real roundtrip ran — [`docs/compatibility.md`](./docs/compatibility.md)                                                                |
-| Interop               | CIRCL (Go) cross-check for ML-DSA and X-Wing shared secrets — [`interop-circl.test.ts`](./packages/core/src/interop-circl.test.ts)                                                                   |
+| Layer                 | How it is verified                                                                                                                                                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primitive correctness | **240 pinned official ML-KEM public sample cases**, including direct Encaps assertions — [`acvp-oracle.test.ts`](./packages/core/src/vendor/ml-kem/__tests__/acvp-oracle.test.ts); existing ML-DSA and X-Wing vector suites remain |
+| Wire format stability | **Golden vectors** for every envelope version (v1, v2, streaming) — regenerated only behind an acknowledged breaking change — [`golden-vectors.test.ts`](./packages/core/src/golden-vectors.test.ts)                               |
+| Parser hostility      | **Fuzzing** of `keys.deserialize` against arbitrary and hostile input — always fails closed — [`deserialize-fuzz.test.ts`](./packages/core/src/deserialize-fuzz.test.ts)                                                           |
+| Roundtrip + tamper    | **Property-based tests** (`fast-check`): decrypt(encrypt(x)) === x, any single-byte tamper fails closed — [`properties.test.ts`](./packages/core/src/properties.test.ts)                                                           |
+| Streaming envelope    | **Mutation matrix** tampering every region independently — truncation, reorder, duplication, cross-stream splice — [`stream-mutations.test.ts`](./packages/core/src/stream-mutations.test.ts)                                      |
+| Format specification  | Normative byte layout — [`docs/serialization-format.md`](./docs/serialization-format.md)                                                                                                                                           |
+| Security policy       | Reporting and known limitations — [`SECURITY.md`](./SECURITY.md)                                                                                                                                                                   |
+| Runtime claims        | Node, Deno, Workers and standalone Hermes — ✅ only after the real roundtrip ran — [`docs/compatibility.md`](./docs/compatibility.md)                                                                                              |
+| Interop               | CIRCL (Go) cross-check for ML-DSA and X-Wing shared secrets — [`interop-circl.test.ts`](./packages/core/src/interop-circl.test.ts)                                                                                                 |
 
 **Audit status and limitations.** This SDK has not undergone an independent
 third-party cryptographic audit. JavaScript provides no constant-time
