@@ -23,7 +23,13 @@ export default defineConfig({
       // of it is unreachable from the ML-KEM surface and would drag the ratios below the
       // thresholds without saying anything about this SDK's own test quality. The local
       // modifications are covered directly by src/vendor/ml-kem/__tests__/.
-      exclude: ['src/**/*.test.ts', 'src/**/*.bench.ts', 'src/vendor/**'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.bench.ts',
+        'src/vendor/**',
+        // Provenance prose is not executable source; preserve the code coverage scope.
+        'src/vectors/acvp/ml-kem/README.md',
+      ],
       thresholds: {
         lines: 90,
         functions: 90,

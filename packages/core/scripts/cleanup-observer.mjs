@@ -137,6 +137,17 @@ try {
           active.values.push({ ref, role: 'encoded-secret' });
           return ref;
         }
+        if (
+          active.operation === 'decapsulate' &&
+          site.includes('/utils.ts') &&
+          site.includes('encode') &&
+          trace.includes('encryptCore') &&
+          args[0] === active.ctLength
+        ) {
+          const ref = Reflect.construct(target, args, target);
+          active.values.push({ ref, role: 'reencryption' });
+          return ref;
+        }
       }
       return Reflect.construct(target, args, target);
     },
@@ -198,6 +209,7 @@ try {
           const context = {
             operation,
             k,
+            ctLength: ct.length,
             fault: scenario.fault,
             injected: false,
             values: [],
@@ -232,7 +244,10 @@ try {
           if (!inputs.every((a, i) => same(a, snapshots[i])))
             controlErrors.push({ ...id, issue: 'borrowed input mutated' });
           if (!scenario.fault && out) {
-            if (operation === 'decapsulate' && context.values.some((v) => v.ref.buffer === out.buffer))
+            if (
+              operation === 'decapsulate' &&
+              context.values.some((v) => v.ref.buffer === out.buffer)
+            )
               controlErrors.push({ ...id, issue: 'returned secret aliases an intermediate' });
             const correct =
               operation === 'decapsulate'
@@ -264,6 +279,11 @@ try {
             controlErrors.push({ ...id, issue: 'empty polynomial observation' });
           if (mode === 'outer' && context.values.filter((v) => v.role === 'message').length !== 1)
             controlErrors.push({ ...id, issue: 'message observation' });
+          if (
+            mode === 'outer' &&
+            context.values.filter((v) => v.role === 'reencryption').length !== 1
+          )
+            controlErrors.push({ ...id, issue: 'reencryption observation' });
           const pending =
             mode === 'sampling'
               ? prfs
@@ -278,7 +298,9 @@ try {
                     ),
                   ]
                 : context.values.filter(
-                    (v) => ['message', 'digest', 'alternate'].includes(v.role) && v.owned !== false,
+                    (v) =>
+                      ['message', 'digest', 'alternate', 'reencryption'].includes(v.role) &&
+                      v.owned !== false,
                   );
           const remaining = pending.filter((v) => nonzero(v.ref));
           if (!pending.length)
