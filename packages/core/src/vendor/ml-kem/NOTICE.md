@@ -76,6 +76,23 @@ reconstructed preset, resolve to this vendored copy.
 
 ## Maintenance
 
+### Owned-buffer cleanup follow-up (2026-11-21)
+
+Local changes in `ml-kem.ts` clear PRF sampling bytes, polynomial products and
+partially initialized helper scratch; both decapsulation paths clear assigned
+intermediates in `finally`, and failed encapsulation clears its unreturned
+candidate. Borrowed inputs, returned outputs and reusable public caches retain
+their ownership contracts. `utils.ts` clears owned nested encodings and partial
+aggregate outputs if encoding fails; it does not erase borrowed raw fields.
+The shared helpers are also used by vendored ML-DSA and retain its regression
+coverage. `_crystals.ts` arithmetic is unchanged.
+
+`cleanup.test.ts` invokes process-isolated observation with staged faults and
+uninstrumented controls. Such observation establishes visible buffer contents;
+it does not guarantee physical erasure or compiled constant-time execution.
+The existing license, upstream version and pristine-file digests above are
+unchanged. A local patch must never replace a pristine digest with a patched one.
+
 When upgrading `@noble/post-quantum`, re-vendor rather than hand-merge:
 
 1. Copy the three files again from the new version's `src/`.

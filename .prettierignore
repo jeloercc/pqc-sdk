@@ -19,3 +19,7 @@ packages/core/src/vendor/ml-kem/ml-kem.ts
 packages/core/src/vendor/ml-kem/_crystals.ts
 packages/core/src/vendor/ml-kem/utils.ts
 packages/core/src/vendor/ml-dsa/ml-dsa.ts
+
+# Exact upstream public sample bytes; hashes and provenance are checked in tests.
+packages/core/src/vectors/acvp/ml-kem/keygen.json
+packages/core/src/vectors/acvp/ml-kem/encapdecap.json

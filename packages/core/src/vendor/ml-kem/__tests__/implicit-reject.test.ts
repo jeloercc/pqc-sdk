@@ -153,12 +153,10 @@ describe('F203-18: implicit-reject selection is output-inert', () => {
   });
 });
 
-describe('F203-18: intermediate values are destroyed', () => {
-  it('zeroizes both shared-secret candidates, not only the non-returned one', () => {
-    // Khat is a view into `kr`, the SHA3-512 digest of (m′ ‖ H(ek)). Reconstructing kr here
-    // and checking the returned secret is a detached buffer establishes that the returned
-    // value cannot alias a candidate the implementation is meant to have wiped — if it did,
-    // wiping both candidates unconditionally would have zeroed the return value.
+describe('F203-18: output ownership is preserved', () => {
+  it('returns a detached, usable shared secret', () => {
+    // This checks the returned output, not retained candidate contents. cleanup.test.ts
+    // separately observes candidate and helper buffers on normal and exceptional exits.
     const { publicKey, secretKey } = kem.keygen();
     const { cipherText, sharedSecret } = kem.encapsulate(publicKey);
 
@@ -172,8 +170,7 @@ describe('F203-18: intermediate values are destroyed', () => {
   });
 
   it('does not leave H(ek) or the public key mutated in the caller’s secret key', () => {
-    // cleanBytes now receives Khat as well; Khat aliases kr, not the secret key. This pins
-    // that the widened destruction did not start reaching into caller-owned memory.
+    // Owned digest cleanup must not reach borrowed views into the caller's secret key.
     const { publicKey, secretKey } = kem.keygen();
     const before = Uint8Array.from(secretKey);
     const { cipherText } = kem.encapsulate(publicKey);
@@ -201,11 +198,9 @@ describe('F203-18: no secret-dependent branch remains in the source', () => {
     expect(code).not.toMatch(/isValid\s*\?/);
     expect(code).not.toMatch(/!isValid\s*\?/);
 
-    // Both call sites must use the helper and destroy both candidates unconditionally.
+    // Both call sites use the mask helper. Runtime cleanup is tested by retaining
+    // actual buffers, not by pinning the spelling of one cleanup statement.
     expect(code.match(/selectSharedSecret\(isValid, Khat, Kbar\)/g)).toHaveLength(2);
-    expect(
-      code.match(/cleanBytes\(msg, cipherText2, kr\.subarray\(32\), Khat, Kbar\)/g),
-    ).toHaveLength(2);
   });
 
   it('the mask yields exactly one candidate for every byte pair', () => {

@@ -1,0 +1,132 @@
+{
+  "repository": "usnistgov/ACVP-Server",
+  "commit": "975de31eb83d87039ec88934fdc47d8c312b892d",
+  "sourceType": "Public sample internalProjection; not a validation submission",
+  "totalCases": 240,
+  "files": [
+    {
+      "file": "keygen.json",
+      "upstreamPath": "gen-val/json-files/ML-KEM-keyGen-FIPS203/internalProjection.json",
+      "sha256": "d7a62a2c3476957f56dd8d24f9004ea6776ccfe995ffe71a65bb9506dc9c7b1b",
+      "gitBlob": "99973426c8dd03f227ace6d7ac917ba4443e2f27",
+      "groups": [
+        {
+          "tgId": 1,
+          "parameterSet": "ML-KEM-512",
+          "function": "keyGen",
+          "tcIds": [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+            25
+          ]
+        },
+        {
+          "tgId": 2,
+          "parameterSet": "ML-KEM-768",
+          "function": "keyGen",
+          "tcIds": [
+            26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+            48, 49, 50
+          ]
+        },
+        {
+          "tgId": 3,
+          "parameterSet": "ML-KEM-1024",
+          "function": "keyGen",
+          "tcIds": [
+            51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72,
+            73, 74, 75
+          ]
+        }
+      ]
+    },
+    {
+      "file": "encapdecap.json",
+      "upstreamPath": "gen-val/json-files/ML-KEM-encapDecap-FIPS203/internalProjection.json",
+      "sha256": "a556952ce869bb89c3a3196a701dad89647c193a34c86eafb61a9d710d5b810f",
+      "gitBlob": "73692fe52abe2f937b7884baa46475c77c68a1d3",
+      "groups": [
+        {
+          "tgId": 1,
+          "parameterSet": "ML-KEM-512",
+          "function": "encapsulation",
+          "tcIds": [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+            25
+          ]
+        },
+        {
+          "tgId": 2,
+          "parameterSet": "ML-KEM-768",
+          "function": "encapsulation",
+          "tcIds": [
+            26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+            48, 49, 50
+          ]
+        },
+        {
+          "tgId": 3,
+          "parameterSet": "ML-KEM-1024",
+          "function": "encapsulation",
+          "tcIds": [
+            51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72,
+            73, 74, 75
+          ]
+        },
+        {
+          "tgId": 4,
+          "parameterSet": "ML-KEM-512",
+          "function": "decapsulation",
+          "tcIds": [76, 77, 78, 79, 80, 81, 82, 83, 84, 85]
+        },
+        {
+          "tgId": 5,
+          "parameterSet": "ML-KEM-768",
+          "function": "decapsulation",
+          "tcIds": [86, 87, 88, 89, 90, 91, 92, 93, 94, 95]
+        },
+        {
+          "tgId": 6,
+          "parameterSet": "ML-KEM-1024",
+          "function": "decapsulation",
+          "tcIds": [96, 97, 98, 99, 100, 101, 102, 103, 104, 105]
+        },
+        {
+          "tgId": 7,
+          "parameterSet": "ML-KEM-512",
+          "function": "decapsulationKeyCheck",
+          "tcIds": [106, 107, 108, 109, 110, 111, 112, 113, 114, 115]
+        },
+        {
+          "tgId": 8,
+          "parameterSet": "ML-KEM-512",
+          "function": "encapsulationKeyCheck",
+          "tcIds": [116, 117, 118, 119, 120, 121, 122, 123, 124, 125]
+        },
+        {
+          "tgId": 9,
+          "parameterSet": "ML-KEM-768",
+          "function": "decapsulationKeyCheck",
+          "tcIds": [126, 127, 128, 129, 130, 131, 132, 133, 134, 135]
+        },
+        {
+          "tgId": 10,
+          "parameterSet": "ML-KEM-768",
+          "function": "encapsulationKeyCheck",
+          "tcIds": [136, 137, 138, 139, 140, 141, 142, 143, 144, 145]
+        },
+        {
+          "tgId": 11,
+          "parameterSet": "ML-KEM-1024",
+          "function": "decapsulationKeyCheck",
+          "tcIds": [146, 147, 148, 149, 150, 151, 152, 153, 154, 155]
+        },
+        {
+          "tgId": 12,
+          "parameterSet": "ML-KEM-1024",
+          "function": "encapsulationKeyCheck",
+          "tcIds": [156, 157, 158, 159, 160, 161, 162, 163, 164, 165]
+        }
+      ]
+    }
+  ]
+}
