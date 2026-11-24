@@ -1,5 +1,14 @@
 # @pqc-sdk/core
 
+## 0.12.1
+
+### Patch Changes
+
+- f4e1b91: Clear owned ML-KEM sampling, polynomial and encoding scratch on normal and
+  exceptional exits. Preserve caller-owned inputs, returned secrets, prepared-cache
+  reuse and existing cryptographic outputs. Add pinned official public sample
+  comparisons and cleanup/failure regressions; clarify their assurance limits.
+
 ## 0.12.0
 
 ### Patch Changes
