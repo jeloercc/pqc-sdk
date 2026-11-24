@@ -1,6 +1,6 @@
 {
   "name": "@pqc-sdk/mcp-server",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "MCP server exposing @pqc-sdk/core post-quantum cryptographic operations as agent tools",
   "type": "module",
   "bin": {
