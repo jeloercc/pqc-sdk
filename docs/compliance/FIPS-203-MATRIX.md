@@ -1,7 +1,7 @@
 # FIPS 203 (ML-KEM) — Conformance Matrix
 
 **Assessment baseline:** `@pqc-sdk/core` @ `0.12.0`, commit `e55ca5d17aa82bee1390e2aa77674dd63150b6ef`.
-The cleanup follow-up described below is an unreleased source change against that baseline.
+The cleanup follow-up below is recorded in the core 0.12.1 changelog; the baseline identifies the original assessment.
 **Normative document:** FIPS 203, _Module-Lattice-Based Key-Encapsulation Mechanism
 Standard_ (NIST, August 2024)
 **Primitive provider:** `@noble/post-quantum@0.7.1` (exact pin), with the ML-KEM surface

@@ -1,7 +1,8 @@
 # ML-KEM owned-buffer cleanup follow-up
 
 Date: 2026-11-21. Baseline: core 0.12.0 at
-`e55ca5d17aa82bee1390e2aa77674dd63150b6ef`; changes described here are unreleased.
+`e55ca5d17aa82bee1390e2aa77674dd63150b6ef`. The follow-up is recorded in the
+core 0.12.1 changelog; this baseline identifies the original assessment.
 The provider remains vendored `@noble/post-quantum` 0.7.1 with hashes 2.4.0.
 
 The review found concrete omissions beyond JavaScript's runtime limitations:
