@@ -39,13 +39,42 @@ checks deliberately alter produced ciphertext/secret values or remove checks and
 wipes; the corresponding regressions fail. Mutation results and exact run evidence
 belong to the implementation review, not a new public certification claim.
 
-This follow-up does not change the F203-18 row's historical
-**CONFORMING (with documented language limitation)** label or adopt an assessor's
-decision. The baseline review recommended reopening that row because of fixable
-omissions; repairs require reassessment rather than automatic closure. Primitive
-flags, runtime-managed copies/registers and compiled constant-time behavior remain
-outside the guarantees established by these tests. Host RBG and other existing
-interpretation questions remain open. See the canonical matrix's §4.3.
+The 2026-11-27 repository reassessment records F203-18 as **INDETERMINATE** for
+the stated scope. The earlier CONFORMING (with documented language limitation)
+label and pre-fix recommendation remain historical. The repairs address the
+identified secret-scratch omissions; the public intermediate, primitive/runtime
+and module-boundary questions below remain explicit. No sample/overwrite result
+is treated as official validation or universal physical-erasure evidence.
 
 The SDK default remains X-Wing. No public format, algorithm registry, provider
 version or runtime floor changes. Third-party licenses and pristine hashes remain.
+
+## Public intermediate scope review (2026-11-27)
+
+The secret-scratch observations above are bounded; they do not inventory every
+non-output value. In the released source, ordinary decapsulation computes a public
+key-check digest at
+[`ml-kem.ts:734`](https://github.com/jeloercc/pqc-sdk/blob/c2f2ccfcce1f6f3fd1c5cba7bdfe20eec74aeb8a/packages/core/src/vendor/ml-kem/ml-kem.ts#L734).
+Prepared mode retains H(ek) at
+[`ml-kem.ts:779`](https://github.com/jeloercc/pqc-sdk/blob/c2f2ccfcce1f6f3fd1c5cba7bdfe20eec74aeb8a/packages/core/src/vendor/ml-kem/ml-kem.ts#L779);
+its exposed clean method delegates to the arithmetic cache and does not overwrite
+that separate hash buffer. Public modulus-validation scratch is also excluded
+from the existing secret-scratch observer success totals.
+
+A synthetic, assessment-only check retained SHA3-256 digest outputs (Keccak suffix
+0x06, output length 32) while running each set's ordinary decapsulation with a
+valid ciphertext, implicit rejection and a bad stored hash, then checked prepared
+mode after clean. Key generation and encapsulation occurred before observation.
+The first ordinary digest is the public H(ek) check, not a shared-secret output.
+On each of Node 20.20.2, 24.22.3 and 26.13.0, all 12 retained public hash buffers
+were nonzero after the relevant exit. Ordinary outcomes matched uninstrumented
+controls and inputs were unchanged. Hooks were restored in finally; records
+contained only counts, source sites and booleans, never secret values.
+
+Retaining references changes liveness, so these results do not prove what an
+uninstrumented collector retains. They are public derived data, not evidence of
+secret-key recovery. They identify an applicability question for the full
+intermediate-destruction wording and its stated exceptions. Primitive boolean,
+register/copy/JIT behavior and the broader SDK/module lifecycle also remain
+outside the guarantee established by the buffer probes. The scope must be stated
+explicitly rather than treating all remaining questions as a language limitation.
